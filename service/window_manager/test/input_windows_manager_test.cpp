@@ -16780,6 +16780,32 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
 }
 
 /**
+ * @tc.name: InputWindowsManagerTest_TouchSourceArbitration_DeviceState_001
+ * @tc.desc: Test device state operations manage pointer state transitions
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration_DeviceState_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    TouchArbitrationDeviceState deviceState;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    deviceState.currentEvent = pointerEvent;
+
+    deviceState.SetPointerState(TEST_POINTER_ID, TouchArbitrationPointerState::ACTIVE);
+    deviceState.SetPointerState(TEST_OTHER_POINTER_ID, TouchArbitrationPointerState::CLOSED);
+
+    EXPECT_TRUE(deviceState.HasActivePointer());
+    EXPECT_TRUE(deviceState.IsPointerInState(TEST_POINTER_ID, TouchArbitrationPointerState::ACTIVE));
+    EXPECT_TRUE(deviceState.IsPointerInState(TEST_OTHER_POINTER_ID, TouchArbitrationPointerState::CLOSED));
+    EXPECT_TRUE(deviceState.ClearPointerState(TEST_POINTER_ID));
+    EXPECT_FALSE(deviceState.HasActivePointer());
+    EXPECT_FALSE(deviceState.IsPointerInState(TEST_POINTER_ID, TouchArbitrationPointerState::ACTIVE));
+    EXPECT_EQ(deviceState.currentEvent, pointerEvent);
+}
+
+/**
  * @tc.name: InputWindowsManagerTest_TouchSourceArbitration_SameSourceMultiTouch_001
  * @tc.desc: Test same source multi-touch does not trigger conflict
  * @tc.type: FUNC
@@ -16807,9 +16833,11 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
 
     auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
     ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
-    auto deviceIter = displayIter->second.activeDevices.find(TEST_REAL_TOUCH_DEVICE_ID);
-    ASSERT_NE(deviceIter, displayIter->second.activeDevices.end());
-    EXPECT_EQ(deviceIter->second.activePointerIds.size(), 2U);
+    auto deviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(deviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(deviceIter->second.pointerStates.size(), 2U);
+    EXPECT_EQ(deviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::ACTIVE);
+    EXPECT_EQ(deviceIter->second.pointerStates.at(TEST_OTHER_POINTER_ID), TouchArbitrationPointerState::ACTIVE);
     EXPECT_EQ(deviceIter->second.currentEvent, firstDown);
 }
 
@@ -16835,7 +16863,11 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.UpdateTouchArbitrationState(realDown);
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
 
-    EXPECT_TRUE(inputWindowsManager.touchArbitrationStates_.empty());
+    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::CLOSED);
     PointerEvent::PointerItem canceledItem;
     EXPECT_TRUE(realDown->GetPointerItem(TEST_POINTER_ID, canceledItem));
     EXPECT_TRUE(canceledItem.IsCanceled());
@@ -16845,10 +16877,11 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     EXPECT_TRUE(inputWindowsManager.firstTouchWindowInfos_.empty());
 
     inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
-    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
+    displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
     ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
-    EXPECT_NE(displayIter->second.activeDevices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID),
-        displayIter->second.activeDevices.end());
+    auto virtualDeviceIter = displayIter->second.devices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(virtualDeviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(virtualDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::ACTIVE);
 }
 
 /**
@@ -16906,18 +16939,57 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.UpdateTouchArbitrationState(realDown);
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
     inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
-    EXPECT_TRUE(inputWindowsManager.IsClosedTouchArbitrationStream(realMove));
+    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::CLOSED);
 
-    EXPECT_EQ(inputWindowsManager.HandleClosedTouchArbitrationStream(realMove),
-        TouchArbitrationResult::DROP_CLOSED_STREAM);
+    EXPECT_TRUE(inputWindowsManager.HandleClosedTouchArbitrationStream(realMove));
     PointerEvent::PointerItem item;
     ASSERT_TRUE(realMove->GetPointerItem(TEST_POINTER_ID, item));
     EXPECT_TRUE(item.IsCanceled());
     EXPECT_FALSE(item.IsPressed());
 
-    EXPECT_EQ(inputWindowsManager.HandleClosedTouchArbitrationStream(realUp),
-        TouchArbitrationResult::DROP_CLOSED_STREAM);
-    EXPECT_FALSE(inputWindowsManager.IsClosedTouchArbitrationStream(realUp));
+    EXPECT_TRUE(inputWindowsManager.HandleClosedTouchArbitrationStream(realUp));
+    EXPECT_EQ(displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID), displayIter->second.devices.end());
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_TouchSourceArbitration_DownReopensClosedPointer_001
+ * @tc.desc: Test a new DOWN reopens a closed pointer stream with the same pointerId
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration_DownReopensClosedPointer_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputWindowsManager inputWindowsManager;
+    auto realDown = CreateTouchArbitrationEvent(TEST_REAL_TOUCH_DEVICE_ID, TEST_DISPLAY_ID,
+        TEST_POINTER_ID, PointerEvent::POINTER_ACTION_DOWN, true);
+    auto virtualDown = CreateTouchArbitrationEvent(TEST_VIRTUAL_TOUCH_DEVICE_ID, TEST_DISPLAY_ID,
+        TEST_POINTER_ID, PointerEvent::POINTER_ACTION_DOWN, false);
+    auto nextRealDown = CreateTouchArbitrationEvent(TEST_REAL_TOUCH_DEVICE_ID, TEST_DISPLAY_ID,
+        TEST_POINTER_ID, PointerEvent::POINTER_ACTION_DOWN, true);
+    ASSERT_NE(realDown, nullptr);
+    ASSERT_NE(virtualDown, nullptr);
+    ASSERT_NE(nextRealDown, nullptr);
+
+    inputWindowsManager.UpdateTouchArbitrationState(realDown);
+    inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
+    inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
+    inputWindowsManager.HandleTouchSourceDownArbitration(nextRealDown);
+    inputWindowsManager.UpdateTouchArbitrationState(nextRealDown);
+
+    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::ACTIVE);
+    auto virtualDeviceIter = displayIter->second.devices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(virtualDeviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(virtualDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::CLOSED);
 }
 
 /**
@@ -16934,8 +17006,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
         TEST_POINTER_ID, PointerEvent::POINTER_ACTION_MOVE, true);
     ASSERT_NE(realMove, nullptr);
 
-    EXPECT_EQ(inputWindowsManager.HandleClosedTouchArbitrationStream(realMove),
-        TouchArbitrationResult::ACCEPTED);
+    EXPECT_FALSE(inputWindowsManager.HandleClosedTouchArbitrationStream(realMove));
     PointerEvent::PointerItem item;
     ASSERT_TRUE(realMove->GetPointerItem(TEST_POINTER_ID, item));
     EXPECT_FALSE(item.IsCanceled());
@@ -16961,8 +17032,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     ASSERT_NE(realUp, nullptr);
 
     inputWindowsManager.UpdateTouchArbitrationState(realDown);
-    EXPECT_EQ(inputWindowsManager.HandleClosedTouchArbitrationStream(realUp),
-        TouchArbitrationResult::ACCEPTED);
+    EXPECT_FALSE(inputWindowsManager.HandleClosedTouchArbitrationStream(realUp));
     inputWindowsManager.UpdateTouchArbitrationState(realUp);
 
     EXPECT_TRUE(inputWindowsManager.touchArbitrationStates_.empty());
@@ -16993,8 +17063,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
         inputWindowsManager.touchArbitrationStates_.end());
     auto otherDisplayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_OTHER_DISPLAY_ID);
     ASSERT_NE(otherDisplayIter, inputWindowsManager.touchArbitrationStates_.end());
-    EXPECT_NE(otherDisplayIter->second.activeDevices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID),
-        otherDisplayIter->second.activeDevices.end());
+    EXPECT_NE(otherDisplayIter->second.devices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID),
+        otherDisplayIter->second.devices.end());
 }
 
 /**
@@ -17030,10 +17100,12 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
 
     EXPECT_EQ(realEvent->GetPointerIds().size(), 2U);
-    EXPECT_TRUE(inputWindowsManager.touchArbitrationStates_.empty());
-    EXPECT_TRUE(inputWindowsManager.IsClosedTouchArbitrationStream(realEvent));
-    realEvent->SetPointerId(TEST_POINTER_ID);
-    EXPECT_TRUE(inputWindowsManager.IsClosedTouchArbitrationStream(realEvent));
+    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
+    ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
+    EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_OTHER_POINTER_ID), TouchArbitrationPointerState::CLOSED);
+    EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::CLOSED);
 }
 #endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 /**
