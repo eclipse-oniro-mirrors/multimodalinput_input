@@ -18,6 +18,7 @@
 #include "define_multimodal.h"
 #include "mmi_log.h"
 #include "multimodal_input_connect_manager.h"
+#include "struct_multimodal.h"
 #include "util.h"
 
 #undef MMI_LOG_TAG
@@ -29,7 +30,6 @@ namespace MMI {
 namespace {
 constexpr int32_t ERROR_CODE_TOUCH_SEQUENCE_ERROR = 4300001;
 constexpr int32_t TOUCH_TOOL_TYPE_FINGER = PointerEvent::TOOL_TYPE_FINGER;
-constexpr int32_t INVALID_DEVICE_ID = -1;
 constexpr int32_t MIN_TOUCH_ID = 0;
 constexpr int32_t MAX_TOUCH_ID = 9;
 } // namespace
@@ -61,7 +61,7 @@ std::shared_ptr<PointerEvent> TouchControllerImpl::CreatePointerEvent(const Poin
     pointerEvent->SetPointerAction(context.action);
     pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
     pointerEvent->SetPointerId(context.touchId);
-    pointerEvent->SetDeviceId(INVALID_DEVICE_ID);
+    pointerEvent->SetDeviceId(VIRTUAL_TOUCH_DEVICE_ID);
     pointerEvent->SetTargetDisplayId(context.displayId);
     pointerEvent->SetActionTime(context.actionTime);
     if (context.action == PointerEvent::POINTER_ACTION_DOWN && contacts.size() == 1) {
@@ -89,7 +89,7 @@ void TouchControllerImpl::AddPointerItems(const std::shared_ptr<PointerEvent> &p
         item.SetRawDisplayX(contact.displayX);
         item.SetRawDisplayY(contact.displayY);
         item.SetToolType(TOUCH_TOOL_TYPE_FINGER);
-        item.SetDeviceId(INVALID_DEVICE_ID);
+        item.SetDeviceId(VIRTUAL_TOUCH_DEVICE_ID);
         item.SetDownTime(contact.downTime);
         item.SetPressed(itemPair.first == context.touchId ? context.currentPressed : true);
         pointerEvent->AddPointerItem(item);

@@ -391,7 +391,11 @@ std::shared_ptr<PointerEvent> TouchTransformProcessor::OnEvent(struct libinput_e
 }
 
 void TouchTransformProcessor::OnDeviceRemoved()
-{}
+{
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+    WIN_MGR->ClearTouchArbitrationStateByDevice(deviceId_);
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+}
 
 void TouchTransformProcessor::OnDeviceEnabled()
 {
@@ -403,6 +407,9 @@ void TouchTransformProcessor::OnDeviceDisabled()
     MMI_HILOGI("TouchScreen[%{public}d] received disable notification", deviceId_);
     RecordActiveOperations();
     CancelAllTouches();
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+    WIN_MGR->ClearTouchArbitrationStateByDevice(deviceId_);
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 
     MMI_HILOGI("Reset event for TouchScreen[%{public}d]", deviceId_);
     pointerEvent_ = nullptr;

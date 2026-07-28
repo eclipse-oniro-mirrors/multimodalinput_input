@@ -42,6 +42,30 @@ enum AcrossDirection : int32_t {
     RIGHTWARDS = 4,
 };
 
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+enum class TouchArbitrationSource {
+    REAL_TOUCH,
+    VIRTUAL_TOUCH,
+    OTHER,
+};
+
+struct ActiveTouchDevice {
+    TouchArbitrationSource source { TouchArbitrationSource::OTHER };
+    std::shared_ptr<PointerEvent> currentEvent { nullptr };
+    std::set<int32_t> activePointerIds;
+};
+
+struct DisplayTouchArbitrationState {
+    std::map<int32_t, ActiveTouchDevice> activeDevices;
+};
+
+enum class TouchArbitrationResult {
+    NOT_PARTICIPATED,
+    ACCEPTED,
+    DROP_CLOSED_STREAM,
+};
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+
 class InputWindowsManager final : public IInputWindowsManager {
 public:
     InputWindowsManager();
@@ -409,6 +433,27 @@ void HandleOneHandMode(const OLD::DisplayInfo &displayInfo, std::shared_ptr<Poin
     bool SkipNavigationWindow(uint32_t flag, int32_t toolType);
     void HandleGestureInjection(bool gestureInject);
     int32_t UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent);
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+    bool IsRealTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
+    bool IsVirtualTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
+    TouchArbitrationSource GetTouchArbitrationSource(const std::shared_ptr<PointerEvent> &pointerEvent) const;
+    bool HasConflictingTouchSource(int32_t displayId, TouchArbitrationSource source) const;
+    bool IsActiveTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent,
+        TouchArbitrationSource source) const;
+    bool IsClosedTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent) const;
+    void ClearClosedTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent,
+        TouchArbitrationSource source);
+    void HandleTouchSourceDownArbitration(const std::shared_ptr<PointerEvent> &pointerEvent);
+    TouchArbitrationResult HandleClosedTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent);
+    void UpdateTouchArbitrationState(const std::shared_ptr<PointerEvent> &pointerEvent);
+    void ClearTouchArbitrationState(int32_t displayId, TouchArbitrationSource source,
+        int32_t pointerId, int32_t deviceId);
+    void CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source);
+    void RemoveTouchArbitrationStateBySource(int32_t displayId, TouchArbitrationSource source);
+    void DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent);
+    void ClearTouchTargetState(int32_t displayId, int32_t deviceId, int32_t pointerId);
+    void ClearTouchArbitrationStateByDevice(int32_t deviceId) override;
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
     void UpdateTargetTouchWinIds(const WindowInfo &item, PointerEvent::PointerItem &pointerItem,
         std::shared_ptr<PointerEvent> pointerEvent, int32_t pointerId, int32_t displayId, int32_t deviceId);
     void ClearMismatchTypeWinIds(int32_t pointerId, int32_t displayId, int32_t deviceId);
@@ -678,6 +723,10 @@ private:
     std::map<int32_t, std::unique_ptr<Media::PixelMap>> transparentWins_;
 #ifdef OHOS_BUILD_ENABLE_TOUCH
     std::shared_ptr<PointerEvent> lastPointerEventForGesture_ { nullptr };
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+    std::map<int32_t, DisplayTouchArbitrationState> touchArbitrationStates_;
+    std::map<int32_t, std::map<int32_t, std::set<int32_t>>> closedTouchArbitrationStreams_;
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 #endif // OHOS_BUILD_ENABLE_TOUCH
     bool IsFoldable_ { false };
     int32_t timerId_ { -1 };

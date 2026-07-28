@@ -185,6 +185,9 @@ public:
 #endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_MONITOR)
 #ifdef OHOS_BUILD_ENABLE_TOUCH
     MOCK_METHOD(std::shared_ptr<PointerEvent>, GetLastPointerEventForGesture, ());
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+    void ClearTouchArbitrationStateByDevice(int32_t deviceId) override {}
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 #endif // OHOS_BUILD_ENABLE_TOUCH
 #ifdef OHOS_BUILD_ENABLE_POINTER
     MOCK_METHOD(bool, IsMouseDragging, (), (const));
