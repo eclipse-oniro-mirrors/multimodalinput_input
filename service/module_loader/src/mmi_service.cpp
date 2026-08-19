@@ -5645,6 +5645,10 @@ int32_t MMIService::SetCustomCursorInner(int32_t windowId, const CustomCursorPar
         MMI_HILOGE("Service is not running");
         return MMISERVICE_NOT_RUNNING;
     }
+    if (windowId < 0 && PER_HELPER->GetTokenType() != OHOS::Security::AccessToken::TOKEN_NATIVE) {
+        MMI_HILOGE("Set the custom cursor failed, windowId:%{public}d", windowId);
+        return ERROR_WINDOW_ID_PERMISSION_DENIED;
+    }
     int32_t pid = GetCallingPid();
     int32_t ret = delegateTasks_.PostSyncTask(std::bind(
         [pid, windowId] {
