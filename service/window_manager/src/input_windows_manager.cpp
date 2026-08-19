@@ -5809,7 +5809,8 @@ bool InputWindowsManager::IsRealTouchEvent(const std::shared_ptr<PointerEvent> &
     }
     return pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
         pointerEvent->GetDeviceId() >= 0 &&
-        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_GENERATE_FROM_REAL);
+        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_GENERATE_FROM_REAL) &&
+        !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SIMULATE);
 }
 
 bool InputWindowsManager::IsVirtualTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const
@@ -5925,6 +5926,7 @@ bool InputWindowsManager::HandleClosedTouchArbitrationStream(
         action != PointerEvent::POINTER_ACTION_CANCEL) {
         return false;
     }
+
     auto displayIter = touchArbitrationStates_.find(pointerEvent->GetTargetDisplayId());
     if (displayIter == touchArbitrationStates_.end()) {
         return false;
@@ -5936,7 +5938,9 @@ bool InputWindowsManager::HandleClosedTouchArbitrationStream(
         return false;
     }
     PointerEvent::PointerItem pointerItem;
-    if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
+    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
+        MarkClosedPointerItemsCanceled(pointerEvent);
+    } else if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
         pointerItem.SetPressed(false);
         pointerItem.SetCanceled(true);
         pointerEvent->UpdatePointerItem(pointerEvent->GetPointerId(), pointerItem);
@@ -5949,6 +5953,34 @@ bool InputWindowsManager::HandleClosedTouchArbitrationStream(
         "pointerId:%{public}d, displayId:%{public}d",
         action, pointerEvent->GetDeviceId(), pointerEvent->GetPointerId(), pointerEvent->GetTargetDisplayId());
     return true;
+}
+
+void InputWindowsManager::MarkClosedPointerItemsCanceled(const std::shared_ptr<PointerEvent> &pointerEvent)
+{
+    auto displayIter = touchArbitrationStates_.find(pointerEvent->GetTargetDisplayId());
+    if (displayIter == touchArbitrationStates_.end()) {
+        return;
+    }
+    auto deviceIter = displayIter->second.devices.find(pointerEvent->GetDeviceId());
+    if (deviceIter == displayIter->second.devices.end()) {
+        return;
+    }
+    // Controller injected events are rebuilt structures without stream state, and non-current
+    // pointer items are always filled as pressed, so every closed pointer item in the event
+    // must be marked canceled to keep downstream pointer state consistent.
+    for (const auto &closedPointerId : pointerEvent->GetPointerIds()) {
+        if (!deviceIter->second.IsPointerInState(closedPointerId, TouchArbitrationPointerState::CLOSED)) {
+            continue;
+        }
+        PointerEvent::PointerItem closedItem;
+        if (!pointerEvent->GetPointerItem(closedPointerId, closedItem)) {
+            MMI_HILOG_DISPATCHE("Can't find closed pointer item, pointerId:%{public}d", closedPointerId);
+            continue;
+        }
+        closedItem.SetPressed(false);
+        closedItem.SetCanceled(true);
+        pointerEvent->UpdatePointerItem(closedPointerId, closedItem);
+    }
 }
 
 void InputWindowsManager::UpdateTouchArbitrationState(const std::shared_ptr<PointerEvent> &pointerEvent)
@@ -5965,6 +5997,9 @@ void InputWindowsManager::UpdateTouchArbitrationState(const std::shared_ptr<Poin
     const auto source = GetTouchArbitrationSource(pointerEvent);
     if (source == TouchArbitrationSource::OTHER) {
         return;
+    }
+    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
+        MarkClosedPointerItemsCanceled(pointerEvent);
     }
     const int32_t action = pointerEvent->GetPointerAction();
     const int32_t displayId = pointerEvent->GetTargetDisplayId();
@@ -6092,7 +6127,13 @@ void InputWindowsManager::DispatchTouchSourceCancel(int32_t pointerId, std::shar
     }
     const int32_t originAction = cancelEvent->GetPointerAction();
     cancelEvent->SetOriginPointerAction(originAction);
-    cancelEvent->SetPointerAction(PointerEvent::POINTER_ACTION_CANCEL);
+    int32_t cancelAction = PointerEvent::POINTER_ACTION_CANCEL;
+    bool isDragging = extraData_.appended && extraData_.sourceType == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
+        (pointerItem.GetToolType() == PointerEvent::TOOL_TYPE_FINGER && extraData_.pointerId == pointerId);
+    if (isDragging) {
+        cancelAction = PointerEvent::POINTER_ACTION_PULL_CANCEL;
+    }
+    cancelEvent->SetPointerAction(cancelAction);
     cancelEvent->SetPointerId(pointerId);
     cancelEvent->SetActionTime(GetSysClockTime());
     pointerItem.SetPressed(false);

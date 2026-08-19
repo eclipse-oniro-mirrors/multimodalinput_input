@@ -472,6 +472,7 @@ void HandleOneHandMode(const OLD::DisplayInfo &displayInfo, std::shared_ptr<Poin
     void HandleTouchSourceDownArbitration(const std::shared_ptr<PointerEvent> &pointerEvent);
     bool HandleClosedTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent);
     void UpdateTouchArbitrationState(const std::shared_ptr<PointerEvent> &pointerEvent);
+    void MarkClosedPointerItemsCanceled(const std::shared_ptr<PointerEvent> &pointerEvent);
     void ClearTouchArbitrationPointerState(int32_t displayId, TouchArbitrationSource source,
         int32_t pointerId, int32_t deviceId);
     void CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source);

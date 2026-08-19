@@ -432,6 +432,10 @@ void TouchDrawingHandler::DrawBubble()
             MMI_HILOGE("Can't find pointer item, pointer:%{public}d", pointerId);
             return;
         }
+        if (pointerEvent_->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER) && pointerItem.IsCanceled()) {
+            MMI_HILOGI("Skip canceled pointer bubble draw, pointerId:%{public}d", pointerId);
+            continue;
+        }
         auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
         Rosen::Drawing::Point centerPt(displayXY.first, displayXY.second);
         Rosen::Drawing::Pen pen;
@@ -471,6 +475,13 @@ void TouchDrawingHandler::DrawPointerPositionHandler()
         (pointerEvent_->GetDeviceId() != currentDeviceId_)) {
         return;
     }
+    PointerEvent::PointerItem currentItem;
+    if (pointerEvent_->GetPointerItem(pointerEvent_->GetPointerId(), currentItem)
+        && currentItem.IsCanceled()) {
+        MMI_HILOGI("Skip pointer position draw, canceled pointerId:%{public}d",
+            pointerEvent_->GetPointerId());
+        return;
+    }
     UpdatePointerPosition();
     ClearTracker();
     RecordLabelsInfo();
@@ -483,6 +494,10 @@ void TouchDrawingHandler::DrawPointerPositionHandler()
         if (!pointerEvent_->GetPointerItem(pointerId, pointerItem)) {
             MMI_HILOGE("Can't find pointer item, pointer:%{public}d", pointerId);
             return;
+        }
+        if (pointerItem.IsCanceled()) {
+            MMI_HILOGI("Skip canceled pointer position draw, pointerId:%{public}d", pointerId);
+            continue;
         }
         auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
         DrawTracker(displayXY.first, displayXY.second, pointerId);
@@ -697,7 +712,13 @@ void TouchDrawingHandler::UpdatePointerPosition()
     int32_t pointerAction = pointerEvent_->GetPointerAction();
     int32_t pointerId = pointerEvent_->GetPointerId();
     if (pointerAction == PointerEvent::POINTER_ACTION_DOWN) {
-        if (pointerEvent_->GetPointerCount() == SINGLE_TOUCH) {
+        int32_t validPointerCount = 0;
+        for (const auto &item : pointerEvent_->GetAllPointerItems()) {
+            if (!item.IsCanceled()) {
+                ++validPointerCount;
+            }
+        }
+        if (validPointerCount == SINGLE_TOUCH) {
             InitLabels();
         }
         maxPointerCount_ = ++currentPointerCount_;
