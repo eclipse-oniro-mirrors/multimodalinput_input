@@ -178,6 +178,7 @@ declare_args() {
     "window_manager/src/pointer_dispatch_event_cache.cpp",
     "window_manager/src/touch_redispatch_store.cpp",
     "window_manager/src/input_windows_manager.cpp",
+    "window_manager/src/touch_arbitration_manager.cpp",
   ]
 
   infraredemitter_sources = [

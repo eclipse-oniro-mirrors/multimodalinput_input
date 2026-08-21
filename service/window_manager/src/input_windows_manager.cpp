@@ -189,6 +189,9 @@ void InputWindowsManager::InitWindowInfo(WindowInfo& info)
 }
 
 InputWindowsManager::InputWindowsManager() : bindInfo_(BIND_CFG_FILE_NAME)
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+    , touchArbitration_(this)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 {
     MMI_HILOGD("Bind cfg file name:%{private}s", BIND_CFG_FILE_NAME.c_str());
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
@@ -5800,320 +5803,6 @@ std::map<int32_t, std::map<int32_t, WindowInfoEX>>& InputWindowsManager::TouchIt
         ? touchRedispatchStore_.GetTouchItemDownInfos() : touchItemDownInfos_;
 }
 
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
-bool InputWindowsManager::IsRealTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return false;
-    }
-    return pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
-        pointerEvent->GetDeviceId() >= 0 &&
-        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_GENERATE_FROM_REAL) &&
-        !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SIMULATE);
-}
-
-bool InputWindowsManager::IsVirtualTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return false;
-    }
-    return pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
-        pointerEvent->GetDeviceId() == VIRTUAL_TOUCH_DEVICE_ID;
-}
-
-TouchArbitrationSource InputWindowsManager::GetTouchArbitrationSource(
-    const std::shared_ptr<PointerEvent> &pointerEvent) const
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return TouchArbitrationSource::OTHER;
-    }
-    PointerEvent::PointerItem pointerItem;
-    if (!pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
-        return TouchArbitrationSource::OTHER;
-    }
-    if (pointerItem.GetToolType() != PointerEvent::TOOL_TYPE_FINGER) {
-        return TouchArbitrationSource::OTHER;
-    }
-    if (IsRealTouchEvent(pointerEvent)) {
-        return TouchArbitrationSource::REAL_TOUCH;
-    }
-    if (IsVirtualTouchEvent(pointerEvent)) {
-        return TouchArbitrationSource::VIRTUAL_TOUCH;
-    }
-    return TouchArbitrationSource::OTHER;
-}
-
-bool InputWindowsManager::HasConflictingTouchSource(int32_t displayId, TouchArbitrationSource source) const
-{
-    auto displayIter = touchArbitrationStates_.find(displayId);
-    if (displayIter == touchArbitrationStates_.end()) {
-        return false;
-    }
-    for (const auto &[deviceId, deviceState] : displayIter->second.devices) {
-        (void)deviceId;
-        if (deviceState.source != source && deviceState.HasActivePointer()) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool InputWindowsManager::IsActiveTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent,
-    TouchArbitrationSource source) const
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return false;
-    }
-    auto displayIter = touchArbitrationStates_.find(pointerEvent->GetTargetDisplayId());
-    if (displayIter == touchArbitrationStates_.end()) {
-        return false;
-    }
-    auto deviceIter = displayIter->second.devices.find(pointerEvent->GetDeviceId());
-    if (deviceIter == displayIter->second.devices.end()) {
-        return false;
-    }
-    return deviceIter->second.source == source &&
-        deviceIter->second.IsPointerInState(pointerEvent->GetPointerId(), TouchArbitrationPointerState::ACTIVE);
-}
-
-void InputWindowsManager::HandleTouchSourceDownArbitration(
-    const std::shared_ptr<PointerEvent> &pointerEvent)
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return;
-    }
-#ifdef OHOS_BUILD_ENABLE_ANCO
-    if (pointerEvent->GetAncoDeal()) {
-        return;
-    }
-#endif // OHOS_BUILD_ENABLE_ANCO
-    const auto source = GetTouchArbitrationSource(pointerEvent);
-    if (source == TouchArbitrationSource::OTHER) {
-        return;
-    }
-    const int32_t displayId = pointerEvent->GetTargetDisplayId();
-    if (!HasConflictingTouchSource(displayId, source)) {
-        return;
-    }
-    const auto conflictingSource = source == TouchArbitrationSource::REAL_TOUCH ?
-        TouchArbitrationSource::VIRTUAL_TOUCH : TouchArbitrationSource::REAL_TOUCH;
-    CancelConflictingTouchSource(displayId, conflictingSource);
-    MMI_HILOG_DISPATCHI("Touch source down conflict handled, action:%{public}d, source:%{public}d, "
-        "conflictingSource:%{public}d, pointerId:%{public}d, displayId:%{public}d",
-        pointerEvent->GetPointerAction(), static_cast<int32_t>(source), static_cast<int32_t>(conflictingSource),
-        pointerEvent->GetPointerId(), displayId);
-}
-
-bool InputWindowsManager::HandleClosedTouchArbitrationStream(
-    const std::shared_ptr<PointerEvent> &pointerEvent)
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return false;
-    }
-    const auto source = GetTouchArbitrationSource(pointerEvent);
-    if (source == TouchArbitrationSource::OTHER) {
-        return false;
-    }
-    const int32_t action = pointerEvent->GetPointerAction();
-    if (action != PointerEvent::POINTER_ACTION_MOVE &&
-        action != PointerEvent::POINTER_ACTION_UP &&
-        action != PointerEvent::POINTER_ACTION_CANCEL) {
-        return false;
-    }
-
-    auto displayIter = touchArbitrationStates_.find(pointerEvent->GetTargetDisplayId());
-    if (displayIter == touchArbitrationStates_.end()) {
-        return false;
-    }
-    auto deviceIter = displayIter->second.devices.find(pointerEvent->GetDeviceId());
-    if (deviceIter == displayIter->second.devices.end() ||
-        !deviceIter->second.IsPointerInState(pointerEvent->GetPointerId(),
-        TouchArbitrationPointerState::CLOSED)) {
-        return false;
-    }
-    PointerEvent::PointerItem pointerItem;
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
-        MarkClosedPointerItemsCanceled(pointerEvent);
-    } else if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
-        pointerItem.SetPressed(false);
-        pointerItem.SetCanceled(true);
-        pointerEvent->UpdatePointerItem(pointerEvent->GetPointerId(), pointerItem);
-    }
-    if (action == PointerEvent::POINTER_ACTION_UP || action == PointerEvent::POINTER_ACTION_CANCEL) {
-        ClearTouchArbitrationPointerState(pointerEvent->GetTargetDisplayId(), source, pointerEvent->GetPointerId(),
-            pointerEvent->GetDeviceId());
-    }
-    MMI_HILOG_DISPATCHD("Drop closed touch stream, action:%{public}d, deviceId:%{public}d, "
-        "pointerId:%{public}d, displayId:%{public}d",
-        action, pointerEvent->GetDeviceId(), pointerEvent->GetPointerId(), pointerEvent->GetTargetDisplayId());
-    return true;
-}
-
-void InputWindowsManager::MarkClosedPointerItemsCanceled(const std::shared_ptr<PointerEvent> &pointerEvent)
-{
-    auto displayIter = touchArbitrationStates_.find(pointerEvent->GetTargetDisplayId());
-    if (displayIter == touchArbitrationStates_.end()) {
-        return;
-    }
-    auto deviceIter = displayIter->second.devices.find(pointerEvent->GetDeviceId());
-    if (deviceIter == displayIter->second.devices.end()) {
-        return;
-    }
-    // Controller injected events are rebuilt structures without stream state, and non-current
-    // pointer items are always filled as pressed, so every closed pointer item in the event
-    // must be marked canceled to keep downstream pointer state consistent.
-    for (const auto &closedPointerId : pointerEvent->GetPointerIds()) {
-        if (!deviceIter->second.IsPointerInState(closedPointerId, TouchArbitrationPointerState::CLOSED)) {
-            continue;
-        }
-        PointerEvent::PointerItem closedItem;
-        if (!pointerEvent->GetPointerItem(closedPointerId, closedItem)) {
-            MMI_HILOG_DISPATCHE("Can't find closed pointer item, pointerId:%{public}d", closedPointerId);
-            continue;
-        }
-        closedItem.SetPressed(false);
-        closedItem.SetCanceled(true);
-        pointerEvent->UpdatePointerItem(closedPointerId, closedItem);
-    }
-}
-
-void InputWindowsManager::UpdateTouchArbitrationState(const std::shared_ptr<PointerEvent> &pointerEvent)
-{
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("PointerEvent is null");
-        return;
-    }
-#ifdef OHOS_BUILD_ENABLE_ANCO
-    if (pointerEvent->GetAncoDeal()) {
-        return;
-    }
-#endif // OHOS_BUILD_ENABLE_ANCO
-    const auto source = GetTouchArbitrationSource(pointerEvent);
-    if (source == TouchArbitrationSource::OTHER) {
-        return;
-    }
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
-        MarkClosedPointerItemsCanceled(pointerEvent);
-    }
-    const int32_t action = pointerEvent->GetPointerAction();
-    const int32_t displayId = pointerEvent->GetTargetDisplayId();
-    const int32_t pointerId = pointerEvent->GetPointerId();
-    switch (action) {
-        case PointerEvent::POINTER_ACTION_DOWN:
-            break;
-        case PointerEvent::POINTER_ACTION_MOVE:
-            if (!IsActiveTouchArbitrationStream(pointerEvent, source)) {
-                return;
-            }
-            break;
-        case PointerEvent::POINTER_ACTION_UP:
-        case PointerEvent::POINTER_ACTION_CANCEL:
-        case PointerEvent::POINTER_ACTION_PULL_UP:
-        case PointerEvent::POINTER_ACTION_PULL_CANCEL:
-            ClearTouchArbitrationPointerState(displayId, source, pointerId, pointerEvent->GetDeviceId());
-            return;
-        default:
-            return;
-    }
-    auto &deviceState = touchArbitrationStates_[displayId].devices[pointerEvent->GetDeviceId()];
-    deviceState.source = source;
-    deviceState.currentEvent = pointerEvent;
-    deviceState.SetPointerState(pointerId, TouchArbitrationPointerState::ACTIVE);
-}
-
-void InputWindowsManager::ClearTouchArbitrationPointerState(int32_t displayId, TouchArbitrationSource source,
-    int32_t pointerId, int32_t deviceId)
-{
-    auto displayIter = touchArbitrationStates_.find(displayId);
-    if (displayIter == touchArbitrationStates_.end()) {
-        return;
-    }
-    auto deviceIter = displayIter->second.devices.find(deviceId);
-    if (deviceIter == displayIter->second.devices.end()) {
-        return;
-    }
-    if (deviceIter->second.source != source) {
-        return;
-    }
-    if (!deviceIter->second.ClearPointerState(pointerId)) {
-        return;
-    }
-    if (deviceIter->second.pointerStates.empty()) {
-        displayIter->second.devices.erase(deviceIter);
-    }
-    if (displayIter->second.devices.empty()) {
-        touchArbitrationStates_.erase(displayIter);
-    }
-}
-
-void InputWindowsManager::ClearTouchArbitrationStateByDevice(int32_t deviceId)
-{
-    for (auto displayIter = touchArbitrationStates_.begin(); displayIter != touchArbitrationStates_.end();) {
-        displayIter->second.devices.erase(deviceId);
-        if (displayIter->second.devices.empty()) {
-            displayIter = touchArbitrationStates_.erase(displayIter);
-        } else {
-            ++displayIter;
-        }
-    }
-}
-
-void InputWindowsManager::CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source)
-{
-    auto displayIter = touchArbitrationStates_.find(displayId);
-    if (displayIter == touchArbitrationStates_.end()) {
-        return;
-    }
-    struct TouchArbitrationCancelInfo {
-        int32_t deviceId { -1 };
-        int32_t pointerId { -1 };
-        std::shared_ptr<PointerEvent> currentEvent { nullptr };
-    };
-    std::vector<TouchArbitrationCancelInfo> cancelInfos;
-    for (const auto &[deviceId, deviceState] : displayIter->second.devices) {
-        if (deviceState.source != source) {
-            continue;
-        }
-        for (const auto &[pointerId, pointerState] : deviceState.pointerStates) {
-            if (pointerState != TouchArbitrationPointerState::ACTIVE) {
-                continue;
-            }
-            const auto currentEvent = deviceState.currentEvent;
-            cancelInfos.push_back({ deviceId, pointerId, currentEvent });
-            if (currentEvent == nullptr) {
-                MMI_HILOG_DISPATCHE("Current touch event is null, deviceId:%{public}d, pointerId:%{public}d",
-                    deviceId, pointerId);
-                continue;
-            }
-            auto cancelEvent = std::make_shared<PointerEvent>(*currentEvent);
-            DispatchTouchSourceCancel(pointerId, cancelEvent);
-            PointerEvent::PointerItem pointerItem;
-            if (!currentEvent->GetPointerItem(pointerId, pointerItem)) {
-                MMI_HILOG_DISPATCHE("Can't find source pointer item, deviceId:%{public}d, pointerId:%{public}d",
-                    deviceId, pointerId);
-                continue;
-            }
-            pointerItem.SetPressed(false);
-            pointerItem.SetCanceled(true);
-            currentEvent->UpdatePointerItem(pointerId, pointerItem);
-        }
-    }
-    for (const auto &cancelInfo : cancelInfos) {
-        ClearTouchTargetState(displayId, cancelInfo.deviceId, cancelInfo.pointerId);
-        auto deviceIter = displayIter->second.devices.find(cancelInfo.deviceId);
-        if (deviceIter == displayIter->second.devices.end()) {
-            continue;
-        }
-        deviceIter->second.SetPointerState(cancelInfo.pointerId, TouchArbitrationPointerState::CLOSED);
-    }
-}
-
 void InputWindowsManager::DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent)
 {
     if (cancelEvent == nullptr) {
@@ -6140,7 +5829,7 @@ void InputWindowsManager::DispatchTouchSourceCancel(int32_t pointerId, std::shar
     pointerItem.SetCanceled(true);
     cancelEvent->SetTargetWindowId(pointerItem.GetTargetWindowId());
     auto windowInfo = GetWindowAndDisplayInfo(pointerItem.GetTargetWindowId(), cancelEvent->GetTargetDisplayId());
-    if (windowInfo != nullptr) {
+    if (windowInfo) {
         cancelEvent->SetAgentWindowId(windowInfo->agentWindowId);
     } else {
         MMI_HILOG_DISPATCHE("Can't find cancel target window, windowId:%{public}d, displayId:%{public}d",
@@ -6175,6 +5864,12 @@ void InputWindowsManager::ClearTouchTargetState(int32_t displayId, int32_t devic
         firstTouchInfos.erase(firstIter);
     }
 }
+
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+void InputWindowsManager::ClearTouchArbitrationStateByDevice(int32_t deviceId)
+{
+    touchArbitration_.ClearTouchArbitrationStateByDevice(deviceId);
+}
 #endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 
 int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent)
@@ -6206,7 +5901,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
     }
 #if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     if (pointerEvent->GetPointerAction() != PointerEvent::POINTER_ACTION_DOWN) {
-        if (HandleClosedTouchArbitrationStream(pointerEvent)) {
+        if (touchArbitration_.HandleClosedTouchArbitrationStream(pointerEvent)) {
             return RET_OK;
         }
     }
@@ -6769,9 +6464,9 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
     }
 #if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN) {
-        HandleTouchSourceDownArbitration(pointerEvent);
+        touchArbitration_.HandleTouchSourceDownArbitration(pointerEvent);
     }
-    UpdateTouchArbitrationState(pointerEvent);
+    touchArbitration_.UpdateTouchArbitrationState(pointerEvent);
 #endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     return ERR_OK;
 }

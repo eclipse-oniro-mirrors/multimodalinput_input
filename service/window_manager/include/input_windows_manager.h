@@ -25,6 +25,7 @@
 #include "input_display_bind_helper.h"
 #include "mouse_redispatch_store.h"
 #include "pointer_dispatch_event_cache.h"
+#include "touch_arbitration_manager.h"
 #include "touch_redispatch_store.h"
 
 namespace OHOS {
@@ -42,58 +43,6 @@ enum AcrossDirection : int32_t {
     LEFTWARDS = 3,
     RIGHTWARDS = 4,
 };
-
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
-enum class TouchArbitrationSource {
-    REAL_TOUCH,
-    VIRTUAL_TOUCH,
-    OTHER,
-};
-
-enum class TouchArbitrationPointerState {
-    ACTIVE,
-    CLOSED,
-};
-
-struct TouchArbitrationDeviceState {
-    TouchArbitrationSource source { TouchArbitrationSource::OTHER };
-    std::shared_ptr<PointerEvent> currentEvent { nullptr };
-    std::map<int32_t, TouchArbitrationPointerState> pointerStates;
-
-    bool HasActivePointer() const
-    {
-        return std::any_of(pointerStates.cbegin(), pointerStates.cend(), [](const auto &pointerState) {
-            return pointerState.second == TouchArbitrationPointerState::ACTIVE;
-        });
-    }
-
-    bool IsPointerInState(int32_t pointerId, TouchArbitrationPointerState state) const
-    {
-        auto pointerIter = pointerStates.find(pointerId);
-        return pointerIter != pointerStates.end() && pointerIter->second == state;
-    }
-
-    void SetPointerState(int32_t pointerId, TouchArbitrationPointerState state)
-    {
-        pointerStates[pointerId] = state;
-    }
-
-    bool ClearPointerState(int32_t pointerId)
-    {
-        auto pointerIter = pointerStates.find(pointerId);
-        if (pointerIter == pointerStates.end()) {
-            return false;
-        }
-        pointerStates.erase(pointerIter);
-        return true;
-    }
-};
-
-struct DisplayTouchArbitrationState {
-    std::map<int32_t, TouchArbitrationDeviceState> devices;
-};
-
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 
 class InputWindowsManager final : public IInputWindowsManager {
 public:
@@ -147,6 +96,8 @@ public:
     void SetFoldState ();
     bool CheckAppFocused(int32_t pid);
     void UpdateUIExtensionInfo(const std::vector<UIExtensionInfo> &uiExtensionInfos);
+    void DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent);
+    void ClearTouchTargetState(int32_t displayId, int32_t deviceId, int32_t pointerId);
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
     std::vector<std::pair<int32_t, TargetInfo>> GetPidAndUpdateTarget(std::shared_ptr<KeyEvent> keyEvent);
     void ReissueEvent(std::shared_ptr<KeyEvent> keyEvent, int32_t focusWindowId);
@@ -463,21 +414,6 @@ void HandleOneHandMode(const OLD::DisplayInfo &displayInfo, std::shared_ptr<Poin
     void HandleGestureInjection(bool gestureInject);
     int32_t UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent);
 #ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
-    bool IsRealTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
-    bool IsVirtualTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
-    TouchArbitrationSource GetTouchArbitrationSource(const std::shared_ptr<PointerEvent> &pointerEvent) const;
-    bool HasConflictingTouchSource(int32_t displayId, TouchArbitrationSource source) const;
-    bool IsActiveTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent,
-        TouchArbitrationSource source) const;
-    void HandleTouchSourceDownArbitration(const std::shared_ptr<PointerEvent> &pointerEvent);
-    bool HandleClosedTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent);
-    void UpdateTouchArbitrationState(const std::shared_ptr<PointerEvent> &pointerEvent);
-    void MarkClosedPointerItemsCanceled(const std::shared_ptr<PointerEvent> &pointerEvent);
-    void ClearTouchArbitrationPointerState(int32_t displayId, TouchArbitrationSource source,
-        int32_t pointerId, int32_t deviceId);
-    void CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source);
-    void DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent);
-    void ClearTouchTargetState(int32_t displayId, int32_t deviceId, int32_t pointerId);
     void ClearTouchArbitrationStateByDevice(int32_t deviceId) override;
 #endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
     void UpdateTargetTouchWinIds(const WindowInfo &item, PointerEvent::PointerItem &pointerItem,
@@ -750,7 +686,7 @@ private:
 #ifdef OHOS_BUILD_ENABLE_TOUCH
     std::shared_ptr<PointerEvent> lastPointerEventForGesture_ { nullptr };
 #ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
-    std::map<int32_t, DisplayTouchArbitrationState> touchArbitrationStates_;
+    TouchArbitrationManager touchArbitration_;
 #endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 #endif // OHOS_BUILD_ENABLE_TOUCH
     bool IsFoldable_ { false };

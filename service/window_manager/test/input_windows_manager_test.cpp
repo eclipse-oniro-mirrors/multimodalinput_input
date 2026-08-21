@@ -6416,7 +6416,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_UpdateTouchScreenTarge
     EXPECT_EQ(inputWindowsMgr.UpdateTouchScreenTarget(pointerEvent), RET_OK);
 #if defined(OHOS_BUILD_ENABLE_ANCO) && defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     EXPECT_TRUE(pointerEvent->GetAncoDeal());
-    EXPECT_TRUE(inputWindowsMgr.touchArbitrationStates_.empty());
+    EXPECT_TRUE(inputWindowsMgr.touchArbitration_.states_.empty());
 #endif // defined(OHOS_BUILD_ENABLE_ANCO) && defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 }
 
@@ -16769,13 +16769,13 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     ASSERT_NE(otherEvent, nullptr);
     ASSERT_NE(penEvent, nullptr);
 
-    EXPECT_EQ(inputWindowsManager.GetTouchArbitrationSource(realEvent),
+    EXPECT_EQ(inputWindowsManager.touchArbitration_.GetTouchArbitrationSource(realEvent),
         TouchArbitrationSource::REAL_TOUCH);
-    EXPECT_EQ(inputWindowsManager.GetTouchArbitrationSource(virtualEvent),
+    EXPECT_EQ(inputWindowsManager.touchArbitration_.GetTouchArbitrationSource(virtualEvent),
         TouchArbitrationSource::VIRTUAL_TOUCH);
-    EXPECT_EQ(inputWindowsManager.GetTouchArbitrationSource(otherEvent),
+    EXPECT_EQ(inputWindowsManager.touchArbitration_.GetTouchArbitrationSource(otherEvent),
         TouchArbitrationSource::OTHER);
-    EXPECT_EQ(inputWindowsManager.GetTouchArbitrationSource(penEvent),
+    EXPECT_EQ(inputWindowsManager.touchArbitration_.GetTouchArbitrationSource(penEvent),
         TouchArbitrationSource::OTHER);
 }
 
@@ -16831,8 +16831,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.HandleTouchSourceDownArbitration(firstDown);
     inputWindowsManager.UpdateTouchArbitrationState(firstDown);
 
-    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
-    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto displayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitration_.states_.end());
     auto deviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
     ASSERT_NE(deviceIter, displayIter->second.devices.end());
     EXPECT_EQ(deviceIter->second.pointerStates.size(), 2U);
@@ -16863,8 +16863,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.UpdateTouchArbitrationState(realDown);
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
 
-    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
-    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto displayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitration_.states_.end());
     auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
     ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
     EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::CLOSED);
@@ -16877,8 +16877,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     EXPECT_TRUE(inputWindowsManager.firstTouchWindowInfos_.empty());
 
     inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
-    displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
-    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    displayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitration_.states_.end());
     auto virtualDeviceIter = displayIter->second.devices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID);
     ASSERT_NE(virtualDeviceIter, displayIter->second.devices.end());
     EXPECT_EQ(virtualDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::ACTIVE);
@@ -16906,10 +16906,10 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
     inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
 
-    EXPECT_NE(inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID),
-        inputWindowsManager.touchArbitrationStates_.end());
-    EXPECT_NE(inputWindowsManager.touchArbitrationStates_.find(TEST_OTHER_DISPLAY_ID),
-        inputWindowsManager.touchArbitrationStates_.end());
+    EXPECT_NE(inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID),
+        inputWindowsManager.touchArbitration_.states_.end());
+    EXPECT_NE(inputWindowsManager.touchArbitration_.states_.find(TEST_OTHER_DISPLAY_ID),
+        inputWindowsManager.touchArbitration_.states_.end());
 }
 
 /**
@@ -16939,8 +16939,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.UpdateTouchArbitrationState(realDown);
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
     inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
-    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
-    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto displayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitration_.states_.end());
     auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
     ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
     EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::CLOSED);
@@ -16982,8 +16982,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.HandleTouchSourceDownArbitration(nextRealDown);
     inputWindowsManager.UpdateTouchArbitrationState(nextRealDown);
 
-    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
-    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto displayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitration_.states_.end());
     auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
     ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
     EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_POINTER_ID), TouchArbitrationPointerState::ACTIVE);
@@ -17011,7 +17011,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     ASSERT_TRUE(realMove->GetPointerItem(TEST_POINTER_ID, item));
     EXPECT_FALSE(item.IsCanceled());
     inputWindowsManager.UpdateTouchArbitrationState(realMove);
-    EXPECT_TRUE(inputWindowsManager.touchArbitrationStates_.empty());
+    EXPECT_TRUE(inputWindowsManager.touchArbitration_.states_.empty());
 }
 
 /**
@@ -17035,7 +17035,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     EXPECT_FALSE(inputWindowsManager.HandleClosedTouchArbitrationStream(realUp));
     inputWindowsManager.UpdateTouchArbitrationState(realUp);
 
-    EXPECT_TRUE(inputWindowsManager.touchArbitrationStates_.empty());
+    EXPECT_TRUE(inputWindowsManager.touchArbitration_.states_.empty());
 }
 
 /**
@@ -17059,10 +17059,10 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.UpdateTouchArbitrationState(virtualDown);
     inputWindowsManager.ClearTouchArbitrationStateByDevice(TEST_REAL_TOUCH_DEVICE_ID);
 
-    EXPECT_EQ(inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID),
-        inputWindowsManager.touchArbitrationStates_.end());
-    auto otherDisplayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_OTHER_DISPLAY_ID);
-    ASSERT_NE(otherDisplayIter, inputWindowsManager.touchArbitrationStates_.end());
+    EXPECT_EQ(inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID),
+        inputWindowsManager.touchArbitration_.states_.end());
+    auto otherDisplayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_OTHER_DISPLAY_ID);
+    ASSERT_NE(otherDisplayIter, inputWindowsManager.touchArbitration_.states_.end());
     EXPECT_NE(otherDisplayIter->second.devices.find(TEST_VIRTUAL_TOUCH_DEVICE_ID),
         otherDisplayIter->second.devices.end());
 }
@@ -17100,8 +17100,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchSourceArbitration
     inputWindowsManager.HandleTouchSourceDownArbitration(virtualDown);
 
     EXPECT_EQ(realEvent->GetPointerIds().size(), 2U);
-    auto displayIter = inputWindowsManager.touchArbitrationStates_.find(TEST_DISPLAY_ID);
-    ASSERT_NE(displayIter, inputWindowsManager.touchArbitrationStates_.end());
+    auto displayIter = inputWindowsManager.touchArbitration_.states_.find(TEST_DISPLAY_ID);
+    ASSERT_NE(displayIter, inputWindowsManager.touchArbitration_.states_.end());
     auto realDeviceIter = displayIter->second.devices.find(TEST_REAL_TOUCH_DEVICE_ID);
     ASSERT_NE(realDeviceIter, displayIter->second.devices.end());
     EXPECT_EQ(realDeviceIter->second.pointerStates.at(TEST_OTHER_POINTER_ID), TouchArbitrationPointerState::CLOSED);

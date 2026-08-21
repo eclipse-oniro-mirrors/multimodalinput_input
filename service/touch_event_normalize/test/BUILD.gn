@@ -942,6 +942,7 @@ ohos_unittest("TouchPadTransformProcessorMockTest") {
     "${mmi_path}/service/window_manager/src/input_display_bind_helper.cpp",
     "${mmi_path}/service/window_manager/src/input_windows_manager.cpp",
     "${mmi_path}/service/window_manager/src/mouse_redispatch_store.cpp",
+    "${mmi_path}/service/window_manager/src/touch_arbitration_manager.cpp",
     "${mmi_path}/service/window_manager/src/touch_redispatch_store.cpp",
     "${mmi_path}/service/window_manager/src/touch_drawing_manager.cpp",
     "src/touchpad_transform_processor_mock_test.cpp",
