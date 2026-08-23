@@ -97,6 +97,8 @@ private:
     void ClearTouchArbitrationPointerState(int32_t displayId, TouchArbitrationSource source,
         int32_t pointerId, int32_t deviceId);
     void CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source);
+    void CloseConflictingTouchPointer(int32_t displayId, int32_t deviceId, int32_t pointerId,
+        DisplayTouchArbitrationState &displayState);
 
     InputWindowsManager *inputWindowsManager_ { nullptr };
     std::map<int32_t, DisplayTouchArbitrationState> states_;

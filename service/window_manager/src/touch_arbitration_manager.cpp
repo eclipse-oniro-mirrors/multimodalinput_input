@@ -341,13 +341,20 @@ void TouchArbitrationManager::CancelConflictingTouchSource(int32_t displayId, To
         }
     }
     for (const auto &cancelInfo : cancelInfos) {
-        inputWindowsManager_->ClearTouchTargetState(displayId, cancelInfo.deviceId, cancelInfo.pointerId);
-        auto deviceIter = displayIter->second.devices.find(cancelInfo.deviceId);
-        if (deviceIter == displayIter->second.devices.end()) {
-            continue;
-        }
-        deviceIter->second.SetPointerState(cancelInfo.pointerId, TouchArbitrationPointerState::CLOSED);
+        CloseConflictingTouchPointer(displayId, cancelInfo.deviceId, cancelInfo.pointerId,
+            displayIter->second);
     }
+}
+
+void TouchArbitrationManager::CloseConflictingTouchPointer(int32_t displayId, int32_t deviceId,
+    int32_t pointerId, DisplayTouchArbitrationState &displayState)
+{
+    inputWindowsManager_->ClearTouchTargetState(displayId, deviceId, pointerId);
+    auto deviceIter = displayState.devices.find(deviceId);
+    if (deviceIter == displayState.devices.end()) {
+        return;
+    }
+    deviceIter->second.SetPointerState(pointerId, TouchArbitrationPointerState::CLOSED);
 }
 } // namespace MMI
 } // namespace OHOS
