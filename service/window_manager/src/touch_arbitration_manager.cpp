@@ -298,6 +298,10 @@ void TouchArbitrationManager::ClearTouchArbitrationStateByDevice(int32_t deviceI
 
 void TouchArbitrationManager::CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source)
 {
+    if (inputWindowsManager_ == nullptr) {
+        MMI_HILOGE("InputWindowsManager is null");
+        return;
+    }
     auto displayIter = states_.find(displayId);
     if (displayIter == states_.end()) {
         return;

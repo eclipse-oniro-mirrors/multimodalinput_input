@@ -24,7 +24,9 @@
 #include "input_display_bind_helper.h"
 #include "mouse_redispatch_store.h"
 #include "pointer_dispatch_event_cache.h"
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 #include "touch_arbitration_manager.h"
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 #include "touch_redispatch_store.h"
 
 namespace OHOS {
