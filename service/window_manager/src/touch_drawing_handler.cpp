@@ -436,35 +436,42 @@ void TouchDrawingHandler::DrawBubble()
             MMI_HILOGI("Skip canceled pointer bubble draw, pointerId:%{public}d", pointerId);
             continue;
         }
-        auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
-        Rosen::Drawing::Point centerPt(displayXY.first, displayXY.second);
-        Rosen::Drawing::Pen pen;
-        pen.SetColor(Rosen::Drawing::Color::COLOR_BLACK);
-        pen.SetAntiAlias(true);
-        pen.SetAlphaF(OUT_CIRCLE_TRANSPARENCY);
-        pen.SetWidth(bubble_.outerCircleWidth);
-        canvas->AttachPen(pen);
-        canvas->DrawCircle(centerPt, bubble_.outerCircleRadius);
-        canvas->DetachPen();
-
-        Rosen::Drawing::Brush brush;
-        brush.SetColor(Rosen::Drawing::Color::COLOR_WHITE);
-        brush.SetAntiAlias(true);
-        brush.SetAlphaF(INNER_CIRCLE_TRANSPARENCY);
-        canvas->AttachBrush(brush);
-        canvas->DrawCircle(centerPt, bubble_.innerCircleRadius);
-        canvas->DetachBrush();
-        CHKPV(surfaceNode_);
-        if (pointerEvent_->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN &&
-            pointerEvent_->GetPointerId() == pointerId) {
-            MMI_HILOGI("Bubble is draw success, %{public}d|%{public}d|%{private}d|%{private}d|%{public}d|%{public}d|"
-                "%{public}.2f|%{public}.2f|%{public}" PRIu64, pointerEvent_->GetPointerAction(),
-                pointerEvent_->GetPointerId(), displayXY.first, displayXY.second, scaleW_, scaleH_,
-                surfaceNode_->GetStagingProperties().GetRotation(),
-                bubbleCanvasNode_->GetStagingProperties().GetRotation(), bubbleCanvasNode_->GetId());
-        }
+        DrawBubbleForPointer(canvas, pointerItem, pointerId);
     }
     bubbleCanvasNode_->FinishRecording();
+}
+
+void TouchDrawingHandler::DrawBubbleForPointer(RosenCanvas *canvas,
+    const PointerEvent::PointerItem &pointerItem, int32_t pointerId)
+{
+    CHKPV(canvas);
+    auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
+    Rosen::Drawing::Point centerPt(displayXY.first, displayXY.second);
+    Rosen::Drawing::Pen pen;
+    pen.SetColor(Rosen::Drawing::Color::COLOR_BLACK);
+    pen.SetAntiAlias(true);
+    pen.SetAlphaF(OUT_CIRCLE_TRANSPARENCY);
+    pen.SetWidth(bubble_.outerCircleWidth);
+    canvas->AttachPen(pen);
+    canvas->DrawCircle(centerPt, bubble_.outerCircleRadius);
+    canvas->DetachPen();
+
+    Rosen::Drawing::Brush brush;
+    brush.SetColor(Rosen::Drawing::Color::COLOR_WHITE);
+    brush.SetAntiAlias(true);
+    brush.SetAlphaF(INNER_CIRCLE_TRANSPARENCY);
+    canvas->AttachBrush(brush);
+    canvas->DrawCircle(centerPt, bubble_.innerCircleRadius);
+    canvas->DetachBrush();
+    CHKPV(surfaceNode_);
+    if (pointerEvent_->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN &&
+        pointerEvent_->GetPointerId() == pointerId) {
+        MMI_HILOGI("Bubble is draw success, %{public}d|%{public}d|%{private}d|%{private}d|%{public}d|%{public}d|"
+            "%{public}.2f|%{public}.2f|%{public}" PRIu64, pointerEvent_->GetPointerAction(),
+            pointerEvent_->GetPointerId(), displayXY.first, displayXY.second, scaleW_, scaleH_,
+            surfaceNode_->GetStagingProperties().GetRotation(),
+            bubbleCanvasNode_->GetStagingProperties().GetRotation(), bubbleCanvasNode_->GetId());
+    }
 }
 
 void TouchDrawingHandler::DrawPointerPositionHandler()

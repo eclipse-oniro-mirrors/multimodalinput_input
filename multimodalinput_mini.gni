@@ -178,7 +178,6 @@ declare_args() {
     "window_manager/src/pointer_dispatch_event_cache.cpp",
     "window_manager/src/touch_redispatch_store.cpp",
     "window_manager/src/input_windows_manager.cpp",
-    "window_manager/src/touch_arbitration_manager.cpp",
   ]
 
   infraredemitter_sources = [
@@ -604,6 +603,7 @@ if (input_feature_touch_gesture) {
 
 if (input_controller_inject_enable) {
   input_default_defines += [ "OHOS_BUILD_ENABLE_CONTROLLER_INJECT" ]
+  libmmi_service_sources += [ "window_manager/src/touch_arbitration_manager.cpp" ]
 }
 
 if (defined(global_parts_info) &&

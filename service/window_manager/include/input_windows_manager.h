@@ -16,7 +16,6 @@
 #ifndef INPUT_WINDOWS_MANAGER_H
 #define INPUT_WINDOWS_MANAGER_H
 
-#include <algorithm>
 #include <shared_mutex>
 #include "mmi_transform.h"
 #include "window_manager_lite.h"
