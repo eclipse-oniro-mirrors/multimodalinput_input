@@ -95,8 +95,10 @@ public:
     void SetFoldState ();
     bool CheckAppFocused(int32_t pid);
     void UpdateUIExtensionInfo(const std::vector<UIExtensionInfo> &uiExtensionInfos);
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
     void DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent);
     void ClearTouchTargetState(int32_t displayId, int32_t deviceId, int32_t pointerId);
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
     std::vector<std::pair<int32_t, TargetInfo>> GetPidAndUpdateTarget(std::shared_ptr<KeyEvent> keyEvent);
     void ReissueEvent(std::shared_ptr<KeyEvent> keyEvent, int32_t focusWindowId);

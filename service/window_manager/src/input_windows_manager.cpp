@@ -189,9 +189,9 @@ void InputWindowsManager::InitWindowInfo(WindowInfo& info)
 }
 
 InputWindowsManager::InputWindowsManager() : bindInfo_(BIND_CFG_FILE_NAME)
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
     , touchArbitration_(this)
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 {
     MMI_HILOGD("Bind cfg file name:%{private}s", BIND_CFG_FILE_NAME.c_str());
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
@@ -5803,6 +5803,7 @@ std::map<int32_t, std::map<int32_t, WindowInfoEX>>& InputWindowsManager::TouchIt
         ? touchRedispatchStore_.GetTouchItemDownInfos() : touchItemDownInfos_;
 }
 
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 void InputWindowsManager::DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent)
 {
     if (cancelEvent == nullptr) {
@@ -5864,6 +5865,7 @@ void InputWindowsManager::ClearTouchTargetState(int32_t displayId, int32_t devic
         firstTouchInfos.erase(firstIter);
     }
 }
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 
 #if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 void InputWindowsManager::ClearTouchArbitrationStateByDevice(int32_t deviceId)
@@ -7250,7 +7252,9 @@ int32_t InputWindowsManager::UpdateTargetPointer(std::shared_ptr<PointerEvent> p
             return ret;
         }
     }
+#if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
     HandlePullEvent(pointerEvent);
+#endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH
     return ret;
 }
 
