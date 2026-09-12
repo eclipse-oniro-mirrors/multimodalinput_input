@@ -37,5 +37,16 @@ int32_t InputManager::GetUserDefinedCursorPixelMap(void *pixelMapPtr)
     *newPixelMapPtr = MOCKHANDLER->mockPixelMapPtr;
     return MOCKHANDLER->mockGetUserDefinedCursorPixelMapRet;
 }
+
+int32_t InputManager::SimulateInputEvent(std::shared_ptr<PointerEvent> pointerEvent, bool isAutoToVirtualScreen,
+    int32_t useCoordinate)
+{
+    (void)isAutoToVirtualScreen;
+    (void)useCoordinate;
+    MOCKHANDLER->lastSimulatedPointerEvent = pointerEvent;
+    MOCKHANDLER->simulatedPointerEvents.push_back(pointerEvent);
+    ++MOCKHANDLER->simulateInputEventCallCount;
+    return MOCKHANDLER->mockSimulateInputEventRet;
+}
 }  // namespace MMI
 }  // namespace OHOS

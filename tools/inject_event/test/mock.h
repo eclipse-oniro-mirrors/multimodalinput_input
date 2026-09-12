@@ -16,6 +16,8 @@
 #ifndef MOCK_H
 #define MOCK_H
 
+#include <vector>
+
 #include <singleton.h>
 
 #include "define_multimodal.h"
@@ -32,6 +34,10 @@ public:
     int32_t mockPointerStyleId { 0 };
     int32_t mockGetUserDefinedCursorPixelMapRet { -1 };
     std::shared_ptr<Media::PixelMap> mockPixelMapPtr { nullptr };
+    int32_t mockSimulateInputEventRet { RET_OK };
+    int32_t simulateInputEventCallCount { 0 };
+    std::shared_ptr<PointerEvent> lastSimulatedPointerEvent { nullptr };
+    std::vector<std::shared_ptr<PointerEvent>> simulatedPointerEvents {};
 };
 } // namespace MMI
 } // namespace OHOS

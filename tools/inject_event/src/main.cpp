@@ -15,6 +15,7 @@
 
 #include "input_enable_key_status_command.h"
 #include "input_manager_command.h"
+#include "input_motion_command.h"
 #ifdef OHOS_BUILD_ENABLE_EVENT_RECORDER
 #include "input_replay_command.h"
 #endif // OHOS_BUILD_ENABLE_EVENT_RECORDER
@@ -32,6 +33,10 @@ int32_t main(int32_t argc, char** argv)
     }
     if (argc > 1 && (std::string(argv[1]) == "enable_key_status")) {
         return OHOS::MMI::InputEnableKeyStatusCommand::HandleEnableKeyStatusCommand(argc, argv);
+    }
+    if (argc > 1 && (std::string(argv[1]) == "motion_down" || std::string(argv[1]) == "motion_move" ||
+        std::string(argv[1]) == "motion_up" || std::string(argv[1]) == "motion_reset")) {
+        return OHOS::MMI::InputMotionCommand::Handle(argc, argv);
     }
     OHOS::MMI::InputManagerCommand command;
     return command.ParseCommand(argc, argv);
