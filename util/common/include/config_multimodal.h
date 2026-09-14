@@ -65,6 +65,8 @@ namespace MMI {
 #define MAX_RECV_LIMIT 32
 #define INPUT_POINTER_DEVICES "input.pointer.device"
 #define SUPER_PRIVACY_SWITCH "persist.input.switch"
+// Education input disable state published for cross-process teaching control
+#define EDU_INPUT_DISABLED_PARAMETER "sys.input.edu_input_disabled"
 #define MMI_DINPUT_PKG_NAME "ohos.multimodalinput.dinput"
 } // namespace MMI
 } // namespace OHOS

@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include <linux/input.h>
 
+#include "config_multimodal.h"
 #include "device_state_manager.h"
 #include "input_device_manager.h"
 #include "key_auto_repeat.h"
@@ -25,8 +26,22 @@
 #include "input_event_handler.h"
 #include "uds_session.h"
 #include "device_observer.h"
+#include "error_multimodal.h"
+#include "parameters.h"
+
+namespace {
+testing::NiceMock<testing::MockFunction<bool(const std::string &, const std::string &)>> g_setParameter;
+} // namespace
 
 namespace OHOS {
+namespace system {
+// Intercept parameter writes in this test executable; never update board parameters.
+bool SetParameter(const std::string &key, const std::string &value)
+{
+    return g_setParameter.Call(key, value);
+}
+} // namespace system
+
 namespace MMI {
 using namespace testing;
 using namespace testing::ext;
@@ -63,7 +78,9 @@ void InputDeviceManagerTestWithMock::TearDownTestCase()
 }
 
 void InputDeviceManagerTestWithMock::SetUp()
-{}
+{
+    ON_CALL(g_setParameter, Call(_, _)).WillByDefault(Return(true));
+}
 
 void InputDeviceManagerTestWithMock::TearDown()
 {
@@ -74,6 +91,7 @@ void InputDeviceManagerTestWithMock::TearDown()
     devMgr->recoverList_.clear();
     devMgr->eduInputDisabled_ = false;
     devMgr->eduInputDisabledPid_ = -1;
+    testing::Mock::VerifyAndClear(&g_setParameter);
 }
 
 class InputDeviceObserver : public IDeviceObserver {
@@ -1010,8 +1028,13 @@ HWTEST_F(InputDeviceManagerTestWithMock, DisableInputEventDispatch_001, TestSize
         .Times(testing::Exactly(EXPECTED_DISABLED_DEVICES_COUNT));
     INPUT_DEV_MGR->Attach(observer);
 
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true"))
+        .WillOnce(Return(false)).WillOnce(Return(true));
     int32_t ret = INPUT_DEV_MGR->DisableInputEventDispatch(true, pid);
     EXPECT_EQ(ret, RET_OK);
+    EXPECT_FALSE(INPUT_DEV_MGR->inputDevice_.at(deviceId1).enable);
+    EXPECT_FALSE(INPUT_DEV_MGR->inputDevice_.at(deviceId2).enable);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, pid), RET_OK);
 
     INPUT_DEV_MGR->Detach(observer);
 }
@@ -1052,8 +1075,11 @@ HWTEST_F(InputDeviceManagerTestWithMock, DisableInputEventDispatch_002, TestSize
         .Times(testing::Exactly(EXPECTED_DISABLED_DEVICES_COUNT));
     INPUT_DEV_MGR->Attach(observer);
 
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).WillOnce(Return(false));
     int32_t ret = INPUT_DEV_MGR->DisableInputEventDispatch(false, pid);
     EXPECT_EQ(ret, RET_OK);
+    EXPECT_FALSE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, -1);
 
     INPUT_DEV_MGR->Detach(observer);
 }
@@ -1092,6 +1118,124 @@ HWTEST_F(InputDeviceManagerTestWithMock, DisableInputEventDispatch_004, TestSize
 
     int32_t ret = INPUT_DEV_MGR->DisableInputEventDispatch(true, pid2);
     EXPECT_EQ(ret, RET_OK);
+}
+
+/**
+ * @tc.name: EduInputParameter_Transitions
+ * @tc.desc: Publish both states even when no input device is connected.
+ * @tc.type: FUNC
+ * @tc.require: RR-30094496
+ */
+HWTEST_F(InputDeviceManagerTestWithMock, EduInputParameter_Transitions, TestSize.Level1)
+{
+    InSequence sequence;
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true")).WillOnce(Return(true));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).WillOnce(Return(true));
+
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, TEST_SESSION_PID_1), RET_OK);
+    EXPECT_TRUE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, TEST_SESSION_PID_1);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(false, TEST_SESSION_PID_1), RET_OK);
+    EXPECT_FALSE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, -1);
+}
+
+/**
+ * @tc.name: EduInputParameter_RetryFailedWrite
+ * @tc.desc: Failed publication preserves control results; repeated requests retry both states.
+ * @tc.type: FUNC
+ * @tc.require: RR-30094496
+ */
+HWTEST_F(InputDeviceManagerTestWithMock, EduInputParameter_RetryFailedWrite, TestSize.Level1)
+{
+    InSequence sequence;
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true")).WillOnce(Return(false));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true")).WillOnce(Return(true));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).WillOnce(Return(false));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).WillOnce(Return(true));
+
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, TEST_SESSION_PID_1), RET_OK);
+    EXPECT_TRUE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, TEST_SESSION_PID_1);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, TEST_SESSION_PID_1), RET_OK);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(false, TEST_SESSION_PID_1), RET_OK);
+    EXPECT_FALSE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, -1);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(false, TEST_SESSION_PID_1), RET_OK);
+}
+
+/**
+ * @tc.name: EduInputParameter_OwnerPreserved
+ * @tc.desc: Another caller can repeat disable but cannot take ownership or publish enable.
+ * @tc.type: FUNC
+ * @tc.require: RR-30094496
+ */
+HWTEST_F(InputDeviceManagerTestWithMock, EduInputParameter_OwnerPreserved, TestSize.Level1)
+{
+    constexpr int32_t otherPid { 1002 };
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true"))
+        .Times(2).WillRepeatedly(Return(true));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).Times(0);
+
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, TEST_SESSION_PID_1), RET_OK);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, otherPid), RET_OK);
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(false, otherPid), ERROR_EDU_INPUT_DISABLED);
+    EXPECT_TRUE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, TEST_SESSION_PID_1);
+}
+
+/**
+ * @tc.name: EduInputParameter_SessionRecovery
+ * @tc.desc: Owner disconnect publishes false even if publication fails.
+ * @tc.type: FUNC
+ * @tc.require: RR-30094496
+ */
+HWTEST_F(InputDeviceManagerTestWithMock, EduInputParameter_SessionRecovery, TestSize.Level1)
+{
+    InSequence sequence;
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true")).WillOnce(Return(true));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).WillOnce(Return(false));
+
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, TEST_SESSION_PID_1), RET_OK);
+    auto session = std::make_shared<UDSSession>(TEST_PROGRAM_NAME, TEST_MODULE_TYPE, -1,
+        TEST_UID, TEST_SESSION_PID_1);
+    INPUT_DEV_MGR->OnSessionLost(session);
+    EXPECT_FALSE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, -1);
+}
+
+/**
+ * @tc.name: EduInputParameter_UnrelatedSession
+ * @tc.desc: Null and unrelated sessions must not publish or restore the owner's state.
+ * @tc.type: FUNC
+ * @tc.require: RR-30094496
+ */
+HWTEST_F(InputDeviceManagerTestWithMock, EduInputParameter_UnrelatedSession, TestSize.Level1)
+{
+    constexpr int32_t otherPid { 1002 };
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "true")).WillOnce(Return(true));
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).Times(0);
+
+    EXPECT_EQ(INPUT_DEV_MGR->DisableInputEventDispatch(true, TEST_SESSION_PID_1), RET_OK);
+    INPUT_DEV_MGR->RecoverInputEnabled(nullptr);
+    auto session = std::make_shared<UDSSession>(TEST_PROGRAM_NAME, TEST_MODULE_TYPE, -1, TEST_UID, otherPid);
+    INPUT_DEV_MGR->OnSessionLost(session);
+    EXPECT_TRUE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, TEST_SESSION_PID_1);
+}
+
+/**
+ * @tc.name: EduInputParameter_InitialPublication
+ * @tc.desc: Startup publication writes the initial false value without changing ownership.
+ * @tc.type: FUNC
+ * @tc.require: RR-30094496
+ */
+HWTEST_F(InputDeviceManagerTestWithMock, EduInputParameter_InitialPublication, TestSize.Level1)
+{
+    EXPECT_CALL(g_setParameter, Call(EDU_INPUT_DISABLED_PARAMETER, "false")).WillOnce(Return(true));
+    INPUT_DEV_MGR->PublishEduInputDisabledState();
+    EXPECT_FALSE(INPUT_DEV_MGR->IsEduInputDisabled());
+    EXPECT_EQ(INPUT_DEV_MGR->eduInputDisabledPid_, -1);
 }
 
 /**
