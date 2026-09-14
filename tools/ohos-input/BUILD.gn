@@ -32,6 +32,9 @@ ohos_cli_executable("ohos-input") {
     "src/mouse_support.cpp",
     "src/option_parser.cpp",
     "src/printer.cpp",
+    "src/touch_support.cpp",
+    "src/touch_swipe_command.cpp",
+    "src/touch_tap_command.cpp",
   ]
   include_dirs = [
     "include",

@@ -1,7 +1,7 @@
 {
   "name": "ohos-input",
   "version": "1.0.0",
-  "description": "Keyboard and mouse input simulation tool. Used for AI Agent applications to simulate keyboard and mouse operations on devices. Only supported on PC products.",
+  "description": "Keyboard, mouse and touch screen input simulation tool. Used for AI Agent applications to simulate keyboard, mouse and touch screen operations on devices. Only supported on PC products.",
   "executablePath": "/system/bin/cli_tool/executable/ohos-input",
   "requirePermissions": [
     "ohos.permission.CONTROL_DEVICE"
@@ -393,6 +393,142 @@
           }
         },
         "required": ["action", "key"]
+      }
+    },
+    "touch-tap": {
+      "description": "Simulate a touch screen tap at specified position. Used for tap or long press on the touch screen. Duration is the time the finger stays pressed.",
+      "requirePermissions": [
+        "ohos.permission.CONTROL_DEVICE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayId": {
+            "type": "integer",
+            "description": "Display ID receiving the touch event",
+            "minimum": 0,
+            "default": 0
+          },
+          "x": {
+            "type": "integer",
+            "description": "Touch X coordinate on the display (required)",
+            "minimum": 0
+          },
+          "y": {
+            "type": "integer",
+            "description": "Touch Y coordinate on the display (required)",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration to hold the touch in milliseconds. 0 means instant release. Default: 100",
+            "minimum": 0,
+            "maximum": 5000,
+            "default": 100
+          }
+        },
+        "required": ["x", "y"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Executed action name"
+          },
+          "displayId": {
+            "type": "integer",
+            "description": "Target display ID"
+          },
+          "x": {
+            "type": "integer",
+            "description": "Touch X coordinate"
+          },
+          "y": {
+            "type": "integer",
+            "description": "Touch Y coordinate"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Touch hold duration in milliseconds"
+          }
+        },
+        "required": ["action", "displayId", "x", "y", "duration"]
+      }
+    },
+    "touch-swipe": {
+      "description": "Simulate a touch screen swipe from source to destination. Used for scrolling or dragging on the touch screen. Duration includes touch down, move steps and touch up.",
+      "requirePermissions": [
+        "ohos.permission.CONTROL_DEVICE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayId": {
+            "type": "integer",
+            "description": "Display ID receiving the touch event",
+            "minimum": 0,
+            "default": 0
+          },
+          "srcX": {
+            "type": "integer",
+            "description": "Source X coordinate on the display (required)",
+            "minimum": 0
+          },
+          "srcY": {
+            "type": "integer",
+            "description": "Source Y coordinate on the display (required)",
+            "minimum": 0
+          },
+          "dstX": {
+            "type": "integer",
+            "description": "Destination X coordinate on the display (required)",
+            "minimum": 0
+          },
+          "dstY": {
+            "type": "integer",
+            "description": "Destination Y coordinate on the display (required)",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Total swipe duration in milliseconds, including touch down and up. 0 means instant completion. Default: 500",
+            "minimum": 0,
+            "maximum": 5000,
+            "default": 500
+          }
+        },
+        "required": ["srcX", "srcY", "dstX", "dstY"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Executed action name"
+          },
+          "displayId": {
+            "type": "integer",
+            "description": "Target display ID"
+          },
+          "srcX": {
+            "type": "integer",
+            "description": "Source X coordinate"
+          },
+          "srcY": {
+            "type": "integer",
+            "description": "Source Y coordinate"
+          },
+          "dstX": {
+            "type": "integer",
+            "description": "Destination X coordinate"
+          },
+          "dstY": {
+            "type": "integer",
+            "description": "Destination Y coordinate"
+          }
+        },
+        "required": ["action", "displayId", "srcX", "srcY", "dstX", "dstY"]
       }
     }
   }

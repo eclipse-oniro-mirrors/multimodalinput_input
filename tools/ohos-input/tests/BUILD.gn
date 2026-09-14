@@ -31,6 +31,9 @@ ohos_unittest("OhosInputCommandTest") {
     "../src/mouse_support.cpp",
     "../src/option_parser.cpp",
     "../src/printer.cpp",
+    "../src/touch_support.cpp",
+    "../src/touch_swipe_command.cpp",
+    "../src/touch_tap_command.cpp",
     "command_table_test.cpp",
     "executor_test.cpp",
     "integration_test.cpp",
@@ -40,6 +43,8 @@ ohos_unittest("OhosInputCommandTest") {
     "mouse_support_test.cpp",
     "option_parser_test.cpp",
     "printer_test.cpp",
+    "touch_support_test.cpp",
+    "touch_swipe_command_test.cpp",
   ]
 
   include_dirs = [

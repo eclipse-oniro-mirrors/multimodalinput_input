@@ -6,7 +6,7 @@ Tests use the OpenHarmony gtest framework (`HWTEST_F`) and follow the layout of
 | File | Responsibility |
 | --- | --- |
 | `command_runner.h` | shared helpers: run `ExecuteCommand` capturing stdout, parse JSON, compare recorded controller calls |
-| `mock_controller_factory.h/.cpp` | link-time stubs for `InputManager`, `MouseControllerImpl` and `KeyboardControllerImpl` |
+| `mock_controller_factory.h/.cpp` | link-time stubs for `InputManager`, `MouseControllerImpl`, `KeyboardControllerImpl` and `TouchControllerImpl` |
 | `modifier_test.cpp` | `ParseModifiers` ordering, single keys, malformed and duplicate input |
 | `option_parser_test.cpp` | `ParseOptionPairs` whitelist/duplicates, `ParseNumber` defaults, ranges and messages |
 | `command_table_test.cpp` | read-only command lookup, declaration order, stable repeated lookup |
@@ -14,6 +14,8 @@ Tests use the OpenHarmony gtest framework (`HWTEST_F`) and follow the layout of
 | `executor_test.cpp` | help routing (global/command, `--help` anywhere), `--version`, unknown command JSON, command availability |
 | `mouse_support_test.cpp` | `ValidateScrollClicks` boundaries and `ParseButton` names/defaults |
 | `mouse_drag_command_test.cpp` | `BuildDragSteps` step splitting, stationary and cross-display paths, no overflow |
+| `touch_support_test.cpp` | `ParseTouchPoint`/`ParseTouchSwipe` defaults, ranges and unknown options |
+| `touch_swipe_command_test.cpp` | `BuildSwipeSteps` step splitting, stationary paths, no overflow |
 | `integration_test.cpp` | full command execution against mock controllers: call order, validation before controller creation, failure paths and controller destruction |
 
 ## Host mock link boundary
@@ -37,4 +39,6 @@ platform injection or destructor cleanup; those require platform/board tests.
 | `ohos-input mouse-move --displayId 1 --x 100 --y 200 --modifier meta` | all options | CONTROL_DEVICE | PC |
 | `ohos-input mouse-drag --srcDisplayId 0 --srcX 0 --srcY 0 --dstDisplayId 1 --dstX 100 --dstY 200 --button middle --duration 16 --modifier shift` | all options | CONTROL_DEVICE | PC |
 | `ohos-input key-press --key 2049 --holdDuration 0 --modifier ctrl\|shift` | all options and modifier order | CONTROL_DEVICE | PC |
+| `ohos-input touch-tap --x 300 --y 400 --displayId 1 --duration 800` | all options, long press | CONTROL_DEVICE | PC |
+| `ohos-input touch-swipe --srcX 400 --srcY 800 --dstX 400 --dstY 300 --displayId 1 --duration 500` | all options, interpolated move steps | CONTROL_DEVICE | PC |
 | invalid/missing options; malformed or duplicate modifiers; `clicks=0`; primary key duplicated in modifiers | parameter error and exit 2 before controller creation | None | None |

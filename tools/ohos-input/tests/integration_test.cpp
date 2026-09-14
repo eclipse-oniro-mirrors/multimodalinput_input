@@ -276,3 +276,122 @@ HWTEST_F(IntegrationTest, ModifierReleaseFailure_EmitsOneJsonAndDestroysControll
         { "PressButton", { 0 } }, { "ReleaseButton", { 0 } }, { "ReleaseKey", { KeyEvent::KEYCODE_CTRL_LEFT } },
         { "DestroyMouse", {} }, { "DestroyKeyboard", {} } });
 }
+
+HWTEST_F(IntegrationTest, TouchTap_CallsTouchDownThenUpAtSamePoint, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-tap", "--x", "10", "--y", "20", "--duration", "0" });
+    ExpectSuccess(result, "touch-tap");
+    EXPECT_EQ(ParseJson(result)["data"]["duration"], 0);
+    ExpectCalls(calls, { { "TouchDown", { 0, 0, 10, 20 } }, { "TouchUp", { 0, 0, 10, 20 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchTap_DisplayIdPassedToTouchEvents, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-tap", "--x", "10", "--y", "20", "--displayId", "1", "--duration", "50" });
+    ExpectSuccess(result, "touch-tap");
+    ExpectCalls(calls, { { "TouchDown", { 0, 1, 10, 20 } }, { "TouchUp", { 0, 1, 10, 20 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchSwipe_ZeroDuration_DownAtSourceThenUpAtTarget, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-swipe", "--srcX", "1", "--srcY", "2", "--dstX", "3", "--dstY", "4", "--duration", "0" });
+    ExpectSuccess(result, "touch-swipe");
+    ExpectCalls(calls, { { "TouchDown", { 0, 0, 1, 2 } }, { "TouchUp", { 0, 0, 3, 4 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchSwipe_SixteenDuration_SingleMoveToTarget, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-swipe", "--srcX", "1", "--srcY", "2", "--dstX", "3", "--dstY", "4", "--duration", "16" });
+    ExpectSuccess(result, "touch-swipe");
+    ExpectCalls(calls, { { "TouchDown", { 0, 0, 1, 2 } }, { "TouchMove", { 0, 0, 3, 4 } },
+        { "TouchUp", { 0, 0, 3, 4 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchSwipe_SameSourceAndTarget_NoMoveInjected, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-swipe", "--srcX", "5", "--srcY", "6", "--dstX", "5", "--dstY", "6", "--duration", "32" });
+    ExpectSuccess(result, "touch-swipe");
+    ExpectCalls(calls, { { "TouchDown", { 0, 0, 5, 6 } }, { "TouchUp", { 0, 0, 5, 6 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchTap_DownFailure_EmitsOneJsonWithServiceError, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls, { 0, 0, "", 0, false, "", 0, 0, "TouchDown", -1 });
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-tap", "--x", "1", "--y", "2", "--duration", "0" });
+    EXPECT_EQ(result.code, SERVICE_EXIT);
+    EXPECT_EQ(std::count(result.stdoutText.begin(), result.stdoutText.end(), '\n'), 1);
+    EXPECT_EQ(ParseJson(result)["errCode"], "ERR_INPUT_SERVICE_EXCEPTION");
+    ExpectCalls(calls, { { "TouchDown", { 0, 0, 1, 2 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchSwipe_MoveFailure_CompensatesWithTouchUp, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls, { 0, 0, "", 0, false, "", 0, 0, "TouchMove", -1 });
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-swipe", "--srcX", "1", "--srcY", "2", "--dstX", "3", "--dstY", "4", "--duration", "16" });
+    EXPECT_EQ(result.code, SERVICE_EXIT);
+    EXPECT_EQ(std::count(result.stdoutText.begin(), result.stdoutText.end(), '\n'), 1);
+    EXPECT_EQ(ParseJson(result)["errCode"], "ERR_INPUT_SERVICE_EXCEPTION");
+    ExpectCalls(calls, { { "TouchDown", { 0, 0, 1, 2 } }, { "TouchMove", { 0, 0, 3, 4 } },
+        { "TouchUp", { 0, 0, 3, 4 } } });
+}
+
+HWTEST_F(IntegrationTest, TouchCreatePermissionFailure_MapsToPermissionJsonAndExitCode, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls, { 0, 0, "", 0, false, "", 0, -201 });
+    const CommandResult result = OHOS::MMI::InputCli::Run({
+        "touch-tap", "--x", "1", "--y", "2", "--duration", "0" });
+    EXPECT_EQ(result.code, PERMISSION_EXIT);
+    const auto parsed = ParseJson(result);
+    EXPECT_EQ(parsed["errCode"], "ERR_PERMISSION_DENIED");
+    EXPECT_EQ(parsed["data"], "");
+    EXPECT_TRUE(calls.empty());
+    EXPECT_EQ(fixture.TouchCreateCount(), 1);
+}
+
+HWTEST_F(IntegrationTest, TouchParameterErrors_RejectedBeforeControllerCreation, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const CommandResult duration = OHOS::MMI::InputCli::Run({
+        "touch-tap", "--x", "1", "--y", "2", "--duration", "5001" });
+    EXPECT_EQ(duration.code, PARAMETER_EXIT);
+    EXPECT_EQ(ParseJson(duration)["errCode"], "ERR_PARAMETER_ERROR");
+    const CommandResult coordinate = OHOS::MMI::InputCli::Run({ "touch-tap", "--x", "-1", "--y", "2" });
+    EXPECT_EQ(coordinate.code, PARAMETER_EXIT);
+    EXPECT_EQ(ParseJson(coordinate)["errCode"], "ERR_PARAMETER_ERROR");
+    const CommandResult unknown = OHOS::MMI::InputCli::Run({
+        "touch-tap", "--x", "1", "--y", "2", "--unknown", "x" });
+    EXPECT_EQ(unknown.code, PARAMETER_EXIT);
+    EXPECT_EQ(ParseJson(unknown)["errCode"], "ERR_PARAMETER_ERROR");
+    EXPECT_EQ(fixture.TouchCreateCount(), 0);
+    EXPECT_TRUE(calls.empty());
+}

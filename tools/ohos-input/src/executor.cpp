@@ -30,6 +30,8 @@
 #include "mouse_move_to_command.h"
 #include "printer.h"
 #include "mouse_scroll_command.h"
+#include "touch_swipe_command.h"
+#include "touch_tap_command.h"
 
 namespace OHOS::MMI::InputCli {
 namespace {
@@ -48,6 +50,8 @@ const std::vector<std::shared_ptr<Command>> &CommandTable()
         std::make_shared<MouseMoveToCommand>(),
         std::make_shared<MouseDragCommand>(),
         std::make_shared<KeyPressCommand>(),
+        std::make_shared<TouchTapCommand>(),
+        std::make_shared<TouchSwipeCommand>(),
     };
     return commands;
 }
@@ -100,7 +104,7 @@ void AppendExamples(std::ostringstream &stream, const std::vector<std::string> &
 std::string BuildGlobalHelp()
 {
     std::ostringstream stream;
-    stream << "ohos-input - Keyboard and mouse input simulation tool for AI Agent applications\n\n";
+    stream << "ohos-input - Keyboard, mouse and touch screen input simulation tool for AI Agent applications\n\n";
     stream << "Usage:\n  ohos-input <subcommand> [options]\n\n";
     stream << "Parameters:\n";
     AppendDocLine(stream, "--help", "Display this help message");
@@ -111,7 +115,10 @@ std::string BuildGlobalHelp()
     }
     stream << "\n";
     AppendExamples(stream, { "# Mouse click at position (100, 200)", "ohos-input mouse-click --x 100 --y 200", "",
-        "# Key press with Ctrl modifier", "ohos-input key-press --key 2049 --modifier ctrl" });
+        "# Key press with Ctrl modifier", "ohos-input key-press --key 2049 --modifier ctrl", "",
+        "# Touch tap at position (300, 400)", "ohos-input touch-tap --x 300 --y 400", "",
+        "# Touch swipe from (400, 800) to (400, 300)", "ohos-input touch-swipe --srcX 400 --srcY 800"
+        " --dstX 400 --dstY 300" });
     return StripTrailingNewline(stream);
 }
 
