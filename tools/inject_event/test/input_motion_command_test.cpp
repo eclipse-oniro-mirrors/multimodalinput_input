@@ -144,7 +144,7 @@ HWTEST_F(InputMotionCommandTest, InvalidParameter_NegativeCoordinate, TestSize.L
     char** argv = const_cast<char**>(injectArgvs);
     StderrRedirect redirect;
     EXPECT_EQ(InputMotionCommand::Handle(4, argv), 1);
-    EXPECT_NE(redirect.Content().find("invalid coordinate, x and y must be non-negative"), std::string::npos);
+    EXPECT_NE(redirect.Content().find("Coordinate value must be greater or equal than 0"), std::string::npos);
 }
 
 /**
@@ -159,6 +159,7 @@ HWTEST_F(InputMotionCommandTest, InvalidParameter_MissingParameter, TestSize.Lev
     char** argv = const_cast<char**>(injectArgvs);
     StderrRedirect redirect;
     EXPECT_EQ(InputMotionCommand::Handle(2, argv), 1);
+    EXPECT_NE(redirect.Content().find("too few arguments to function"), std::string::npos);
     EXPECT_NE(redirect.Content().find("usage"), std::string::npos);
 }
 

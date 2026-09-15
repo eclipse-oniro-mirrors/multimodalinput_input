@@ -112,7 +112,7 @@ bool ParseOptions(int32_t argc, char** argv, int32_t &x, int32_t &y, int32_t &fi
         }
         int32_t coordinate = 0;
         if (!ParseNumber(arg, coordinate)) {
-            std::cerr << "invalid coordinate: " << arg << std::endl;
+            std::cerr << "invalid coordinate value" << std::endl;
             PrintUsage();
             return false;
         }
@@ -124,7 +124,7 @@ bool ParseOptions(int32_t argc, char** argv, int32_t &x, int32_t &y, int32_t &fi
         ++positionSeen;
     }
     if (positionSeen < POSITION_COUNT) {
-        std::cerr << "missing required parameter: x and y" << std::endl;
+        std::cerr << "too few arguments to function" << std::endl;
         PrintUsage();
         return false;
     }
@@ -174,7 +174,7 @@ int32_t InputMotionCommand::ValidateParams(int32_t x, int32_t y, int32_t fingerI
         return MOTION_EXIT_FAILURE;
     }
     if ((x < 0) || (y < 0)) {
-        std::cerr << "invalid coordinate, x and y must be non-negative" << std::endl;
+        std::cerr << "Coordinate value must be greater or equal than 0" << std::endl;
         return MOTION_EXIT_FAILURE;
     }
     return MOTION_EXIT_SUCCESS;
