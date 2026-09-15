@@ -42,6 +42,14 @@ constexpr int32_t POSITION_COUNT { 2 };
 constexpr char MOTION_STATE_FILE_PATH[] = "/data/local/tmp/uinput_motion_state";
 constexpr mode_t MOTION_STATE_FILE_MODE { 0666 };
 constexpr int32_t MOTION_INVALID_FD { -1 };
+constexpr int32_t OPTION_VALUE_STEP { 2 };
+
+struct MotionOptions {
+    int32_t x { 0 };
+    int32_t y { 0 };
+    int32_t fingerId { DEFAULT_FINGER_ID };
+    int32_t screenId { DEFAULT_SCREEN_ID };
+};
 
 FingerState *FindFingerState(FingerStateMap &stateMap, int32_t screenId, int32_t fingerId)
 {
@@ -79,12 +87,48 @@ bool ParseNumber(const std::string &text, int32_t &value)
     return true;
 }
 
-bool ParseOptions(int32_t argc, char** argv, int32_t &x, int32_t &y, int32_t &fingerId, int32_t &screenId)
+bool ParseOptionArg(const std::string &name, const std::string &value, MotionOptions &options)
 {
-    fingerId = DEFAULT_FINGER_ID;
-    screenId = DEFAULT_SCREEN_ID;
+    int32_t number = 0;
+    if (!ParseNumber(value, number)) {
+        std::cerr << "invalid number for option " << name << ": " << value << std::endl;
+        return false;
+    }
+    if (name == "-f") {
+        options.fingerId = number;
+    } else {
+        options.screenId = number;
+    }
+    return true;
+}
+
+bool ApplyPositionalArg(const std::string &arg, int32_t &positionSeen, MotionOptions &options)
+{
+    if (positionSeen >= POSITION_COUNT) {
+        std::cerr << "too many positional parameters: " << arg << std::endl;
+        PrintUsage();
+        return false;
+    }
+    int32_t coordinate = 0;
+    if (!ParseNumber(arg, coordinate)) {
+        std::cerr << "invalid coordinate value" << std::endl;
+        PrintUsage();
+        return false;
+    }
+    if (positionSeen == 0) {
+        options.x = coordinate;
+    } else {
+        options.y = coordinate;
+    }
+    ++positionSeen;
+    return true;
+}
+
+bool ParseOptions(int32_t argc, char** argv, MotionOptions &options)
+{
     int32_t positionSeen = 0;
-    for (int32_t i = FIRST_OPTION_INDEX; i < argc; ++i) {
+    int32_t i = FIRST_OPTION_INDEX;
+    while (i < argc) {
         const std::string arg(argv[i]);
         if ((arg == "-f") || (arg == "-s")) {
             if (i + 1 >= argc) {
@@ -92,36 +136,16 @@ bool ParseOptions(int32_t argc, char** argv, int32_t &x, int32_t &y, int32_t &fi
                 PrintUsage();
                 return false;
             }
-            int32_t value = 0;
-            if (!ParseNumber(argv[i + 1], value)) {
-                std::cerr << "invalid number for option " << arg << ": " << argv[i + 1] << std::endl;
+            if (!ParseOptionArg(arg, argv[i + 1], options)) {
                 return false;
             }
-            if (arg == "-f") {
-                fingerId = value;
-            } else {
-                screenId = value;
-            }
-            ++i;
+            i += OPTION_VALUE_STEP;
             continue;
         }
-        if (positionSeen >= POSITION_COUNT) {
-            std::cerr << "too many positional parameters: " << arg << std::endl;
-            PrintUsage();
+        if (!ApplyPositionalArg(arg, positionSeen, options)) {
             return false;
         }
-        int32_t coordinate = 0;
-        if (!ParseNumber(arg, coordinate)) {
-            std::cerr << "invalid coordinate value" << std::endl;
-            PrintUsage();
-            return false;
-        }
-        if (positionSeen == 0) {
-            x = coordinate;
-        } else {
-            y = coordinate;
-        }
-        ++positionSeen;
+        ++i;
     }
     if (positionSeen < POSITION_COUNT) {
         std::cerr << "too few arguments to function" << std::endl;
@@ -148,23 +172,20 @@ int32_t InputMotionCommand::Handle(int32_t argc, char** argv)
         PrintUsage();
         return MOTION_EXIT_FAILURE;
     }
-    int32_t x = 0;
-    int32_t y = 0;
-    int32_t fingerId = DEFAULT_FINGER_ID;
-    int32_t screenId = DEFAULT_SCREEN_ID;
-    if (!ParseOptions(argc, argv, x, y, fingerId, screenId)) {
+    MotionOptions options;
+    if (!ParseOptions(argc, argv, options)) {
         return MOTION_EXIT_FAILURE;
     }
-    if (ValidateParams(x, y, fingerId) != MOTION_EXIT_SUCCESS) {
+    if (ValidateParams(options.x, options.y, options.fingerId) != MOTION_EXIT_SUCCESS) {
         return MOTION_EXIT_FAILURE;
     }
     if (subCommand == "motion_down") {
-        return command.HandleDown(x, y, fingerId, screenId);
+        return command.HandleDown(options.x, options.y, options.fingerId, options.screenId);
     }
     if (subCommand == "motion_move") {
-        return command.HandleMove(x, y, fingerId, screenId);
+        return command.HandleMove(options.x, options.y, options.fingerId, options.screenId);
     }
-    return command.HandleUp(x, y, fingerId, screenId);
+    return command.HandleUp(options.x, options.y, options.fingerId, options.screenId);
 }
 
 int32_t InputMotionCommand::ValidateParams(int32_t x, int32_t y, int32_t fingerId)
