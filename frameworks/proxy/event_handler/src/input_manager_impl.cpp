@@ -3263,6 +3263,36 @@ int32_t InputManagerImpl::SetCustomCursor(int32_t windowId, CustomCursor cursor,
 #endif // OHOS_BUILD_ENABLE_POINTER
 }
 
+int32_t InputManagerImpl::SetGlobalPriorityCursor(const CustomCursor &cursor)
+{
+    CALL_DEBUG_ENTER;
+#if defined OHOS_BUILD_ENABLE_POINTER
+    int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->SetGlobalPriorityCursor(cursor);
+    if (ret != RET_OK) {
+        MMI_HILOGE("Set global priority cursor failed, ret:%{public}d", ret);
+    }
+    return ret;
+#else
+    MMI_HILOGW("Pointer device module does not support");
+    return ERROR_UNSUPPORT;
+#endif // OHOS_BUILD_ENABLE_POINTER
+}
+
+int32_t InputManagerImpl::UnsetGlobalPriorityCursor()
+{
+    CALL_DEBUG_ENTER;
+#if defined OHOS_BUILD_ENABLE_POINTER
+    int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->UnsetGlobalPriorityCursor();
+    if (ret != RET_OK) {
+        MMI_HILOGE("Unset global priority cursor failed, ret:%{public}d", ret);
+    }
+    return ret;
+#else
+    MMI_HILOGW("Pointer device module does not support");
+    return ERROR_UNSUPPORT;
+#endif // OHOS_BUILD_ENABLE_POINTER
+}
+
 int32_t InputManagerImpl::CheckKnuckleEvent(float pointX, float pointY, bool &isKnuckleType)
 {
     CALL_DEBUG_ENTER;

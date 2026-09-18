@@ -72,6 +72,8 @@ public:
         const CursorOptionsParcel& cOptionParcel) override;
     ErrCode SetUIExtensionCustomCursor(int32_t windowId, const CustomCursorParcel& curParcel,
         const CursorOptionsParcel& cOptionParcel, const sptr<IRemoteObject> &token) override;
+    ErrCode SetGlobalPriorityCursor(const CustomCursorParcel& curParcel) override;
+    ErrCode UnsetGlobalPriorityCursor() override;
     ErrCode SetMouseIcon(int32_t windowId, const CursorPixelMap& curPixelMap) override;
     ErrCode ClearWindowPointerStyle(int32_t pid, int32_t windowId) override;
     ErrCode SetMouseHotSpot(int32_t pid, int32_t windowId, int32_t hotSpotX, int32_t hotSpotY) override;

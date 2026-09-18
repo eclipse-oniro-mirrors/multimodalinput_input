@@ -151,6 +151,11 @@ public:
         int32_t pid, int32_t windowId, int32_t focusX, int32_t focusY) override;
     int32_t SetCustomCursor(int32_t pid, int32_t windowId, CustomCursor cursor, CursorOptions options,
         const sptr<IRemoteObject> &token = nullptr) override;
+    int32_t SetGlobalPriorityCursor(const CustomCursor &cursor, int32_t pid) override;
+    int32_t UnsetGlobalPriorityCursor(int32_t pid) override;
+    bool HasGlobalPriorityCursor() const override;
+    GlobalPriorityCursor GetGlobalPriorityCursor() const override;
+    int32_t RestoreOnServiceStart() override;
     int32_t SetMouseHotSpot(int32_t pid, int32_t windowId, int32_t hotSpotX, int32_t hotSpotY) override;
     PointerStyle GetLastMouseStyle() override;
     void SetLastMouseStyle(PointerStyle style) override;
@@ -226,6 +231,7 @@ private:
     int32_t GetCurrentUser();
     int32_t UpdateCursorProperty(CursorPixelMap curPixelMap, const int32_t &focusX, const int32_t &focusY);
     int32_t UpdateCursorProperty(CustomCursor cursor);
+    int32_t DrawGlobalPriorityCursor();
     void RotateDegree(Direction direction);
     int32_t DrawMovePointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
         PointerStyle pointerStyle, Direction direction);
@@ -352,6 +358,8 @@ private:
     bool userIconFollowSystem_ { false };
     bool followSystem_ { false };
     bool offRenderScaleUpdate_ { false };
+    std::atomic<bool> hasGlobalPriorityCursor_ { false };
+    GlobalPriorityCursor globalPriorityCursor_ {};
     std::atomic<bool> mouseDirectionUpdate_{ false };
     OLD::DisplayInfo displayInfo_ {};
     int32_t lastPhysicalX_ { -1 };

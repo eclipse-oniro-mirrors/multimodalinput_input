@@ -148,6 +148,12 @@ function SetCustomCursorPixelMapAsync(windowId: i32, pixelMap: @sts_type("image.
 @gen_promise("setCustomCursor")
 function SetCustomCursorAsync(windowId: i32, cursor: CustomCursor, config: CursorConfig): void;
 
+@gen_promise("setGlobalPriorityCursor")
+function SetGlobalPriorityCursorAsync(cursor: CustomCursor): void;
+
+@gen_promise("unsetGlobalPriorityCursor")
+function UnsetGlobalPriorityCursorAsync(): void;
+
 @rename("getPointerSpeedSync")
 function GetPointerSpeedSyncImpl(): i32;
 

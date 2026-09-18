@@ -383,6 +383,36 @@ int32_t CursorDrawingComponent::SetCustomCursor(
     return pointerInstance_->SetCustomCursor(pid, windowId, cursor, options, token);
 }
 
+int32_t CursorDrawingComponent::SetGlobalPriorityCursor(const CustomCursor &cursor, int32_t pid)
+{
+    CHK_IS_LOADR(isLoaded_, pointerInstance_)
+    return pointerInstance_->SetGlobalPriorityCursor(cursor, pid);
+}
+
+int32_t CursorDrawingComponent::UnsetGlobalPriorityCursor(int32_t pid)
+{
+    CHK_IS_LOADR(isLoaded_, pointerInstance_)
+    return pointerInstance_->UnsetGlobalPriorityCursor(pid);
+}
+
+bool CursorDrawingComponent::HasGlobalPriorityCursor()
+{
+    CHK_IS_LOADF(isLoaded_, pointerInstance_)
+    return pointerInstance_->HasGlobalPriorityCursor();
+}
+
+GlobalPriorityCursor CursorDrawingComponent::GetGlobalPriorityCursor()
+{
+    CHK_IS_LOADF(isLoaded_, pointerInstance_)
+    return pointerInstance_->GetGlobalPriorityCursor();
+}
+
+int32_t CursorDrawingComponent::RestoreOnServiceStart()
+{
+    CHK_IS_LOADR(isLoaded_, pointerInstance_)
+    return pointerInstance_->RestoreOnServiceStart();
+}
+
 int32_t CursorDrawingComponent::SetMouseIcon(int32_t userId, int32_t pid, int32_t windowId, CursorPixelMap curPixelMap)
 {
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
@@ -531,6 +561,11 @@ void CursorDrawingComponent::OnSessionLost(int32_t pid)
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
     CursorDrawingInformation::GetInstance().OnSessionLost(pid);
 #endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
+    CHK_IS_LOADV(isLoaded_, pointerInstance_)
+    if (pointerInstance_->HasGlobalPriorityCursor() &&
+        pointerInstance_->GetGlobalPriorityCursor().pid == pid) {
+        pointerInstance_->UnsetGlobalPriorityCursor(pid);
+    }
 }
 
 int32_t CursorDrawingComponent::SkipPointerLayer(bool isSkip)

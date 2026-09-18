@@ -209,6 +209,7 @@ ohos_shared_library("libcursor_drawing_adapter") {
   if (input_feature_pointer_drawing) {
     sources += [
       "hardware_cursor_pointer_manager/src/hardware_cursor_pointer_manager.cpp",
+      "window_manager/src/global_priority_cursor_persistence.cpp",
       "window_manager/src/pointer_drawing_manager.cpp",
       "window_manager/src/pointer_renderer.cpp",
       "window_manager/src/screen_pointer.cpp",
@@ -1548,6 +1549,7 @@ ohos_unittest("PointerDrawingManagerHardCursorTest") {
   }
  
   sources = [
+    "window_manager/src/global_priority_cursor_persistence.cpp",
     "window_manager/src/pointer_drawing_manager.cpp",
     "window_manager/src/pointer_renderer.cpp",
     "window_manager/src/screen_pointer.cpp",

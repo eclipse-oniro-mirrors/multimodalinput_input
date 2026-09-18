@@ -17,6 +17,7 @@
 #define I_POINTER_DRAWING_MANAGER_H
 
 #include "pointer_style.h"
+#include "global_priority_cursor.h"
 #include "old_display_info.h"
 #include "delegate_interface.h"
 
@@ -68,6 +69,26 @@ public:
     }
     virtual int32_t SetCustomCursor(int32_t pid, int32_t windowId, CustomCursor cursor, CursorOptions options,
         const sptr<IRemoteObject> &token = nullptr)
+    {
+        return 0;
+    }
+    virtual int32_t SetGlobalPriorityCursor(const CustomCursor &cursor, int32_t pid)
+    {
+        return 0;
+    }
+    virtual int32_t UnsetGlobalPriorityCursor(int32_t pid)
+    {
+        return 0;
+    }
+    virtual bool HasGlobalPriorityCursor() const
+    {
+        return false;
+    }
+    virtual GlobalPriorityCursor GetGlobalPriorityCursor() const
+    {
+        return {};
+    }
+    virtual int32_t RestoreOnServiceStart()
     {
         return 0;
     }

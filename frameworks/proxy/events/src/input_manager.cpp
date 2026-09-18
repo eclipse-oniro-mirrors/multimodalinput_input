@@ -994,6 +994,16 @@ int32_t InputManager::SetCustomCursor(int32_t windowId, CustomCursor cursor, Cur
     return InputMgrImpl.SetCustomCursor(windowId, cursor, options, token);
 }
 
+int32_t InputManager::SetGlobalPriorityCursor(const CustomCursor &cursor)
+{
+    return InputMgrImpl.SetGlobalPriorityCursor(cursor);
+}
+
+int32_t InputManager::UnsetGlobalPriorityCursor()
+{
+    return InputMgrImpl.UnsetGlobalPriorityCursor();
+}
+
 int32_t InputManager::CheckKnuckleEvent(float pointX, float pointY, bool &isKnuckleType)
 {
     return InputMgrImpl.CheckKnuckleEvent(pointX, pointY, isKnuckleType);

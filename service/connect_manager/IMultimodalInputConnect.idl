@@ -49,6 +49,8 @@ interface OHOS.MMI.IMultimodalInputConnect {
     void SetCustomCursorPixelMap([in] int windowId, [in] int focusX, [in] int focusY, [in] CursorPixelMap pixelMap);
     void SetCustomCursor([in] int windowId, [in] CustomCursorParcel curParcel, [in] CursorOptionsParcel cOptionParcel);
     void SetUIExtensionCustomCursor([in] int windowId, [in] CustomCursorParcel curParcel, [in] CursorOptionsParcel cOptionParcel, [in] IRemoteObject token);
+    void SetGlobalPriorityCursor([in] CustomCursorParcel curParcel);
+    void UnsetGlobalPriorityCursor();
     void SetMouseIcon([in] int windowId, [in] CursorPixelMap pixelMap);
     void SetPointerSize([in] int size);
     void SetNapStatus([in] int pid, [in] int uid, [in] String bundleName, [in] int napStatus);

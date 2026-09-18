@@ -122,3 +122,35 @@
    * @since 13
    */
   function getTouchpadThreeFingersTapSwitch(): Promise<boolean>;
+
+  /**
+   * Sets the global priority cursor with a custom cursor image and anchor point.
+   * When a global priority cursor is set, all windows will display this cursor,
+   * overriding per-window cursor styles.
+   *
+   * @param { CustomCursor } customCursor - Custom cursor, including the pixel map image,
+   * focusX (horizontal coordinate of the cursor focus), and focusY (vertical coordinate of the cursor focus).
+   * @returns { Promise<void> } Promise that returns no value.
+   * @throws { BusinessError } 201 - Permission denied.
+   * @throws { BusinessError } 202 - SystemAPI permission error.
+   * @throws { BusinessError } 401 - Parameter error.
+   * @throws { BusinessError } 3800001 - Input service exception.
+   * @syscap SystemCapability.MultimodalInput.Input.Pointer
+   * @systemapi hide for inner use.
+   * @since 25
+   */
+  function setGlobalPriorityCursor(customCursor: CustomCursor): Promise<void>;
+
+  /**
+   * Unsets the global priority cursor. Only the process that set the global
+   * priority cursor can unset it.
+   *
+   * @returns { Promise<void> } Promise that returns no value.
+   * @throws { BusinessError } 201 - Permission denied.
+   * @throws { BusinessError } 202 - SystemAPI permission error.
+   * @throws { BusinessError } 3800001 - Input service exception.
+   * @syscap SystemCapability.MultimodalInput.Input.Pointer
+   * @systemapi hide for inner use.
+   * @since 25
+   */
+  function unsetGlobalPriorityCursor(): Promise<void>;

@@ -492,6 +492,10 @@ int32_t MMIService::Init()
     MMI_HILOGI("Set para input.pointer.device false");
     INPUT_SETTING_MANAGER->Initialize();
     InputPluginManager::GetInstance()->Init(*this);
+#if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
+    CursorDrawingComponent::GetInstance();
+    CursorDrawingComponent::GetInstance().RestoreOnServiceStart();
+#endif // OHOS_BUILD_ENABLE_POINTER && OHOS_BUILD_ENABLE_POINTER_DRAWING
     return RET_OK;
     // LCOV_EXCL_STOP
 }
@@ -811,6 +815,9 @@ void MMIService::OnDisconnected(SessionPtr s)
         CursorDrawingComponent::GetInstance().DeletePointerVisible(s->GetPid());
     }
 #endif // OHOS_BUILD_ENABLE_POINTER
+#if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
+    CursorDrawingComponent::GetInstance().OnSessionLost(s->GetPid());
+#endif // OHOS_BUILD_ENABLE_POINTER && OHOS_BUILD_ENABLE_POINTER_DRAWING
 }
 
 ErrCode MMIService::SetMouseScrollRows(int32_t rows)
@@ -5718,6 +5725,78 @@ int32_t MMIService::SetCustomCursorInner(int32_t windowId, const CustomCursorPar
         MMI_HILOGE("Set the custom cursor failed, ret:%{public}d", ret);
         return ret;
     }
+#endif // OHOS_BUILD_ENABLE_POINTER
+    return RET_OK;
+}
+
+ErrCode MMIService::SetGlobalPriorityCursor(const CustomCursorParcel& curParcel)
+{
+    CALL_DEBUG_ENTER;
+    if (!PER_HELPER->VerifySystemApp()) {
+        MMI_HILOGE("Verify system APP failed");
+        return ERROR_NOT_SYSAPI;
+    }
+    if (!PER_HELPER->CheckMouseCursor()) {
+        MMI_HILOGE("Mouse cursor permission check failed");
+        return ERROR_NO_PERMISSION;
+    }
+    if (!IsRunning()) {
+        MMI_HILOGE("Service is not running");
+        return ERR_SERVICE_EXCEPTION;
+    }
+    CustomCursor cursor;
+    cursor.pixelMap = curParcel.pixelMap;
+    cursor.focusX = curParcel.focusX;
+    cursor.focusY = curParcel.focusY;
+    int32_t pid = IPCSkeleton::GetCallingPid();
+#if defined OHOS_BUILD_ENABLE_POINTER
+    CursorDrawingComponent::GetInstance();
+    int32_t ret = delegateTasks_.PostSyncTask(std::bind(
+        [pid, cursor] {
+            return CursorDrawingComponent::GetInstance().SetGlobalPriorityCursor(cursor, pid);
+        }
+        ));
+    if (ret != RET_OK) {
+        MMI_HILOGE("Set the global priority cursor failed, ret:%{public}d", ret);
+        return ret;
+    }
+#else
+    MMI_HILOGW("Pointer device module does not support");
+    return ERROR_UNSUPPORT;
+#endif // OHOS_BUILD_ENABLE_POINTER
+    return RET_OK;
+}
+
+ErrCode MMIService::UnsetGlobalPriorityCursor()
+{
+    CALL_DEBUG_ENTER;
+    if (!PER_HELPER->VerifySystemApp()) {
+        MMI_HILOGE("Verify system APP failed");
+        return ERROR_NOT_SYSAPI;
+    }
+    if (!PER_HELPER->CheckMouseCursor()) {
+        MMI_HILOGE("Mouse cursor permission check failed");
+        return ERROR_NO_PERMISSION;
+    }
+    if (!IsRunning()) {
+        MMI_HILOGE("Service is not running");
+        return ERR_SERVICE_EXCEPTION;
+    }
+    int32_t pid = IPCSkeleton::GetCallingPid();
+#if defined OHOS_BUILD_ENABLE_POINTER
+    CursorDrawingComponent::GetInstance();
+    int32_t ret = delegateTasks_.PostSyncTask(std::bind(
+        [pid] {
+            return CursorDrawingComponent::GetInstance().UnsetGlobalPriorityCursor(pid);
+        }
+        ));
+    if (ret != RET_OK) {
+        MMI_HILOGE("Unset the global priority cursor failed, ret:%{public}d", ret);
+        return ret;
+    }
+#else
+    MMI_HILOGW("Pointer device module does not support");
+    return ERROR_UNSUPPORT;
 #endif // OHOS_BUILD_ENABLE_POINTER
     return RET_OK;
 }
