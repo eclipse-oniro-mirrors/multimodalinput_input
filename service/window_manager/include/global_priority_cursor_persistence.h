@@ -25,6 +25,18 @@ public:
     static int32_t Save(const GlobalPriorityCursor &globalCursor);
     static int32_t Load(GlobalPriorityCursor &globalCursor);
     static int32_t Remove();
+
+private:
+    struct FileHeader {
+        int32_t pid = -1;
+        int32_t width = 0;
+        int32_t height = 0;
+        int32_t focusX = 0;
+        int32_t focusY = 0;
+    };
+    static int32_t LoadHeader(std::ifstream &ifs, FileHeader &fileHeader);
+    static int32_t LoadPixelData(std::ifstream &ifs, const FileHeader &fileHeader,
+        GlobalPriorityCursor &globalCursor);
 };
 } // namespace MMI
 } // namespace OHOS

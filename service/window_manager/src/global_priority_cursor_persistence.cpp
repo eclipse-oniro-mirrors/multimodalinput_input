@@ -67,36 +67,26 @@ int32_t GlobalPriorityCursorPersistence::Save(const GlobalPriorityCursor &global
     return RET_OK;
 }
 
-int32_t GlobalPriorityCursorPersistence::Load(GlobalPriorityCursor &globalCursor)
+int32_t GlobalPriorityCursorPersistence::LoadHeader(std::ifstream &ifs, FileHeader &fileHeader)
 {
-    std::ifstream ifs(GPC_FILE_PATH, std::ios::binary);
-    if (!ifs.is_open() || ifs.peek() == std::ifstream::traits_type::eof()) {
-        MMI_HILOGD("Global priority cursor file does not exist");
-        return RET_ERR;
-    }
-    char magic[sizeof(GPC_MAGIC)] = { 0 };
-    ifs.read(magic, strlen(GPC_MAGIC));
-    if (strncmp(magic, GPC_MAGIC, strlen(GPC_MAGIC)) != 0) {
-        MMI_HILOGE("Global priority cursor file magic is invalid");
-        return RET_ERR;
-    }
-    int32_t pid = -1;
-    int32_t width = 0;
-    int32_t height = 0;
-    int32_t focusX = 0;
-    int32_t focusY = 0;
-    ifs.read(reinterpret_cast<char *>(&pid), sizeof(pid));
-    ifs.read(reinterpret_cast<char *>(&width), sizeof(width));
-    ifs.read(reinterpret_cast<char *>(&height), sizeof(height));
-    ifs.read(reinterpret_cast<char *>(&focusX), sizeof(focusX));
-    ifs.read(reinterpret_cast<char *>(&focusY), sizeof(focusY));
-    if (pid <= 0 || width <= 0 || height <= 0) {
+    ifs.read(reinterpret_cast<char *>(&fileHeader.pid), sizeof(fileHeader.pid));
+    ifs.read(reinterpret_cast<char *>(&fileHeader.width), sizeof(fileHeader.width));
+    ifs.read(reinterpret_cast<char *>(&fileHeader.height), sizeof(fileHeader.height));
+    ifs.read(reinterpret_cast<char *>(&fileHeader.focusX), sizeof(fileHeader.focusX));
+    ifs.read(reinterpret_cast<char *>(&fileHeader.focusY), sizeof(fileHeader.focusY));
+    if (fileHeader.pid <= 0 || fileHeader.width <= 0 || fileHeader.height <= 0) {
         MMI_HILOGE("Global priority cursor file header is invalid");
         return RET_ERR;
     }
+    return RET_OK;
+}
+
+int32_t GlobalPriorityCursorPersistence::LoadPixelData(std::ifstream &ifs, const FileHeader &fileHeader,
+    GlobalPriorityCursor &globalCursor)
+{
     Media::InitializationOptions opts;
-    opts.size.width = width;
-    opts.size.height = height;
+    opts.size.width = fileHeader.width;
+    opts.size.height = fileHeader.height;
     opts.editable = true;
     auto pixelMap = Media::PixelMap::Create(opts);
     if (pixelMap == nullptr) {
@@ -112,12 +102,32 @@ int32_t GlobalPriorityCursorPersistence::Load(GlobalPriorityCursor &globalCursor
         return RET_ERR;
     }
     globalCursor.cursor.pixelMap = pixelMap.release();
-    globalCursor.cursor.focusX = focusX;
-    globalCursor.cursor.focusY = focusY;
-    globalCursor.pid = pid;
+    globalCursor.cursor.focusX = fileHeader.focusX;
+    globalCursor.cursor.focusY = fileHeader.focusY;
+    globalCursor.pid = fileHeader.pid;
     globalCursor.persisted = true;
-    MMI_HILOGD("Load global priority cursor succeeded, pid:%{public}d", pid);
+    MMI_HILOGD("Load global priority cursor succeeded, pid:%{public}d", fileHeader.pid);
     return RET_OK;
+}
+
+int32_t GlobalPriorityCursorPersistence::Load(GlobalPriorityCursor &globalCursor)
+{
+    std::ifstream ifs(GPC_FILE_PATH, std::ios::binary);
+    if (!ifs.is_open() || ifs.peek() == std::ifstream::traits_type::eof()) {
+        MMI_HILOGD("Global priority cursor file does not exist");
+        return RET_ERR;
+    }
+    char magic[sizeof(GPC_MAGIC)] = { 0 };
+    ifs.read(magic, strlen(GPC_MAGIC));
+    if (strncmp(magic, GPC_MAGIC, strlen(GPC_MAGIC)) != 0) {
+        MMI_HILOGE("Global priority cursor file magic is invalid");
+        return RET_ERR;
+    }
+    FileHeader fileHeader;
+    if (LoadHeader(ifs, fileHeader) != RET_OK) {
+        return RET_ERR;
+    }
+    return LoadPixelData(ifs, fileHeader, globalCursor);
 }
 
 int32_t GlobalPriorityCursorPersistence::Remove()

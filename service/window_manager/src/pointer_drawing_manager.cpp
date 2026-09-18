@@ -659,11 +659,9 @@ void PointerDrawingManager::DrawMovePointer(uint64_t rsId, int32_t physicalX, in
     }
 }
 
-void PointerDrawingManager::DrawPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
-    const PointerStyle pointerStyle, Direction direction)
+PointerStyle PointerDrawingManager::PrepareDrawStyle(uint64_t rsId, int32_t physicalX, int32_t physicalY,
+    Direction direction, PointerStyle drawStyle)
 {
-    CALL_DEBUG_ENTER;
-    PointerStyle drawStyle = pointerStyle;
     if (hasGlobalPriorityCursor_.load() && CursorDrawingInformation::GetInstance().IsPointerVisible()) {
         drawStyle.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
     }
@@ -690,6 +688,14 @@ void PointerDrawingManager::DrawPointer(uint64_t rsId, int32_t physicalX, int32_
         MMI_HILOGD("MagicCursor AdjustMouseFocus:%{public}d",
             CursorDrawingInformation::GetInstance().MouseIcon2IconType(MOUSE_ICON(drawStyle.id)));
     }
+    return drawStyle;
+}
+
+void PointerDrawingManager::DrawPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
+    const PointerStyle pointerStyle, Direction direction)
+{
+    CALL_DEBUG_ENTER;
+    PointerStyle drawStyle = PrepareDrawStyle(rsId, physicalX, physicalY, direction, pointerStyle);
     if (DrawMovePointer(rsId, physicalX, physicalY, drawStyle, direction) == RET_OK) {
         return;
     }
