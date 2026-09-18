@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <string>
 
+#include "pointer_style.h"
 #include "struct_multimodal.h"
 
 namespace OHOS {
