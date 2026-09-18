@@ -403,7 +403,16 @@ bool CursorDrawingComponent::HasGlobalPriorityCursor()
 
 GlobalPriorityCursor CursorDrawingComponent::GetGlobalPriorityCursor()
 {
-    CHK_IS_LOADF(isLoaded_, pointerInstance_)
+    GlobalPriorityCursor globalCursor;
+    Load();
+    if ((isLoaded_) == 0) {
+        MMI_HILOGE("libcursor_drawing_adapter.z.so is not loaded");
+        return globalCursor;
+    }
+    if ((pointerInstance_) == nullptr) {
+        MMI_HILOGE("pointer instance does not exist");
+        return globalCursor;
+    }
     return pointerInstance_->GetGlobalPriorityCursor();
 }
 
