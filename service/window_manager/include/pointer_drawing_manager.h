@@ -129,6 +129,8 @@ public:
     ~PointerDrawingManager();
     void DrawPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
         const PointerStyle pointerStyle, Direction direction) override;
+    PointerStyle PrepareDrawStyle(uint64_t rsId, int32_t physicalX, int32_t physicalY,
+        Direction direction, PointerStyle pointerStyle);
     void UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo) override;
     void OnDisplayInfo(const OLD::DisplayGroupInfo& displayGroupInfo, bool isDisplayChanged = false) override;
     void OnWindowInfo(const WinInfo &info) override;
