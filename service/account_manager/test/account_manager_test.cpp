@@ -849,6 +849,23 @@ HWTEST_F(AccountManagerTest, AccountManagerTest_QueryAllCreatedOsAccounts_01, Te
 }
 
 /**
+ * @tc.name: AccountManagerTest_QueryForegroundOsAccountIds_01
+ * @tc.desc: Test QueryForegroundOsAccountIds function
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AccountManagerTest, AccountManagerTest_QueryForegroundOsAccountIds_01, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto accountMgr = ACCOUNT_MGR;
+    auto foregroundIds = accountMgr->QueryForegroundOsAccountIds();
+    EXPECT_GE(foregroundIds.size(), 0);
+    for (int32_t id : foregroundIds) {
+        EXPECT_GE(id, 0);
+    }
+}
+
+/**
  * @tc.name: AccountManagerTest_QueryCurrentAccountId_01
  * @tc.desc: Test QueryCurrentAccountId function
  * @tc.type: FUNC

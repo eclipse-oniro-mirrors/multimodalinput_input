@@ -1933,6 +1933,18 @@ int32_t PointerDrawingManager::CreatePointerWindowForNoScreenPointer(uint64_t rs
     Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
     surfaceNodeConfig.SurfaceNodeName = "pointer window";
     Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
+    auto staleSurfaceNode = GetSurfaceNode();
+    if (staleSurfaceNode != nullptr && activeGroupId_ >= 0 &&
+        WIN_MGR->FindGroupIdByRsId(rsId) == activeGroupId_) {
+        std::unique_lock<std::mutex> lockGuard(surfaceNodeMutex_);
+        auto it = groupCursorCtxMap_.find(activeGroupId_);
+        if (it != groupCursorCtxMap_.end() && it->second.surfaceNode == staleSurfaceNode) {
+            MMI_HILOGI("Remove stale surfaceNode of group:%{public}d before recreate", activeGroupId_);
+            staleSurfaceNode->RemoveFromTree();
+            it->second.surfaceNode = nullptr;
+            it->second.canvasNode = nullptr;
+        }
+    }
     // Remove surfaceNode from render tree
     SetSurfaceNode(nullptr);
     RsFlushImplicitTransaction();
@@ -1986,6 +1998,11 @@ void PointerDrawingManager::CreatePointerWindow(uint64_t rsId, int32_t physicalX
     RotateDegree(direction);
     lastDirection_ = direction;
     CreateCanvasNode();
+    if (!GetHardCursorEnabled() && activeGroupId_ >= 0 &&
+        WIN_MGR->FindGroupIdByRsId(rsId) == activeGroupId_ &&
+        groupCursorCtxMap_.count(activeGroupId_) > 0) {
+        SaveActiveGroupToMap();
+    }
     RsFlushImplicitTransaction();
     BytraceAdapter::StopRsSurfaceNode();
 }
