@@ -2494,5 +2494,26 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_ResolveScreenLiteInfo_005, TestSiz
     EXPECT_EQ(result.rotation, OHOS::Rosen::Rotation::ROTATION_0);
     OHOS::system::g_mockProductType.clear();
 }
+
+/**
+ * @tc.name: ScreenPointerTest_GetBufferSize_001
+ * @tc.desc: Test the hard cursor buffer side length is 256 and the derived focus is 128
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetBufferSize_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_unique<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    // The hard cursor buffer shrinks from 512 to 256: 10 buffers per screen means 10MB -> 2.5MB.
+    EXPECT_EQ(screenpointer->GetBufferSize(), 256u);
+    // The rotation pivot and the MoveHard/MoveSoft offset both derive from this, so both are 128.
+    EXPECT_EQ(screenpointer->GetBufferSize() / 2u, 128u);
+}
 } // namespace MMI
 } // namespace OHOS

@@ -38,7 +38,7 @@ constexpr int32_t POINTER_WINDOW_INIT_SIZE{64};
 constexpr int32_t BUFFER_RELEASE_WAIT_MS{1000};
 constexpr int32_t NUM_TWO{2};
 constexpr int32_t DEFAULT_BUFFER_SIZE{8};
-constexpr int32_t DEFAULT_CURSOR_SIZE{512};
+constexpr int32_t DEFAULT_CURSOR_SIZE{256};
 constexpr uint32_t FOCUS_POINT = DEFAULT_CURSOR_SIZE / NUM_TWO;
 constexpr int32_t BUFFER_TIMEOUT{150};
 constexpr int32_t STRIDE_ALIGNMENT{8};
@@ -585,6 +585,11 @@ void ScreenPointer::CalculateHwcPositionForMirror(int32_t& x, int32_t& y)
     Rotate(rotation_t(direction), x, y, width, height);
     x += paddingLeft_;
     y += paddingTop_;
+}
+
+uint32_t ScreenPointer::GetBufferSize() const
+{
+    return DEFAULT_CURSOR_SIZE;
 }
 
 bool ScreenPointer::Move(int32_t x, int32_t y)

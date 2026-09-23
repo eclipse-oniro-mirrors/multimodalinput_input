@@ -76,6 +76,11 @@ public:
         return screenId_;
     }
 
+    // Side length of the cursor buffers owned by this ScreenPointer. Callers that compute a
+    // rotation pivot must derive it from this rather than a fixed constant, so the pivot stays
+    // inside the buffer when the hard cursor buffer shrinks.
+    uint32_t GetBufferSize() const;
+
     uint32_t GetScreenWidth() const
     {
         return width_;

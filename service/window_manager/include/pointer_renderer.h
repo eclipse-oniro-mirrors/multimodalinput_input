@@ -48,10 +48,15 @@ public:
     uint64_t screenId { 0 };
     bool isBlur { false };
     int32_t GetImageSize() const;
+    // Clamps GetImageSize() to fit a buffer of the given side length, preserving the 1:1 aspect ratio.
+    // Gear 1 has a zero suppression exponent, so imageSize = 40 * dpi is unbounded and can exceed the
+    // buffer; every other gear is already bounded by MAX_DPI. Takes the side as a parameter so the
+    // soft (512) and hard (256) paths share one implementation without either hardcoding the other's size.
+    int32_t GetClampedImageSize(uint32_t bufferSide) const;
     float AdjustIncreaseRatio(float dpi) const;
     std::string ToString() const;
-    int32_t GetOffsetX() const;
-    int32_t GetOffsetY() const;
+    uint32_t GetFocusX() const;
+    uint32_t GetFocusY() const;
 
     RenderConfig() = default;
     ~RenderConfig() = default;
@@ -79,7 +84,7 @@ public:
 private:
     int32_t BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t width, uint32_t height,
         const RenderConfig &cfg);
-    void DrawDefaultPointer(const RenderConfig &cfg);
+    void DrawDefaultPointer(uint32_t width, uint32_t height, const RenderConfig &cfg);
     void DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg, const RenderConfig &cfg);
     void AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t direction, uint32_t displayDirection);
     bool IsPositionOutCanvas(int32_t x, int32_t y, int32_t imageSize, uint32_t width, uint32_t height);
@@ -87,33 +92,39 @@ private:
     void SetPointerCfg(const RenderConfig &cfg);
     const RenderConfig& GetPointerCfg(const RenderConfig &defaultCfg);
     std::vector<image_ptr_t> GetPointerImage(const RenderConfig &cfg);
-    void LoadDefaultPointerImage(const RenderConfig &cfg);
+    void LoadDefaultPointerImage(uint32_t bufferSide, const RenderConfig &cfg);
     void ApplyAlpha(uint8_t *pixel, const int32_t len, bool isPixelPremul, const float pecent);
     void SetAlpha(pixelmap_ptr_t pixelMap, const float pecent);
-    image_ptr_t LoadPointerImage(const RenderConfig &cfg);
+    image_ptr_t LoadPointerImage(uint32_t bufferSide, const RenderConfig &cfg);
     bool GetPointerFromCache(const RenderConfig &cfg, std::string& svgContent);
-    pixelmap_ptr_t LoadCursorSvgWithColor(const RenderConfig &cfg);
+    pixelmap_ptr_t LoadCursorSvgWithColor(uint32_t bufferSide, const RenderConfig &cfg);
     image_ptr_t ExtractDrawingImage(pixelmap_ptr_t pixelMap);
-    int32_t DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, const RenderConfig &cfg);
-    std::vector<std::tuple<RenderConfig, image_ptr_t>> imgMaps_;
+    int32_t DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, uint32_t width, uint32_t height,
+        const RenderConfig &cfg);
+    // The cached image is decoded at GetClampedImageSize(bufferSide), so the buffer side is part of
+    // the identity: RenderConfig::operator== compares the *unclamped* image size, and above the
+    // buffer limit two sides can share that value while producing differently sized images.
+    // Omitting it would let a 320px soft-cursor decode be reused for a 256px hard-cursor buffer,
+    // bypassing the clamp.
+    std::vector<std::tuple<RenderConfig, uint32_t, image_ptr_t>> imgMaps_;
     std::shared_mutex imgMapsMtx_;
-    image_ptr_t FindImg(const RenderConfig &cfg)
+    image_ptr_t FindImg(uint32_t bufferSide, const RenderConfig &cfg)
     {
         std::shared_lock lock(imgMapsMtx_);
         for (auto& data : imgMaps_) {
-            if (std::get<0>(data) == cfg) {
-                return std::get<1>(data);
+            if ((std::get<1>(data) == bufferSide) && (std::get<0>(data) == cfg)) {
+                return std::get<2>(data);
             }
         }
         return nullptr;
     }
-    void PushImg(const RenderConfig &cfg, image_ptr_t img)
+    void PushImg(uint32_t bufferSide, const RenderConfig &cfg, image_ptr_t img)
     {
         std::unique_lock lock(imgMapsMtx_);
         if (imgMaps_.size() >= DEFAULT_IMG_SIZE) {
             imgMaps_.erase(imgMaps_.begin());
         }
-        imgMaps_.push_back({cfg, img});
+        imgMaps_.push_back({cfg, bufferSide, img});
     }
     std::map<MOUSE_ICON, std::string> mouseIcons_;
     mutable std::mutex cacheMutex_;

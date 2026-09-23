@@ -1222,12 +1222,20 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         MMI_HILOGD("HardwareCursorRender, screen = %{public}" PRIu64 ", dpi = %{public}f",
             it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
+            // Hard cursor: derive the pivot from this ScreenPointer's buffer size so it stays
+            // inside the buffer when the hard cursor buffer shrinks. The soft cursor path keeps
+            // using GetFocusCoordinates() because its buffer size is unchanged.
+            float hardFocus = static_cast<float>(it.second->GetBufferSize()) / CALCULATE_IMAGE_MIDDLE;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = GetFocusCoordinates();
-                cfg.rotationFocusY = GetFocusCoordinates();
+                cfg.rotationFocusX = hardFocus;
+                cfg.rotationFocusY = hardFocus;
             } else {
-                cfg.rotationFocusX = GetFocusCoordinates() + cfg.GetImageSize() * RUNNING_X_RATIO;
-                cfg.rotationFocusY = GetFocusCoordinates() + cfg.GetImageSize() * RUNNING_Y_RATIO;
+                // RUNNING pivot is glyph-relative, not buffer-centre-relative: the rotate pivot is
+                // fed straight to canvas.Rotate() with nothing subtracting the buffer focus, so
+                // adding hardFocus here would push the pivot outside a 256 buffer
+                // (128 + 254*0.675 = 299.5). Keep it purely glyph-relative.
+                cfg.rotationFocusX = cfg.GetImageSize() * RUNNING_X_RATIO;
+                cfg.rotationFocusY = cfg.GetImageSize() * RUNNING_Y_RATIO;
             }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);
