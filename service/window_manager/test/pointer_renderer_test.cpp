@@ -529,7 +529,9 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_AdjustDeltaForDirection_001, T
 
 /**
  * @tc.name: PointerRendererTest_IsPositionOutCanvas_001
- * @tc.desc: Test IsPositionOutCanvas
+ * @tc.desc: The arguments are the image's TOP-LEFT, matching what DrawImage() consumes. An earlier
+ *           version subtracted imageSize/2 from them as if they were a centre, which at gear 7
+ *           turned the centred origin (1,1) into "left = -126" and skipped every blur frame.
  * @tc.type: Function
  * @tc.require:
  */
@@ -540,28 +542,44 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_IsPositionOutCanvas_001, TestS
     int32_t imageSize = 20;
     uint32_t width = 200;
     uint32_t height = 200;
-    int32_t x = 100;
-    int32_t y = 100;
-    bool ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, false);
-    x = -100;
-    ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, true);
-    y = -100;
-    ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, true);
-    x = 100;
-    ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, true);
-    y = 300;
-    ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, true);
-    x = 300;
-    ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, true);
-    y = 100;
-    ret = renderer.IsPositionOutCanvas(x, y, imageSize, width, height);
-    EXPECT_EQ(ret, true);
+    // Fully inside -> drawn.
+    EXPECT_FALSE(renderer.IsPositionOutCanvas(100, 100, imageSize, width, height));
+    // The real blur case: a centred image at gear 7 starts at origin 1 and must still be drawn.
+    EXPECT_FALSE(renderer.IsPositionOutCanvas(1, 1, 254, 256, 256));
+    // Just past the right edge but within the quarter-image slack -> still drawn.
+    EXPECT_FALSE(renderer.IsPositionOutCanvas(195, 100, imageSize, width, height));
+    // Entirely above/left of the buffer -> skipped.
+    EXPECT_TRUE(renderer.IsPositionOutCanvas(-100, 100, imageSize, width, height));
+    EXPECT_TRUE(renderer.IsPositionOutCanvas(100, -100, imageSize, width, height));
+    // Well past the right/bottom edge -> skipped.
+    EXPECT_TRUE(renderer.IsPositionOutCanvas(300, 100, imageSize, width, height));
+    EXPECT_TRUE(renderer.IsPositionOutCanvas(100, 300, imageSize, width, height));
+}
+
+/**
+ * @tc.name: PointerRendererTest_DrawBlurPointer_002
+ * @tc.desc: Regression guard for the blur filter. At gear 7 the image is centred with origin 1, so
+ *           every blur frame passed a small positive top-left. The old centre-based bounds check
+ *           computed left = 1 - 127 = -126 and skipped all of them, silently dropping the drag
+ *           trail. Assert the frames are actually drawn.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_DrawBlurPointer_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerRenderer renderer;
+    const int32_t side = static_cast<int32_t>(HARD_CURSOR_SIZE);
+    // The check the blur loop performs, with the origin a centred gear-7 image produces.
+    const int32_t origin = side / 2 - 254 / 2;          // 1
+    const int32_t imageSize = 254;
+    for (int32_t dx : {0, 1, 5, 50}) {
+        for (float ratio : {0.4f, 0.6f, 0.8f}) {
+            int32_t localX = origin + static_cast<int32_t>(dx * ratio);
+            EXPECT_FALSE(renderer.IsPositionOutCanvas(localX, origin, imageSize, side, side))
+                << "blur frame wrongly skipped, dx=" << dx << " ratio=" << ratio;
+        }
+    }
 }
 
 /**

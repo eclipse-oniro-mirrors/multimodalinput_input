@@ -35,6 +35,13 @@ using screen_info_ptr_t = sptr<OHOS::Rosen::ScreenInfo>;
 using mode_t = OHOS::Rosen::ScreenSourceMode;
 using rotation_t = OHOS::Rosen::Rotation;
 
+// Side length of every cursor buffer: the hard-cursor common/default/transparent buffers, and the
+// soft-cursor surface buffer. The draw origin centres the image in it, HotspotInBuffer() is
+// computed against it, and Move()/MoveSoft() offset the node bounds by that hotspot, so all four
+// must agree on one number -- they did not when the soft path derived its size from the separate
+// setcanvassize parameter.
+constexpr int32_t DEFAULT_CURSOR_SIZE{256};
+
 uint32_t GetScreenInfoWidth(const screen_info_ptr_t);
 uint32_t GetScreenInfoHeight(const screen_info_ptr_t);
 
@@ -65,7 +72,9 @@ public:
     buffer_ptr_t GetCommonBuffer();
     buffer_ptr_t RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer);
     buffer_ptr_t GetCurrentBuffer();
-    void UpdateHotspotInBuffer(const RenderConfig &cfg);
+    // Caches the hotspot for the given path. isHard selects which copy to update:
+    // the two paths run on different threads and must not share one value.
+    void UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard);
 
     bool Move(int32_t x, int32_t y);
     bool MoveSoft(int32_t x, int32_t y);
@@ -249,11 +258,17 @@ private:
     std::shared_ptr<OHOS::Rosen::RSUIContext> rsUIContext_{nullptr};
 
     RenderConfig defaultCursorCfg_;
-    // Hotspot position within the rendered buffer, cached by RequestBuffer() for Move()/MoveSoft(),
-    // which receive only a position. Initialised to the buffer centre so behaviour before the first
-    // render matches the old unconditional half-buffer offset.
-    int32_t hotspotInBufferX_{128};
-    int32_t hotspotInBufferY_{128};
+    // Hotspot position within the rendered buffer, cached for Move()/MoveSoft(), which receive only
+    // a position. Held per path: the two are driven from different threads with their own
+    // RenderConfig (the soft path renders at the screen dpi and has its own direction), so a single
+    // pair let one path's write reposition the other's cursor -- e.g. at direction 90 the hard and
+    // soft hotspots differ by the half-buffer term and the hard cursor would jump by that amount.
+    // Initialised to the buffer centre so behaviour before the first render matches the old
+    // unconditional half-buffer offset.
+    int32_t hotspotHardX_{DEFAULT_CURSOR_SIZE / 2};
+    int32_t hotspotHardY_{DEFAULT_CURSOR_SIZE / 2};
+    int32_t hotspotSoftX_{DEFAULT_CURSOR_SIZE / 2};
+    int32_t hotspotSoftY_{DEFAULT_CURSOR_SIZE / 2};
     buffer_ptr_t transparentBuffer_{nullptr};
     buffer_ptr_t defaultBuffer_{nullptr};
     std::shared_mutex bufferMutex_;

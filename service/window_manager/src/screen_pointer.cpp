@@ -38,7 +38,6 @@ constexpr int32_t POINTER_WINDOW_INIT_SIZE{64};
 constexpr int32_t BUFFER_RELEASE_WAIT_MS{1000};
 constexpr int32_t NUM_TWO{2};
 constexpr int32_t DEFAULT_BUFFER_SIZE{8};
-constexpr int32_t DEFAULT_CURSOR_SIZE{256};
 constexpr int32_t BUFFER_TIMEOUT{150};
 constexpr int32_t STRIDE_ALIGNMENT{8};
 constexpr uint32_t RENDER_STRIDE{4};
@@ -299,19 +298,27 @@ buffer_ptr_t ScreenPointer::GetCommonBuffer()
     return commonBuffers_[newId];
 }
 
-void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg)
+void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard)
 {
     // The draw origin centres the image in the buffer, so the hotspot no longer sits at the buffer
     // centre. Cache where it did land: Move()/MoveSoft() take only a position and must offset by
-    // this rather than by half the buffer side. Both the hard path (RequestBuffer) and the soft
-    // path (DrawSoftCursor, which has no buffer to request) must call this before moving.
-    hotspotInBufferX_ = cfg.HotspotInBufferX(DEFAULT_CURSOR_SIZE);
-    hotspotInBufferY_ = cfg.HotspotInBufferY(DEFAULT_CURSOR_SIZE);
+    // this rather than by half the buffer side. The hard path (RequestBuffer) and the soft path
+    // (SoftwareCursorRender, which has no buffer to request) each keep their own copy, because
+    // they run on different threads with different RenderConfigs.
+    int32_t x = cfg.HotspotInBufferX(DEFAULT_CURSOR_SIZE);
+    int32_t y = cfg.HotspotInBufferY(DEFAULT_CURSOR_SIZE);
+    if (isHard) {
+        hotspotHardX_ = x;
+        hotspotHardY_ = y;
+    } else {
+        hotspotSoftX_ = x;
+        hotspotSoftY_ = y;
+    }
 }
 
 buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer)
 {
-    UpdateHotspotInBuffer(cfg);
+    UpdateHotspotInBuffer(cfg, true);
     if (cfg.style_ == MOUSE_ICON::TRANSPARENT_ICON) {
         MMI_HILOGD("The buffer transparent buffer.");
         isCommonBuffer = false;
@@ -640,8 +647,8 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
     if (IsPositionOutScreen(x, y)) {
         MMI_HILOGE("Position out of screen");
     }
-    int32_t px = x - hotspotInBufferX_;
-    int32_t py = y - hotspotInBufferY_;
+    int32_t px = x - hotspotHardX_;
+    int32_t py = y - hotspotHardY_;
     uint32_t bid = bufferId_.load(std::memory_order_relaxed);
     BytraceAdapter::StartHardPointerMove(buffer->GetWidth(), buffer->GetHeight(), bid, screenId_);
     auto ret = hwcMgr_->SetPosition(screenId_, px, py, bh);
@@ -672,8 +679,8 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     if (IsMirror()) {
         CalculateHwcPositionForMirror(x, y);
     }
-    int32_t px = x - hotspotInBufferX_;
-    int32_t py = y - hotspotInBufferY_;
+    int32_t px = x - hotspotSoftX_;
+    int32_t py = y - hotspotSoftY_;
 
     if (!IsMirror()) {
         int64_t nodeId = surfaceNode_->GetId();

@@ -2518,10 +2518,12 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetBufferSize_001, TestSize.Level1
 
 /**
  * @tc.name: ScreenPointerTest_UpdateHotspotInBuffer_001
- * @tc.desc: The soft path never calls RequestBuffer, so it must cache the hotspot itself. Before
- *           UpdateHotspotInBuffer() was extracted, hotspotInBufferX_/Y_ kept the 128 default on that
- *           path while the image was drawn centred, putting every non-centre-aligned style off by up
- *           to 127px. Verify the cache tracks the config for both a centre and a corner alignment.
+ * @tc.desc: The hard and soft cursor paths run on different threads with their own RenderConfig
+ *           (the soft path renders at the screen dpi and carries its own direction), so each must
+ *           keep its own hotspot. A single shared pair let the soft path's write reposition the
+ *           hard cursor -- at direction 90 the two hotspots differ by the half-buffer term.
+ *           Also covers the original defect: the soft path never calls RequestBuffer, so it has
+ *           to cache its own hotspot rather than keeping the initial default.
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -2536,25 +2538,37 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
     ASSERT_NE(screenpointer, nullptr);
 
     const int32_t side = static_cast<int32_t>(screenpointer->GetBufferSize());
-    RenderConfig centre;
-    centre.style_ = MOUSE_ICON::CURSOR_CIRCLE;
-    centre.align_ = ICON_TYPE::ANGLE_CENTER;
-    centre.size = 7;
-    centre.dpi = 1.93f;
-    centre.direction = 0;
-    centre.displayDirection = 0;
-    screenpointer->UpdateHotspotInBuffer(centre);
-    EXPECT_EQ(screenpointer->hotspotInBufferX_, centre.HotspotInBufferX(side));
-    EXPECT_EQ(screenpointer->hotspotInBufferY_, centre.HotspotInBufferY(side));
-
-    RenderConfig corner = centre;
+    RenderConfig corner;
     corner.style_ = MOUSE_ICON::DEFAULT;
     corner.align_ = ICON_TYPE::ANGLE_NW;
-    screenpointer->UpdateHotspotInBuffer(corner);
-    EXPECT_EQ(screenpointer->hotspotInBufferX_, corner.HotspotInBufferX(side));
-    EXPECT_EQ(screenpointer->hotspotInBufferY_, corner.HotspotInBufferY(side));
-    // A north-west anchored style must not report the buffer centre.
-    EXPECT_NE(screenpointer->hotspotInBufferX_, side / 2);
+    corner.size = 7;
+    corner.dpi = 1.93f;
+    corner.direction = 0;
+    corner.displayDirection = 0;
+
+    // Each path caches into its own slot.
+    screenpointer->UpdateHotspotInBuffer(corner, true);
+    EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side));
+    EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side));
+    // An ANGLE_NW hotspot is the image corner, never the buffer centre.
+    EXPECT_NE(screenpointer->hotspotHardX_, side / 2);
+
+    // A subsequent soft write must not disturb the hard value, even for a config whose hotspot
+    // differs -- this is the cross-thread clobber the split storage prevents.
+    RenderConfig softCfg = corner;
+    softCfg.direction = 1;      // direction 90 rotates the hotspot about the buffer centre
+    screenpointer->UpdateHotspotInBuffer(softCfg, false);
+    EXPECT_EQ(screenpointer->hotspotSoftX_, softCfg.HotspotInBufferX(side));
+    EXPECT_EQ(screenpointer->hotspotSoftY_, softCfg.HotspotInBufferY(side));
+    EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side))
+        << "soft write changed the hard hotspot";
+    EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side))
+        << "soft write changed the hard hotspot";
+    // The two really do differ here, so the assertions above are not vacuous. Compare the pair:
+    // for direction 90 the X components coincide and only Y separates them.
+    EXPECT_TRUE(screenpointer->hotspotHardX_ != screenpointer->hotspotSoftX_ ||
+        screenpointer->hotspotHardY_ != screenpointer->hotspotSoftY_)
+        << "hard and soft hotspots are identical, test input does not exercise the split";
 }
 } // namespace MMI
 } // namespace OHOS

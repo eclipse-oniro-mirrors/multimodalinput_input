@@ -56,7 +56,52 @@ static int32_t BufferFocus(uint32_t side)
     return static_cast<int32_t>(side / CALCULATE_IMAGE_MIDDLE);
 }
 
-// The draw origin centres the decoded image in the buffer. It deliberately does NOT align the
+// The side the image is actually drawn at: the built-in SVG path is sized from the gear and dpi,
+// but an app-supplied pixelmap keeps its own dimensions unless it would not fit the buffer.
+int32_t RenderConfig::GetPlacedImageSize(uint32_t bufferSide) const
+{
+    if (userIconPixelMap == nullptr) {
+        return GetClampedImageSize(bufferSide);
+    }
+    Media::ImageInfo imageInfo;
+    userIconPixelMap->GetImageInfo(imageInfo);
+    int32_t iconWidth = imageInfo.size.width;
+    int32_t iconHeight = imageInfo.size.height;
+    if (iconWidth <= 0 || iconHeight <= 0) {
+        MMI_HILOGE("Invalid user icon size, width:%{public}d, height:%{public}d", iconWidth, iconHeight);
+        return GetClampedImageSize(bufferSide);
+    }
+    // A user icon larger than the buffer is scaled down to fit (see UserIconScale); anything that
+    // already fits keeps its original size, so a legal 256x256 icon renders at 256, not 255.
+    int32_t longSide = (iconWidth > iconHeight ? iconWidth : iconHeight);
+    int32_t maxSide = static_cast<int32_t>(bufferSide);
+    if (longSide > maxSide) {
+        return maxSide;
+    }
+    return longSide;
+}
+
+float RenderConfig::UserIconScaleRatio(uint32_t bufferSide) const
+{
+    if (userIconPixelMap == nullptr) {
+        return 1.0f;
+    }
+    Media::ImageInfo imageInfo;
+    userIconPixelMap->GetImageInfo(imageInfo);
+    int32_t iconWidth = imageInfo.size.width;
+    int32_t iconHeight = imageInfo.size.height;
+    if (iconWidth <= 0 || iconHeight <= 0) {
+        return 1.0f;
+    }
+    int32_t longSide = (iconWidth > iconHeight ? iconWidth : iconHeight);
+    int32_t maxSide = static_cast<int32_t>(bufferSide);
+    if (longSide <= maxSide) {
+        return 1.0f;
+    }
+    return static_cast<float>(maxSide) / static_cast<float>(longSide);
+}
+
+// The draw origin centres the image in the buffer. It deliberately does NOT align the
 // style's own focus (GetFocusX/Y) onto the buffer centre: that older scheme let a non-centred
 // align (ANGLE_NW's hotspot, ANGLE_SW's (0,h)) push the image almost a full imageSize away from
 // the centre, so it needed a 2x buffer and clipped 8 styles once the side shrank to 256.
@@ -66,12 +111,14 @@ static int32_t BufferFocus(uint32_t side)
 // see HotspotInBufferX/Y.
 static int32_t CalcDrawOriginX(uint32_t width, const RenderConfig &cfg)
 {
-    return BufferFocus(width) - static_cast<int32_t>(cfg.GetClampedImageSize(width) / CALCULATE_IMAGE_MIDDLE);
+    // Uses the size the image is actually placed at, so an app-supplied pixelmap is centred by its
+    // own dimensions rather than by the system gear size.
+    return BufferFocus(width) - static_cast<int32_t>(cfg.GetPlacedImageSize(width) / CALCULATE_IMAGE_MIDDLE);
 }
 
 static int32_t CalcDrawOriginY(uint32_t height, const RenderConfig &cfg)
 {
-    return BufferFocus(height) - static_cast<int32_t>(cfg.GetClampedImageSize(height) / CALCULATE_IMAGE_MIDDLE);
+    return BufferFocus(height) - static_cast<int32_t>(cfg.GetPlacedImageSize(height) / CALCULATE_IMAGE_MIDDLE);
 }
 
 int32_t RenderConfig::GetImageSize() const
@@ -150,7 +197,9 @@ static void RotateOffsetAboutCentre(uint32_t direction, int32_t &dx, int32_t &dy
 // The hotspot's position relative to the buffer centre, after rotation.
 static void HotspotOffsetFromCentre(uint32_t bufferSide, const RenderConfig &cfg, int32_t &dx, int32_t &dy)
 {
-    int32_t half = static_cast<int32_t>(cfg.GetClampedImageSize(bufferSide) / CALCULATE_IMAGE_MIDDLE);
+    // Half of the size the image is actually placed at, so an app-supplied icon is centred by its
+    // own dimensions rather than by the system gear size.
+    int32_t half = static_cast<int32_t>(cfg.GetPlacedImageSize(bufferSide) / CALCULATE_IMAGE_MIDDLE);
     dx = static_cast<int32_t>(cfg.GetFocusX(bufferSide)) - half;
     dy = static_cast<int32_t>(cfg.GetFocusY(bufferSide)) - half;
     RotateOffsetAboutCentre(cfg.direction, dx, dy);
@@ -192,7 +241,11 @@ uint32_t RenderConfig::GetFocusX(uint32_t bufferSide) const
         case ANGLE_NE:
             return static_cast<uint32_t>(width);
         case ANGLE_NW:
-            return static_cast<uint32_t>(this->userIconHotSpotX);
+            // The app's hotspot is in the icon's own pixel coordinates. When the icon is scaled
+            // down to fit the buffer, the hotspot must shrink by the same ratio, or it points at
+            // the wrong part of the drawn image.
+            return static_cast<uint32_t>(static_cast<float>(this->userIconHotSpotX) *
+                this->UserIconScaleRatio(bufferSide));
         case ANGLE_NW_RIGHT:
             // Do NOT simplify to static_cast<uint32_t>(width * CALCULATE_MOUSE_ICON_BIAS): the
             // pre-change expression truncated (focus - width * BIAS) as a whole, which rounds this
@@ -224,7 +277,9 @@ uint32_t RenderConfig::GetFocusY(uint32_t bufferSide) const
         case ANGLE_SW:
             return static_cast<uint32_t>(height);
         case ANGLE_NW:
-            return static_cast<uint32_t>(this->userIconHotSpotY);
+            // See GetFocusX(): the hotspot scales with the icon.
+            return static_cast<uint32_t>(static_cast<float>(this->userIconHotSpotY) *
+                this->UserIconScaleRatio(bufferSide));
         default:
             MMI_HILOGD("No need calculate focus y");
             return 0;
@@ -234,31 +289,26 @@ uint32_t RenderConfig::GetFocusY(uint32_t bufferSide) const
 image_ptr_t PointerRenderer::UserIconScale(uint32_t width, uint32_t height, const RenderConfig &cfg)
 {
     CHKPP(cfg.userIconPixelMap);
-    // An app-supplied pixelmap is unbounded external input: GetImageSize()/GetClampedImageSize()
-    // constrain the built-in SVG path only, so this path has to bound itself (INV-6). Without it a
-    // large user icon would be clipped by the buffer instead of shrunk to fit.
-    uint32_t maxSide = (width < height ? width : height);
-    if (maxSide == 0) {
+    // An app-supplied pixelmap is unbounded external input, so it is bounded here rather than by
+    // GetClampedImageSize(), which only constrains the built-in SVG path. The bound is the buffer
+    // side itself, not side-1: the draw origin centres the image, so an icon exactly the size of
+    // the buffer lands at [0, side) and is fully visible. Trimming a pixel would change the
+    // rendering of a legal 256x256 icon, which this change must not do.
+    if (width == 0 || height == 0) {
         MMI_HILOGE("Invalid buffer size, width:%{public}u, height:%{public}u", width, height);
         return ExtractDrawingImage(cfg.userIconPixelMap);
     }
-    // Leave one pixel of headroom, matching GetClampedImageSize().
-    maxSide -= 1;
+    float ratio = cfg.UserIconScaleRatio(width);
+    if (ratio >= 1.0f) {
+        // Already fits: draw at native size, keeping the app's pixels and hotspot untouched.
+        return ExtractDrawingImage(cfg.userIconPixelMap);
+    }
     Media::ImageInfo imageInfo;
     cfg.userIconPixelMap->GetImageInfo(imageInfo);
-    int32_t iconWidth = imageInfo.size.width;
-    int32_t iconHeight = imageInfo.size.height;
-    if (iconWidth <= 0 || iconHeight <= 0) {
-        MMI_HILOGE("Invalid user icon size, width:%{public}d, height:%{public}d", iconWidth, iconHeight);
-        return ExtractDrawingImage(cfg.userIconPixelMap);
-    }
-    int32_t longSide = (iconWidth > iconHeight ? iconWidth : iconHeight);
-    if (longSide <= static_cast<int32_t>(maxSide)) {
-        return ExtractDrawingImage(cfg.userIconPixelMap);
-    }
-    // Scale the longer side down to the limit and apply the same ratio to both axes, so the
-    // aspect ratio is preserved rather than the icon being squashed into a square.
-    float scale = static_cast<float>(maxSide) / static_cast<float>(longSide);
+    // Same reasoning as GetClampedImageSize(): this runs per render, and an oversized user icon is
+    // a stable condition, so it must not be warn-level.
+    MMI_HILOGD("User icon %{public}dx%{public}d exceeds buffer %{public}u, scale by %{public}f",
+        imageInfo.size.width, imageInfo.size.height, width, ratio);
     MessageParcel data;
     cfg.userIconPixelMap->Marshalling(data);
     std::shared_ptr<Media::PixelMap> scaled(Media::PixelMap::Unmarshalling(data));
@@ -266,11 +316,7 @@ image_ptr_t PointerRenderer::UserIconScale(uint32_t width, uint32_t height, cons
         MMI_HILOGE("Copy user icon failed, draw it unscaled");
         return ExtractDrawingImage(cfg.userIconPixelMap);
     }
-    // Same reasoning as GetClampedImageSize(): UserIconScale() runs per render, and an oversized
-    // user icon is a stable condition, so this must not be warn-level.
-    MMI_HILOGD("User icon %{public}dx%{public}d exceeds buffer %{public}u, scale by %{public}f",
-        iconWidth, iconHeight, maxSide, scale);
-    scaled->scale(scale, scale, Media::AntiAliasingOption::SLR);
+    scaled->scale(ratio, ratio, Media::AntiAliasingOption::SLR);
     return ExtractDrawingImage(scaled);
 }
 
@@ -442,15 +488,19 @@ void PointerRenderer::AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t
         static_cast<int32_t>(direction), static_cast<int32_t>(displayDirection), static_cast<int32_t>(angle));
 }
 
-bool PointerRenderer::IsPositionOutCanvas(int32_t x, int32_t y, int32_t imageSize, uint32_t width, uint32_t height)
+// Bounds check for a blur image about to be drawn at (left, top). These coordinates are a
+// top-left corner, the same value DrawImage() consumes -- not a centre. An earlier version
+// subtracted imageSize/2 from them, which double-counted the offset: at gear 7 the image is
+// centred with origin 1, so the check saw left = -126 and skipped every horizontal blur frame.
+bool PointerRenderer::IsPositionOutCanvas(int32_t left, int32_t top, int32_t imageSize,
+    uint32_t width, uint32_t height)
 {
-    int32_t left = x - imageSize / 2;
-    int32_t right = x + imageSize / 2;
-    int32_t top = y + imageSize / 2;
-    int32_t bottom = y - imageSize / 2;
-    int32_t scale = imageSize / 4;
-    return left < -scale || right > static_cast<int32_t>(width) + scale ||
-            bottom < -scale || top > static_cast<int32_t>(height) + scale;
+    int32_t right = left + imageSize;
+    int32_t bottom = top + imageSize;
+    // Allow a quarter of the image to hang off each edge so a partially visible blur still draws.
+    int32_t slack = imageSize / 4;
+    return right < -slack || left > static_cast<int32_t>(width) + slack ||
+            bottom < -slack || top > static_cast<int32_t>(height) + slack;
 }
 
 bool PointerRenderer::HasPointerCfg(const RenderConfig &cfg)

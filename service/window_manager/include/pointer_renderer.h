@@ -53,6 +53,14 @@ public:
     // buffer; every other gear is already bounded by MAX_DPI. Takes the side as a parameter so the
     // soft (512) and hard (256) paths share one implementation without either hardcoding the other's size.
     int32_t GetClampedImageSize(uint32_t bufferSide) const;
+    // The side the image is actually drawn at. For built-in SVGs this is GetClampedImageSize();
+    // for an app-supplied pixelmap it is the icon's own long side, capped at the buffer side, so
+    // placement and the hotspot follow the real dimensions rather than the system gear size.
+    int32_t GetPlacedImageSize(uint32_t bufferSide) const;
+    // Ratio an app-supplied icon is drawn at relative to its own pixels: 1.0 when it already fits
+    // the buffer, otherwise bufferSide/longSide. Placement, the hotspot and the actual scaling all
+    // go through this one value so they cannot drift apart.
+    float UserIconScaleRatio(uint32_t bufferSide) const;
     float AdjustIncreaseRatio(float dpi) const;
     std::string ToString() const;
     // The style's focus within its own image. Takes the buffer side because the focus must be
@@ -94,7 +102,8 @@ private:
     void DrawDefaultPointer(uint32_t width, uint32_t height, const RenderConfig &cfg);
     void DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg, const RenderConfig &cfg);
     void AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t direction, uint32_t displayDirection);
-    bool IsPositionOutCanvas(int32_t x, int32_t y, int32_t imageSize, uint32_t width, uint32_t height);
+    // (left, top) is the image's top-left in buffer coordinates, matching DrawImage's arguments.
+    bool IsPositionOutCanvas(int32_t left, int32_t top, int32_t imageSize, uint32_t width, uint32_t height);
     bool HasPointerCfg(const RenderConfig &cfg);
     void SetPointerCfg(const RenderConfig &cfg);
     const RenderConfig& GetPointerCfg(const RenderConfig &defaultCfg);
