@@ -55,8 +55,15 @@ public:
     int32_t GetClampedImageSize(uint32_t bufferSide) const;
     float AdjustIncreaseRatio(float dpi) const;
     std::string ToString() const;
-    uint32_t GetFocusX() const;
-    uint32_t GetFocusY() const;
+    // The style's focus within its own image. Takes the buffer side because the focus must be
+    // derived from GetClampedImageSize(), which the bitmap is actually decoded at.
+    uint32_t GetFocusX(uint32_t bufferSide) const;
+    uint32_t GetFocusY(uint32_t bufferSide) const;
+    // Where the hotspot lands inside the buffer, now that the draw origin centres the image rather
+    // than aligning the hotspot to the buffer centre. ScreenPointer::Move offsets the cursor
+    // position by this instead of by half the buffer side.
+    int32_t HotspotInBufferX(uint32_t bufferSide) const;
+    int32_t HotspotInBufferY(uint32_t bufferSide) const;
 
     RenderConfig() = default;
     ~RenderConfig() = default;

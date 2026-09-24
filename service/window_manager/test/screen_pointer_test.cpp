@@ -2515,5 +2515,46 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetBufferSize_001, TestSize.Level1
     // The rotation pivot and the MoveHard/MoveSoft offset both derive from this, so both are 128.
     EXPECT_EQ(screenpointer->GetBufferSize() / 2u, 128u);
 }
+
+/**
+ * @tc.name: ScreenPointerTest_UpdateHotspotInBuffer_001
+ * @tc.desc: The soft path never calls RequestBuffer, so it must cache the hotspot itself. Before
+ *           UpdateHotspotInBuffer() was extracted, hotspotInBufferX_/Y_ kept the 128 default on that
+ *           path while the image was drawn centred, putting every non-centre-aligned style off by up
+ *           to 127px. Verify the cache tracks the config for both a centre and a corner alignment.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+
+    const int32_t side = static_cast<int32_t>(DEFAULT_CURSOR_SIZE);
+    RenderConfig centre;
+    centre.style_ = MOUSE_ICON::CURSOR_CIRCLE;
+    centre.align_ = ICON_TYPE::ANGLE_CENTER;
+    centre.size = 7;
+    centre.dpi = 1.93f;
+    centre.direction = 0;
+    centre.displayDirection = 0;
+    screenpointer->UpdateHotspotInBuffer(centre);
+    EXPECT_EQ(screenpointer->hotspotInBufferX_, centre.HotspotInBufferX(side));
+    EXPECT_EQ(screenpointer->hotspotInBufferY_, centre.HotspotInBufferY(side));
+
+    RenderConfig corner = centre;
+    corner.style_ = MOUSE_ICON::DEFAULT;
+    corner.align_ = ICON_TYPE::ANGLE_NW;
+    screenpointer->UpdateHotspotInBuffer(corner);
+    EXPECT_EQ(screenpointer->hotspotInBufferX_, corner.HotspotInBufferX(side));
+    EXPECT_EQ(screenpointer->hotspotInBufferY_, corner.HotspotInBufferY(side));
+    // A north-west anchored style must not report the buffer centre.
+    EXPECT_NE(screenpointer->hotspotInBufferX_, side / 2);
+}
 } // namespace MMI
 } // namespace OHOS

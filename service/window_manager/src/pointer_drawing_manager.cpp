@@ -1223,19 +1223,23 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
             // Hard cursor: derive the pivot from this ScreenPointer's buffer size so it stays
-            // inside the buffer when the hard cursor buffer shrinks. The soft cursor path keeps
-            // using GetFocusCoordinates() because its buffer size is unchanged.
-            float hardFocus = static_cast<float>(it.second->GetBufferSize()) / CALCULATE_IMAGE_MIDDLE;
+            // inside the buffer when the hard cursor buffer shrinks. The soft cursor path derives
+            // the same way -- both share DEFAULT_CURSOR_SIZE, so neither can keep a 512 of its own.
+            //
+            // The pivot is consumed by canvas.Rotate() in the same coordinate system the image is
+            // drawn in, so it must be buffer-centre based, exactly as the soft cursor path is.
+            // Using the clamped size (the size actually drawn) keeps the pivot inside the glyph:
+            // with the unclamped size, gear 7 would put it at 128 + 254*0.675 = 299.5, outside a
+            // 256 buffer.
+            uint32_t bufferSide = it.second->GetBufferSize();
+            float hardFocus = static_cast<float>(bufferSide) / CALCULATE_IMAGE_MIDDLE;
+            float drawnSize = static_cast<float>(cfg.GetClampedImageSize(bufferSide));
             if (mouseStyle == MOUSE_ICON::LOADING) {
                 cfg.rotationFocusX = hardFocus;
                 cfg.rotationFocusY = hardFocus;
             } else {
-                // RUNNING pivot is glyph-relative, not buffer-centre-relative: the rotate pivot is
-                // fed straight to canvas.Rotate() with nothing subtracting the buffer focus, so
-                // adding hardFocus here would push the pivot outside a 256 buffer
-                // (128 + 254*0.675 = 299.5). Keep it purely glyph-relative.
-                cfg.rotationFocusX = cfg.GetImageSize() * RUNNING_X_RATIO;
-                cfg.rotationFocusY = cfg.GetImageSize() * RUNNING_Y_RATIO;
+                cfg.rotationFocusX = hardFocus + drawnSize * RUNNING_X_RATIO;
+                cfg.rotationFocusY = hardFocus + drawnSize * RUNNING_Y_RATIO;
             }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);
@@ -3570,6 +3574,7 @@ void PointerDrawingManager::SoftwareCursorRender(MOUSE_ICON mouseStyle, int32_t 
             cfg.align_ = CursorDrawingInformation::GetInstance().MouseIcon2IconType(cfg.style_);
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
         }
+        it.second->UpdateHotspotInBuffer(cfg);
         DrawSoftCursor(it.second->GetSurfaceNode(), cfg);
     }
     MMI_HILOGD("SoftwareCursorRender success");

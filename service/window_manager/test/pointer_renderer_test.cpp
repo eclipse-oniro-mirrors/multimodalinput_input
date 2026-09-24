@@ -12,8 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <algorithm>
+#include <climits>
 #include <cstdio>
 #include <fstream>
+#include <vector>
 #include <gtest/gtest.h>
 
 #include "config_multimodal.h"
@@ -51,15 +54,17 @@ public:
 };
 
 namespace {
+constexpr uint32_t BUFFER_SIDE{256};
 constexpr uint32_t FOCUS_POINT_OLD{256};
 constexpr float CALCULATE_IMAGE_MIDDLE_OLD{2.0f};
 constexpr float CALCULATE_MOUSE_ICON_BIAS_OLD{5.0f / 33.0f};
 
 // Replicates the pre-change RenderConfig::GetOffsetX() so the focus identity can be asserted
 // against a reference value that does not depend on the production code under change.
-int32_t LegacyOffsetX(const RenderConfig &cfg)
+// Takes the width explicitly: GetFocusX now derives from GetClampedImageSize(), so the reference
+// must be fed the same clamped width rather than the raw GetImageSize().
+int32_t LegacyOffsetX(const RenderConfig &cfg, int32_t width)
 {
-    int32_t width = cfg.GetImageSize();
     switch (cfg.align_) {
         case ANGLE_E:
             return FOCUS_POINT_OLD;
@@ -82,10 +87,9 @@ int32_t LegacyOffsetX(const RenderConfig &cfg)
     }
 }
 
-// Replicates the pre-change RenderConfig::GetOffsetY().
-int32_t LegacyOffsetY(const RenderConfig &cfg)
+// Replicates the pre-change RenderConfig::GetOffsetY(). See LegacyOffsetX() on the height param.
+int32_t LegacyOffsetY(const RenderConfig &cfg, int32_t height)
 {
-    int32_t height = cfg.GetImageSize();
     switch (cfg.align_) {
         case ANGLE_E:
             return FOCUS_POINT_OLD - height / CALCULATE_IMAGE_MIDDLE_OLD;
@@ -132,14 +136,15 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_GetFocus_001, TestSize.Level1)
             config.userIconHotSpotX = 3;
             config.userIconHotSpotY = 5;
             ASSERT_GT(config.GetImageSize(), 0);
-            EXPECT_EQ(static_cast<int32_t>(config.GetFocusX()),
-                static_cast<int32_t>(FOCUS_POINT_OLD) - LegacyOffsetX(config))
+            const int32_t clamped = config.GetClampedImageSize(BUFFER_SIDE);
+            EXPECT_EQ(static_cast<int32_t>(config.GetFocusX(BUFFER_SIDE)),
+                static_cast<int32_t>(FOCUS_POINT_OLD) - LegacyOffsetX(config, clamped))
                 << "align=" << static_cast<int32_t>(align) << ", size=" << size
-                << ", imageSize=" << config.GetImageSize();
-            EXPECT_EQ(static_cast<int32_t>(config.GetFocusY()),
-                static_cast<int32_t>(FOCUS_POINT_OLD) - LegacyOffsetY(config))
+                << ", clampedImageSize=" << clamped;
+            EXPECT_EQ(static_cast<int32_t>(config.GetFocusY(BUFFER_SIDE)),
+                static_cast<int32_t>(FOCUS_POINT_OLD) - LegacyOffsetY(config, clamped))
                 << "align=" << static_cast<int32_t>(align) << ", size=" << size
-                << ", imageSize=" << config.GetImageSize();
+                << ", clampedImageSize=" << clamped;
         }
     }
 }
@@ -164,8 +169,8 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_GetFocus_002, TestSize.Level1)
     large.size = MAX_POINTER_SIZE;
     large.dpi = MAX_DPI;
     ASSERT_GT(large.GetImageSize(), small.GetImageSize());
-    EXPECT_GT(large.GetFocusX(), small.GetFocusX());
-    EXPECT_GT(large.GetFocusY(), small.GetFocusY());
+    EXPECT_GT(large.GetFocusX(BUFFER_SIDE), small.GetFocusX(BUFFER_SIDE));
+    EXPECT_GT(large.GetFocusY(BUFFER_SIDE), small.GetFocusY(BUFFER_SIDE));
 
     // ANGLE_NW focus is the user icon hotspot, independent of imageSize.
     RenderConfig nw;
@@ -174,16 +179,16 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_GetFocus_002, TestSize.Level1)
     nw.dpi = MAX_DPI;
     nw.userIconHotSpotX = 7;
     nw.userIconHotSpotY = 11;
-    EXPECT_EQ(nw.GetFocusX(), 7u);
-    EXPECT_EQ(nw.GetFocusY(), 11u);
+    EXPECT_EQ(nw.GetFocusX(BUFFER_SIDE), 7u);
+    EXPECT_EQ(nw.GetFocusY(BUFFER_SIDE), 11u);
 
     // ANGLE_SW focus is (0, h): X pinned to the origin, Y tracking imageSize.
     RenderConfig sw;
     sw.align_ = ICON_TYPE::ANGLE_SW;
     sw.size = MAX_POINTER_SIZE;
     sw.dpi = MAX_DPI;
-    EXPECT_EQ(sw.GetFocusX(), 0u);
-    EXPECT_EQ(static_cast<int32_t>(sw.GetFocusY()), sw.GetImageSize());
+    EXPECT_EQ(sw.GetFocusX(BUFFER_SIDE), 0u);
+    EXPECT_EQ(static_cast<int32_t>(sw.GetFocusY(BUFFER_SIDE)), sw.GetClampedImageSize(BUFFER_SIDE));
 }
 
 /**
@@ -1164,68 +1169,148 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_ImageSizeUpperBound_002, TestS
 
 /**
  * @tc.name: PointerRendererTest_RunningPivotBound_001
- * @tc.desc: Guardrail for INV-4: the RUNNING rotate pivot is glyph-relative, so the swept extent
- *           pivot_y + r_max (0.3003 * imageSize) must stay inside a 256 buffer. Adding the buffer
- *           focus to the pivot would push it out (128 + 254*0.675 = 299.5) and is regression-tested
- *           here because canvas.Rotate() consumes rotationFocus directly.
+ * @tc.desc: INV-4, end-to-end. Renders RUNNING through the real draw path (DynamicRender) across a
+ *           full rotation cycle and asserts the ink stays inside the buffer. An earlier version of
+ *           this test only recomputed the pivot arithmetic in glyph-local coordinates, which is a
+ *           different space from the one canvas.Rotate() consumes, so it passed while the rendered
+ *           cursor swung outside the buffer.
  * @tc.type: Function
  * @tc.require:
  */
 HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    constexpr int32_t hardCursorBufferSize = static_cast<int32_t>(HARD_CURSOR_SIZE);
-    constexpr float runningXRatio = 0.3f;
-    constexpr float runningYRatio = 0.675f;
-    constexpr float runningInkRadiusRatio = 0.3003f;
-    for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
-        RenderConfig config;
-        config.align_ = ICON_TYPE::ANGLE_NW;
-        config.size = gear;
-        config.dpi = MAX_DPI;
-        float imageSize = static_cast<float>(config.GetImageSize());
-        ASSERT_GT(imageSize, 0.0f);
-        // Mirrors the hard cursor pivot in HardwareCursorDynamicRender: glyph-relative only.
-        float pivotX = imageSize * runningXRatio;
-        float pivotY = imageSize * runningYRatio;
-        float inkRadius = imageSize * runningInkRadiusRatio;
-        EXPECT_GE(pivotX - inkRadius, -1.0f) << "gear=" << gear << " pivotX=" << pivotX;
-        EXPECT_LT(pivotY + inkRadius, static_cast<float>(hardCursorBufferSize))
-            << "RUNNING sweep overflows the buffer: gear=" << gear << ", imageSize=" << imageSize
-            << ", pivotY=" << pivotY << ", inkRadius=" << inkRadius;
+    const uint32_t side = HARD_CURSOR_SIZE;
+    constexpr int32_t rotationStep = 12;    // DYNAMIC_ROTATION_ANGLE
+    constexpr int32_t frameCount = 30;      // full 360 cycles
+    const float bufferFocus = static_cast<float>(side) / 2.0f;
+
+    for (float dpi : {1.93f, 3.0f}) {
+        for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
+            for (int32_t frame = 0; frame < frameCount; ++frame) {
+                RenderConfig config;
+                config.style_ = MOUSE_ICON::RUNNING_RIGHT;
+                config.path_ = "/data/service/el1/public/multimodalinput/mouse_icon/Loading_Right.svg";
+                config.align_ = ICON_TYPE::ANGLE_NW;
+                config.size = gear;
+                config.dpi = dpi;
+                config.color = 0;
+                config.rotationAngle = frame * rotationStep;
+                // Mirrors HardwareCursorDynamicRender: buffer-centre based, using the drawn size.
+                float drawnSize = static_cast<float>(config.GetClampedImageSize(side));
+                config.rotationFocusX = bufferFocus + drawnSize * 0.3f;
+                config.rotationFocusY = bufferFocus + drawnSize * 0.675f;
+
+                std::vector<uint8_t> pixels(static_cast<size_t>(side) * side * 4, 0);
+                PointerRenderer renderer;
+                ASSERT_EQ(renderer.DynamicRender(pixels.data(), side, side, config), RET_OK);
+
+                int32_t minX = INT32_MAX, minY = INT32_MAX, maxX = -1, maxY = -1;
+                for (uint32_t y = 0; y < side; ++y) {
+                    for (uint32_t x = 0; x < side; ++x) {
+                        if (pixels[(static_cast<size_t>(y) * side + x) * 4 + 3] != 0) {
+                            minX = std::min(minX, static_cast<int32_t>(x));
+                            maxX = std::max(maxX, static_cast<int32_t>(x));
+                            minY = std::min(minY, static_cast<int32_t>(y));
+                            maxY = std::max(maxY, static_cast<int32_t>(y));
+                        }
+                    }
+                }
+                ASSERT_GE(maxX, 0) << "RUNNING produced no ink, dpi=" << dpi << " gear=" << gear;
+                EXPECT_GT(minX, 0) << "clipped at left edge, frame=" << frame
+                    << " dpi=" << dpi << " gear=" << gear;
+                EXPECT_GT(minY, 0) << "clipped at top edge, frame=" << frame
+                    << " dpi=" << dpi << " gear=" << gear;
+                EXPECT_LT(maxX, static_cast<int32_t>(side) - 1) << "clipped at right edge, frame=" << frame
+                    << " dpi=" << dpi << " gear=" << gear;
+                EXPECT_LT(maxY, static_cast<int32_t>(side) - 1) << "clipped at bottom edge, frame=" << frame
+                    << " dpi=" << dpi << " gear=" << gear;
+            }
+        }
     }
 }
 
-/**
- * @tc.name: PointerRendererTest_ImgCacheKey_001
- * @tc.desc: Test the decoded-image cache is keyed by buffer side as well as config. Above the
- *           buffer limit two sides share the same unclamped GetImageSize(), so keying on config
- *           alone would let a 320px soft-cursor decode be reused for a 256px hard-cursor buffer
- *           and bypass GetClampedImageSize().
- * @tc.type: Function
- * @tc.require:
- */
-HWTEST_F(PointerRendererTest, PointerRendererTest_ImgCacheKey_001, TestSize.Level1)
+// The draw origin now centres the image instead of pinning the hotspot to the buffer centre, so an
+// off-centre hotspot is carried by the canvas rotation. HotspotInBuffer* must track that, otherwise
+// Move() offsets by the unrotated hotspot and the cursor shifts on screen when the display rotates.
+// Verified against the ink bounding box, which is the thing the user actually sees.
+HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    PointerRenderer renderer;
-    RenderConfig config;
-    config.style_ = MOUSE_ICON::LOADING;
-    config.align_ = ICON_TYPE::ANGLE_CENTER;
-    config.size = 1;
-    config.dpi = 8.0f;   // gear 1 leak channel: unclamped imageSize is 320
-    ASSERT_GT(config.GetImageSize(), static_cast<int32_t>(HARD_CURSOR_SIZE));
+    const uint32_t side = HARD_CURSOR_SIZE;
+    // ANGLE_NW puts the hotspot at the image's top-left, the furthest-from-centre case.
+    for (uint32_t direction = 0; direction < 4; ++direction) {
+        RenderConfig config;
+        config.style_ = MOUSE_ICON::DEFAULT;
+        config.path_ = "/data/service/el1/public/multimodalinput/mouse_icon/Default.svg";
+        config.align_ = ICON_TYPE::ANGLE_NW;
+        config.size = MAX_POINTER_SIZE;
+        config.dpi = 1.93f;
+        config.color = 0;
+        config.direction = direction;
+        config.displayDirection = direction;
 
-    image_ptr_t softImg = std::make_shared<OHOS::Rosen::Drawing::Image>();
-    image_ptr_t hardImg = std::make_shared<OHOS::Rosen::Drawing::Image>();
-    renderer.PushImg(SOFT_CURSOR_SIZE, config, softImg);
-    renderer.PushImg(HARD_CURSOR_SIZE, config, hardImg);
+        std::vector<uint8_t> pixels(static_cast<size_t>(side) * side * 4, 0);
+        PointerRenderer renderer;
+        ASSERT_EQ(renderer.Render(pixels.data(), side, side, config), RET_OK);
 
-    // Same config, different buffer side: each side must get its own entry back.
-    EXPECT_EQ(renderer.FindImg(SOFT_CURSOR_SIZE, config), softImg);
-    EXPECT_EQ(renderer.FindImg(HARD_CURSOR_SIZE, config), hardImg);
-    // An unseen side must miss rather than silently reuse another side's decode.
-    EXPECT_EQ(renderer.FindImg(1024, config), nullptr);
+        int32_t minX = INT32_MAX, minY = INT32_MAX, maxX = -1, maxY = -1;
+        for (uint32_t y = 0; y < side; ++y) {
+            for (uint32_t x = 0; x < side; ++x) {
+                if (pixels[(static_cast<size_t>(y) * side + x) * 4 + 3] != 0) {
+                    minX = std::min(minX, static_cast<int32_t>(x));
+                    maxX = std::max(maxX, static_cast<int32_t>(x));
+                    minY = std::min(minY, static_cast<int32_t>(y));
+                    maxY = std::max(maxY, static_cast<int32_t>(y));
+                }
+            }
+        }
+        ASSERT_GE(maxX, 0) << "no ink, direction=" << direction;
+
+        // The reported hotspot must land on the ink, within the tip's leading corner. Under the
+        // unrotated (buggy) value this lands outside the ink for direction 1..3.
+        int32_t hx = config.HotspotInBufferX(side);
+        int32_t hy = config.HotspotInBufferY(side);
+        EXPECT_GE(hx, minX) << "hotspot left of ink, direction=" << direction;
+        EXPECT_LE(hx, maxX) << "hotspot right of ink, direction=" << direction;
+        EXPECT_GE(hy, minY) << "hotspot above ink, direction=" << direction;
+        EXPECT_LE(hy, maxY) << "hotspot below ink, direction=" << direction;
+    }
+}
+
+// The hotspot's distance from the buffer centre is rotation-invariant: a quarter turn permutes the
+// axes but cannot change the radius. This pins the mapping without depending on ink rendering.
+HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    const uint32_t side = HARD_CURSOR_SIZE;
+    const int32_t bufferFocus = static_cast<int32_t>(side) / 2;
+    for (ICON_TYPE align : {ANGLE_NW, ANGLE_SW, ANGLE_CENTER, ANGLE_NW_RIGHT, ANGLE_E}) {
+        int32_t reference = -1;
+        for (uint32_t direction = 0; direction < 4; ++direction) {
+            RenderConfig config;
+            config.style_ = MOUSE_ICON::DEFAULT;
+            config.align_ = align;
+            config.size = MAX_POINTER_SIZE;
+            config.dpi = 1.93f;
+            config.direction = direction;
+
+            int32_t dx = config.HotspotInBufferX(side) - bufferFocus;
+            int32_t dy = config.HotspotInBufferY(side) - bufferFocus;
+            int32_t radiusSq = dx * dx + dy * dy;
+            if (direction == 0) {
+                reference = radiusSq;
+            } else {
+                EXPECT_EQ(radiusSq, reference) << "hotspot radius changed under rotation, align="
+                    << static_cast<int32_t>(align) << " direction=" << direction;
+            }
+            // Must stay inside the buffer for every style and rotation.
+            EXPECT_GE(config.HotspotInBufferX(side), 0);
+            EXPECT_GE(config.HotspotInBufferY(side), 0);
+            EXPECT_LT(config.HotspotInBufferX(side), static_cast<int32_t>(side));
+            EXPECT_LT(config.HotspotInBufferY(side), static_cast<int32_t>(side));
+        }
+    }
 }
 } // namespace MMI
 } // namespace OHOS

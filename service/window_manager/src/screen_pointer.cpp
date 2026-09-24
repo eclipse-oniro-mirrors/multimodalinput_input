@@ -39,7 +39,6 @@ constexpr int32_t BUFFER_RELEASE_WAIT_MS{1000};
 constexpr int32_t NUM_TWO{2};
 constexpr int32_t DEFAULT_BUFFER_SIZE{8};
 constexpr int32_t DEFAULT_CURSOR_SIZE{256};
-constexpr uint32_t FOCUS_POINT = DEFAULT_CURSOR_SIZE / NUM_TWO;
 constexpr int32_t BUFFER_TIMEOUT{150};
 constexpr int32_t STRIDE_ALIGNMENT{8};
 constexpr uint32_t RENDER_STRIDE{4};
@@ -300,8 +299,19 @@ buffer_ptr_t ScreenPointer::GetCommonBuffer()
     return commonBuffers_[newId];
 }
 
+void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg)
+{
+    // The draw origin centres the image in the buffer, so the hotspot no longer sits at the buffer
+    // centre. Cache where it did land: Move()/MoveSoft() take only a position and must offset by
+    // this rather than by half the buffer side. Both the hard path (RequestBuffer) and the soft
+    // path (DrawSoftCursor, which has no buffer to request) must call this before moving.
+    hotspotInBufferX_ = cfg.HotspotInBufferX(DEFAULT_CURSOR_SIZE);
+    hotspotInBufferY_ = cfg.HotspotInBufferY(DEFAULT_CURSOR_SIZE);
+}
+
 buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer)
 {
+    UpdateHotspotInBuffer(cfg);
     if (cfg.style_ == MOUSE_ICON::TRANSPARENT_ICON) {
         MMI_HILOGD("The buffer transparent buffer.");
         isCommonBuffer = false;
@@ -630,8 +640,8 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
     if (IsPositionOutScreen(x, y)) {
         MMI_HILOGE("Position out of screen");
     }
-    int32_t px = x - FOCUS_POINT;
-    int32_t py = y - FOCUS_POINT;
+    int32_t px = x - hotspotInBufferX_;
+    int32_t py = y - hotspotInBufferY_;
     uint32_t bid = bufferId_.load(std::memory_order_relaxed);
     BytraceAdapter::StartHardPointerMove(buffer->GetWidth(), buffer->GetHeight(), bid, screenId_);
     auto ret = hwcMgr_->SetPosition(screenId_, px, py, bh);
@@ -662,8 +672,8 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     if (IsMirror()) {
         CalculateHwcPositionForMirror(x, y);
     }
-    int32_t px = x - FOCUS_POINT;
-    int32_t py = y - FOCUS_POINT;
+    int32_t px = x - hotspotInBufferX_;
+    int32_t py = y - hotspotInBufferY_;
 
     if (!IsMirror()) {
         int64_t nodeId = surfaceNode_->GetId();

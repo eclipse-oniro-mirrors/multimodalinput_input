@@ -56,15 +56,22 @@ static int32_t BufferFocus(uint32_t side)
     return static_cast<int32_t>(side / CALCULATE_IMAGE_MIDDLE);
 }
 
-// The draw origin places the style's own focus (GetFocusX/Y) onto the buffer focus.
+// The draw origin centres the decoded image in the buffer. It deliberately does NOT align the
+// style's own focus (GetFocusX/Y) onto the buffer centre: that older scheme let a non-centred
+// align (ANGLE_NW's hotspot, ANGLE_SW's (0,h)) push the image almost a full imageSize away from
+// the centre, so it needed a 2x buffer and clipped 8 styles once the side shrank to 256.
+// Centring the image needs only 1x: imageSize <= side - 1 already guarantees origin >= 0 and
+// origin + imageSize <= side, for every align, direction and app-supplied hotspot alike.
+// The hotspot then lands at origin + GetFocusX/Y, which ScreenPointer::Move must offset by --
+// see HotspotInBufferX/Y.
 static int32_t CalcDrawOriginX(uint32_t width, const RenderConfig &cfg)
 {
-    return BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX());
+    return BufferFocus(width) - static_cast<int32_t>(cfg.GetClampedImageSize(width) / CALCULATE_IMAGE_MIDDLE);
 }
 
 static int32_t CalcDrawOriginY(uint32_t height, const RenderConfig &cfg)
 {
-    return BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY());
+    return BufferFocus(height) - static_cast<int32_t>(cfg.GetClampedImageSize(height) / CALCULATE_IMAGE_MIDDLE);
 }
 
 int32_t RenderConfig::GetImageSize() const
@@ -115,9 +122,61 @@ std::string RenderConfig::ToString() const
     return oss.str();
 }
 
-uint32_t RenderConfig::GetFocusX() const
+// Render()/BlurRender() call canvas.Rotate(-direction * 90, bufferCentre) before drawing, so the
+// rotation carries the hotspot along with the image. The old scheme aligned the hotspot onto the
+// buffer centre -- the one point a rotation about the centre leaves fixed -- so it needed no
+// compensation here, and paid for that with a 2x buffer. Now that the origin centres the image
+// instead, an off-centre hotspot does move, and Move() would offset by the unrotated position.
+// Rotate the centre-relative offset by the same angle to recover where the hotspot really is.
+static void RotateOffsetAboutCentre(uint32_t direction, int32_t &dx, int32_t &dy)
 {
-    int32_t width = this->GetImageSize();
+    // Quarter turns need no trig. The canvas applies -direction * 90, i.e. the inverse of the
+    // +90 mapping in AdjustDeltaForDirection(), so the signs here are that one's transposed.
+    int32_t tempDx = dx;
+    int32_t tempDy = dy;
+    Direction angle = static_cast<Direction>(direction % DIRECTION_NUM);
+    if (angle == DIRECTION90) {
+        dx = tempDy;
+        dy = -tempDx;
+    } else if (angle == DIRECTION180) {
+        dx = -tempDx;
+        dy = -tempDy;
+    } else if (angle == DIRECTION270) {
+        dx = -tempDy;
+        dy = tempDx;
+    }
+}
+
+// The hotspot's position relative to the buffer centre, after rotation.
+static void HotspotOffsetFromCentre(uint32_t bufferSide, const RenderConfig &cfg, int32_t &dx, int32_t &dy)
+{
+    int32_t half = static_cast<int32_t>(cfg.GetClampedImageSize(bufferSide) / CALCULATE_IMAGE_MIDDLE);
+    dx = static_cast<int32_t>(cfg.GetFocusX(bufferSide)) - half;
+    dy = static_cast<int32_t>(cfg.GetFocusY(bufferSide)) - half;
+    RotateOffsetAboutCentre(cfg.direction, dx, dy);
+}
+
+int32_t RenderConfig::HotspotInBufferX(uint32_t bufferSide) const
+{
+    int32_t dx = 0;
+    int32_t dy = 0;
+    HotspotOffsetFromCentre(bufferSide, *this, dx, dy);
+    return BufferFocus(bufferSide) + dx;
+}
+
+int32_t RenderConfig::HotspotInBufferY(uint32_t bufferSide) const
+{
+    int32_t dx = 0;
+    int32_t dy = 0;
+    HotspotOffsetFromCentre(bufferSide, *this, dx, dy);
+    return BufferFocus(bufferSide) + dy;
+}
+
+uint32_t RenderConfig::GetFocusX(uint32_t bufferSide) const
+{
+    // Must use the clamped size: the bitmap is decoded at GetClampedImageSize(), so deriving the
+    // focus from the unclamped GetImageSize() would offset the hotspot by the clamp delta.
+    int32_t width = this->GetClampedImageSize(bufferSide);
     switch (this->align_) {
         case ANGLE_E:       // fall-though
         case ANGLE_SW:
@@ -146,9 +205,10 @@ uint32_t RenderConfig::GetFocusX() const
     }
 }
 
-uint32_t RenderConfig::GetFocusY() const
+uint32_t RenderConfig::GetFocusY(uint32_t bufferSide) const
 {
-    int32_t height = this->GetImageSize();
+    // See GetFocusX(): the clamped size is what the bitmap was decoded at.
+    int32_t height = this->GetClampedImageSize(bufferSide);
     switch (this->align_) {
         case ANGLE_S:       // fall-though
         case ANGLE_NE:      // fall-though
@@ -343,7 +403,9 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     AdjustDeltaForDirection(dx, dy, cfg.direction, cfg.displayDirection);
     const int32_t offsetX = CalcDrawOriginX(width, cfg);
     const int32_t offsetY = CalcDrawOriginY(height, cfg);
-    const int32_t imageSize = cfg.GetImageSize();
+    // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
+    // extent and let the bounds check below pass a blur image that actually spills the buffer.
+    const int32_t imageSize = cfg.GetClampedImageSize(width);
     for (int32_t i = 1; i <= BLUR_NUM; i++) {
         if (!images[i]) {
             MMI_HILOGE("Blur pointer image %{public}d is null", i);

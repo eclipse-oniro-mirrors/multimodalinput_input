@@ -65,6 +65,7 @@ public:
     buffer_ptr_t GetCommonBuffer();
     buffer_ptr_t RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer);
     buffer_ptr_t GetCurrentBuffer();
+    void UpdateHotspotInBuffer(const RenderConfig &cfg);
 
     bool Move(int32_t x, int32_t y);
     bool MoveSoft(int32_t x, int32_t y);
@@ -248,6 +249,11 @@ private:
     std::shared_ptr<OHOS::Rosen::RSUIContext> rsUIContext_{nullptr};
 
     RenderConfig defaultCursorCfg_;
+    // Hotspot position within the rendered buffer, cached by RequestBuffer() for Move()/MoveSoft(),
+    // which receive only a position. Initialised to the buffer centre so behaviour before the first
+    // render matches the old unconditional half-buffer offset.
+    int32_t hotspotInBufferX_{128};
+    int32_t hotspotInBufferY_{128};
     buffer_ptr_t transparentBuffer_{nullptr};
     buffer_ptr_t defaultBuffer_{nullptr};
     std::shared_mutex bufferMutex_;
