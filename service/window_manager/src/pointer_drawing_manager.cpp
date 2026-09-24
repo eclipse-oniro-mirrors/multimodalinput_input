@@ -569,7 +569,7 @@ int32_t PointerDrawingManager::UpdateMouseLayer(int32_t physicalX, int32_t physi
         if (cursorWidth_ == 0 && cursorHeight_ == 0) {
             RestoreCustomCursorFromPersistence(0,0);
         }
-        ExpandCanvasForCustomCursor;
+        ExpandCanvasForCustomCursor();
     }
     if (InitLayer(MOUSE_ICON(lastMouseStyle_.id)) != RET_OK) {
         CursorDrawingInformation::GetInstance().SetMouseIconUpdate(false);
@@ -4041,22 +4041,6 @@ std::shared_ptr<OHOS::Media::PixelMap> PointerDrawingManager::GetUserIconCopy(bo
     return pixelMapPtr;
 }
 
-void PointerDrawingManager::SetSurfaceNodeBounds()
-{
-    if (GetHardCursorEnabled()) {
-        return;
-    }
-
-    auto surfaceNodePtr = GetSurfaceNode();
-    CHKPV(surfaceNodePtr);
-    int32_t x = lastPhysicalX_;
-    int32_t y = lastPhysicalY_;
-    Direction direction = static_cast<Direction>((
-        ((displayInfo_.direction - displayInfo_.displayDirection) * ANGLE_90 + ANGLE_360) % ANGLE_360) / ANGLE_90);
-    AdjustMouseFocusToSoftRenderOrigin(direction, MOUSE_ICON(lastMouseStyle_.id), x, y);
-    surfaceNodePtr->SetBounds(x, y, canvasWidth_, canvasHeight_);
-}
-
 void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::PixelMap>& pixelMapPtr)
 {
     Media::ImageInfo imageInfo;
@@ -4088,7 +4072,7 @@ void PointerDrawingManager::RestoreCustomCursorFromPersistence(int32_t defaultWi
 {
     cursorWidth_ = defaultWidth;
     cursorHeight_ = defaultHeight;
-    userIconHotSpotX = 0;
+    userIconHotSpotX_ = 0;
     userIconHotSpotY_ = 0;
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
     int32_t persistedW = CursorDrawingInformation::GetInstance().GetCustomCursorWidth();

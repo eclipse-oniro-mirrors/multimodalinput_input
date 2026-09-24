@@ -179,10 +179,10 @@ public:
     PointerStyle GetLastMouseStyle();
     void SetCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
         int32_t hotSpotX, int32_t hotSpotY);
-    int32_t GetCustomCursorWidth() {return customCursorWidth_};
-    int32_t GetCustomCursorHeight() {return customCursorHeight_};
-    int32_t GetCustomCursorHotSpotX() {return customCursorHotSpotX_};
-    int32_t GetCustomCursorHotSpotY() {return customCursorHotSpotY_};
+    int32_t GetCustomCursorWidth() { return customCursorWidth_; }
+    int32_t GetCustomCursorHeight() { return customCursorHeight_; }
+    int32_t GetCustomCursorHotSpotX() { return customCursorHotSpotX_; }
+    int32_t GetCustomCursorHotSpotY() { return customCursorHotSpotY_; }
 private:
     int32_t GetCurrentUser();
 
