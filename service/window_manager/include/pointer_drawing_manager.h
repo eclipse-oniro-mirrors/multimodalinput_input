@@ -154,6 +154,8 @@ public:
     int32_t SetMouseHotSpot(int32_t pid, int32_t windowId, int32_t hotSpotX, int32_t hotSpotY) override;
     PointerStyle GetLastMouseStyle() override;
     void SetLastMouseStyle(PointerStyle style) override;
+    void RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
+        int32_t hotSpotX, int32_t hotSpotY) override;
     IconStyle GetIconStyle(const MOUSE_ICON mouseStyle) override;
     bool HasMagicCursor();
     int32_t DrawCursor(const MOUSE_ICON mouseStyle);
@@ -257,8 +259,10 @@ private:
     bool CreateGroupContext(int32_t groupId, uint64_t rsId);
     void ClearGroupCursorCtxMap();
     bool SetCursorLocation(int32_t physicalX, int32_t physicalY);
-    std::shared_ptr<OHOS::Media::PixelMap> GetUserIconCopy(bool setSurfaceNode = true);
-    void SetSurfaceNodeBounds();
+    std::shared_ptr<OHOS::Media::PixelMap> GetUserIconCopy(bool needUpdateCanvasProperty = true);
+    void ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::PixelMap>& pixelMapPtr);
+    void RestoreCustomCursorFromPersistence(int32_t defaultWidth, int32_t defaultHeight);
+    void ExpandCanvasForCustomCursor();
     int32_t DrawNewDpiPointer() override;
     bool SetDynamicHardWareCursorLocation(int32_t physicalX, int32_t physicalY, MOUSE_ICON mouseStyle);
     void RenderThreadLoop();

@@ -177,7 +177,12 @@ public:
     void SetMouseIcons(std::map<MOUSE_ICON, IconStyle> mouseIcons);
     isMagicCursor GetHasMagicCursor();
     PointerStyle GetLastMouseStyle();
-
+    void SetCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
+        int32_t hotSpotX, int32_t hotSpotY);
+    int32_t GetCustomCursorWidth() {return customCursorWidth_};
+    int32_t GetCustomCursorHeight() {return customCursorHeight_};
+    int32_t GetCustomCursorHotSpotX() {return customCursorHotSpotX_};
+    int32_t GetCustomCursorHotSpotY() {return customCursorHotSpotY_};
 private:
     int32_t GetCurrentUser();
 
@@ -190,6 +195,10 @@ private:
     isMagicCursor hasMagicCursor_;
     int32_t pid_ { 0 };
     PointerStyle lastMouseStyle_ {};
+    int32_t customCursorWidth_ { 0 };
+    int32_t customCursorHeight_ { 0 };
+    int32_t customCursorHotSpotX_ { 0 };
+    int32_t customCursorHotSpotY_ { 0 };
 };
 #endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
 } // namespace OHOS::MMI
