@@ -2547,7 +2547,7 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
     corner.displayDirection = 0;
 
     // Each path caches into its own slot.
-    screenpointer->UpdateHotspotInBuffer(corner, true);
+    screenpointer->UpdateHotspotInBuffer(corner, true, side);
     EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side));
     EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side));
     // An ANGLE_NW hotspot is the image corner, never the buffer centre.
@@ -2557,7 +2557,7 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
     // differs -- this is the cross-thread clobber the split storage prevents.
     RenderConfig softCfg = corner;
     softCfg.direction = 1;      // direction 90 rotates the hotspot about the buffer centre
-    screenpointer->UpdateHotspotInBuffer(softCfg, false);
+    screenpointer->UpdateHotspotInBuffer(softCfg, false, side);
     EXPECT_EQ(screenpointer->hotspotSoftX_, softCfg.HotspotInBufferX(side));
     EXPECT_EQ(screenpointer->hotspotSoftY_, softCfg.HotspotInBufferY(side));
     EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side))

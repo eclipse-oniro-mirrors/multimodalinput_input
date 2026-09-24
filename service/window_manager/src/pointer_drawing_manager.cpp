@@ -1305,15 +1305,22 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         cfg.screenId = it.first;
         MMI_HILOGD("SoftwareCursorDynamicRender, screen = %{public}" PRIu64 ", dpi = %{public}f", it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
+            // The animation redraws the glyph, so the cached hotspot must be refreshed here just as
+            // the static soft path does. Without this a style or size change leaves the previous
+            // hotspot in place and MoveSoft offsets by it -- e.g. switching the default arrow to
+            // LOADING kept hot spot 108 where 128 is correct, shifting the spinner by 20px.
+            int32_t softSide = it.second->GetSoftBufferSide();
+            it.second->UpdateHotspotInBuffer(cfg, false, softSide);
             // Same pivot rule as the hard path: the spinner turns about its own centre, which the
             // draw origin places at origin + size*ratio. Deriving it from the buffer centre
             // instead double-counts the centring offset and swings the ink out of the buffer.
-            float softSize = static_cast<float>(cfg.GetClampedImageSize(DEFAULT_CURSOR_SIZE));
-            float softOrigin = static_cast<float>(DEFAULT_CURSOR_SIZE -
-                cfg.GetClampedImageSize(DEFAULT_CURSOR_SIZE)) / CALCULATE_IMAGE_MIDDLE;
+            float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
+            float softOrigin = static_cast<float>(softSide -
+                cfg.GetClampedImageSize(softSide)) / CALCULATE_IMAGE_MIDDLE;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = static_cast<float>(DEFAULT_CURSOR_SIZE) / CALCULATE_IMAGE_MIDDLE;
-                cfg.rotationFocusY = static_cast<float>(DEFAULT_CURSOR_SIZE) / CALCULATE_IMAGE_MIDDLE;
+                // LOADING spins about the buffer centre.
+                cfg.rotationFocusX = static_cast<float>(softSide) / CALCULATE_IMAGE_MIDDLE;
+                cfg.rotationFocusY = static_cast<float>(softSide) / CALCULATE_IMAGE_MIDDLE;
             } else {
                 cfg.rotationFocusX = softOrigin + softSize * RUNNING_X_RATIO;
                 cfg.rotationFocusY = softOrigin + softSize * RUNNING_Y_RATIO;
@@ -2025,13 +2032,32 @@ sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Sur
     CALL_DEBUG_ENTER;
     sptr<OHOS::SurfaceBuffer> buffer;
     int32_t releaseFence = -1;
-    // The cursor buffer side must match what the rest of the cursor code assumes: the draw origin
-    // centres the image in the buffer, HotspotInBuffer is computed against it, and Move/MoveSoft
-    // offset the node bounds by that hotspot. Deriving the side from GetCanvasSize() (which is
-    // 512 and driven by a separate system parameter) made the soft path lay the image out for a
-    // 512 buffer while the hotspot was computed for a 256 one, a constant (128,128) misalignment.
-    int32_t width = DEFAULT_CURSOR_SIZE;
-    int32_t height = DEFAULT_CURSOR_SIZE;
+    int32_t width = 0;
+    int32_t height = 0;
+    if (GetHardCursorEnabled()) {
+        // With a hard cursor the soft path is only a fallback, and the rest of the cursor code
+        // (draw origin, HotspotInBuffer, MoveSoft's node bounds) assumes a buffer of this side, so
+        // it must not take a size of its own. Deriving it from GetCanvasSize() here made the image
+        // lay out for a 512 buffer while the hotspot was computed for a 256 one: a constant
+        // (128,128) misalignment.
+        width = DEFAULT_CURSOR_SIZE;
+        height = DEFAULT_CURSOR_SIZE;
+    } else {
+        // Without a hard cursor the soft cursor is the only cursor, so the buffer has to fit the
+        // rendered glyph. canvasWidth_/Height_ are derived from the pointer size and dpi (rounded
+        // up to a 64px step), which keeps large-pointer and high-dpi devices correct. Forcing a
+        // flat 256 here clipped a 480dpi gear-7 cursor (~395px of glyph) down to 256.
+        width = canvasWidth_;
+        height = canvasHeight_;
+    }
+    // Record the side actually requested so the hotspot and the MoveSoft node bounds are computed
+    // against the same number, whatever branch produced it.
+    int32_t softSide = (width < height ? width : height);
+    for (auto &entry : CopyScreenPointers()) {
+        if (entry.second != nullptr) {
+            entry.second->SetSoftBufferSide(softSide);
+        }
+    }
     OHOS::BufferRequestConfig config = {
         .width = width,
         .height = height,
@@ -3580,7 +3606,7 @@ void PointerDrawingManager::SoftwareCursorRender(MOUSE_ICON mouseStyle, int32_t 
             cfg.align_ = CursorDrawingInformation::GetInstance().MouseIcon2IconType(cfg.style_);
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
         }
-        it.second->UpdateHotspotInBuffer(cfg, false);
+        it.second->UpdateHotspotInBuffer(cfg, false, it.second->GetSoftBufferSide());
         DrawSoftCursor(it.second->GetSurfaceNode(), cfg);
     }
     MMI_HILOGD("SoftwareCursorRender success");

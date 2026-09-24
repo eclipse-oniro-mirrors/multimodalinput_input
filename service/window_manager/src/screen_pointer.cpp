@@ -298,27 +298,30 @@ buffer_ptr_t ScreenPointer::GetCommonBuffer()
     return commonBuffers_[newId];
 }
 
-void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard)
+void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide)
 {
     // The draw origin centres the image in the buffer, so the hotspot no longer sits at the buffer
     // centre. Cache where it did land: Move()/MoveSoft() take only a position and must offset by
     // this rather than by half the buffer side. The hard path (RequestBuffer) and the soft path
     // (SoftwareCursorRender, which has no buffer to request) each keep their own copy, because
     // they run on different threads with different RenderConfigs.
-    int32_t x = cfg.HotspotInBufferX(DEFAULT_CURSOR_SIZE);
-    int32_t y = cfg.HotspotInBufferY(DEFAULT_CURSOR_SIZE);
+    int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
+    int32_t x = cfg.HotspotInBufferX(side);
+    int32_t y = cfg.HotspotInBufferY(side);
     if (isHard) {
         hotspotHardX_ = x;
         hotspotHardY_ = y;
+        hardBufferSide_ = side;
     } else {
         hotspotSoftX_ = x;
         hotspotSoftY_ = y;
+        softBufferSide_ = side;
     }
 }
 
 buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer)
 {
-    UpdateHotspotInBuffer(cfg, true);
+    UpdateHotspotInBuffer(cfg, true, DEFAULT_CURSOR_SIZE);
     if (cfg.style_ == MOUSE_ICON::TRANSPARENT_ICON) {
         MMI_HILOGD("The buffer transparent buffer.");
         isCommonBuffer = false;
@@ -682,12 +685,14 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     int32_t px = x - hotspotSoftX_;
     int32_t py = y - hotspotSoftY_;
 
+    // The node is sized to the buffer the image was actually drawn into, so on a soft-only device
+    // whose buffer is larger than the shared constant the node does not crop the glyph.
+    uint32_t side = static_cast<uint32_t>(softBufferSide_);
     if (!IsMirror()) {
         int64_t nodeId = surfaceNode_->GetId();
-        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, DEFAULT_CURSOR_SIZE,
-            DEFAULT_CURSOR_SIZE);
+        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, side, side);
     } else {
-        surfaceNode_->SetBounds(px, py, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+        surfaceNode_->SetBounds(px, py, side, side);
     }
     MMI_HILOGD("Pointer Window SetBounds ScreenId:%{public}" PRIu64
         ", surfaceNodeId=%{public}" PRId64 ", pos=(%{private}d, %{private}d)",
