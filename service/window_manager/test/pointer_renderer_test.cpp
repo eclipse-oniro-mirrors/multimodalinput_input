@@ -1488,5 +1488,63 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_HotspotInvariance_001, TestSiz
         }
     }
 }
+
+/**
+ * @tc.name: PointerRendererTest_UserIconPlacement_001
+ * @tc.desc: AC-3.2. An app-supplied icon must be placed by its OWN dimensions, not by the system
+ *           gear size. Previously CalcDrawOriginX/Y used GetClampedImageSize() -- a function of
+ *           gear and dpi -- so at gear 1 / dpi 1.93 a 200x200 icon got a 77-box origin of 90 and
+ *           spanned [90,290], clipping 34px off the right and bottom. Icons smaller than the
+ *           system size were misplaced too, just without clipping.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_UserIconPlacement_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    const uint32_t side = HARD_CURSOR_SIZE;
+    const std::string iconPath = "/data/service/el1/public/multimodalinput/mouse_icon/Default.svg";
+
+    // Requested icon side. Anything at or below the buffer side is placed at its own size (so an
+    // exact 256 is NOT trimmed to 255); anything larger is capped at the buffer side.
+    const int32_t cases[] = {256, 200, 77, 40, 400};
+
+    for (int32_t iconSide : cases) {
+        // A fresh source per case: an ImageSource does not support a second CreatePixelMap.
+        OHOS::Media::SourceOptions opts;
+        uint32_t ret = 0;
+        auto imageSource = OHOS::Media::ImageSource::CreateImageSource(iconPath, opts, ret);
+        ASSERT_NE(imageSource, nullptr) << "icon side " << iconSide;
+        OHOS::Media::DecodeOptions decodeOpts;
+        decodeOpts.desiredSize = { .width = iconSide, .height = iconSide };
+        RenderConfig config;
+        config.style_ = MOUSE_ICON::AECH_DEVELOPER_DEFINED_ICON;
+        config.align_ = ICON_TYPE::ANGLE_NW;
+        config.size = 1;
+        config.dpi = 1.93f;
+        config.userIconPixelMap = imageSource->CreatePixelMap(decodeOpts, ret);
+        ASSERT_NE(config.userIconPixelMap, nullptr) << "icon side " << iconSide;
+
+        int32_t wantPlaced = std::min(iconSide, static_cast<int32_t>(side));
+        EXPECT_EQ(config.GetPlacedImageSize(side), wantPlaced) << "placed size for icon " << iconSide;
+
+        // The placed image must fit the buffer, and the hotspot must stay inside it.
+        EXPECT_LE(config.GetPlacedImageSize(side), static_cast<int32_t>(side));
+        EXPECT_GE(config.HotspotInBufferX(side), 0) << "hotspot off the left edge, icon " << iconSide;
+        EXPECT_LT(config.HotspotInBufferX(side), static_cast<int32_t>(side));
+        EXPECT_GE(config.HotspotInBufferY(side), 0);
+        EXPECT_LT(config.HotspotInBufferY(side), static_cast<int32_t>(side));
+
+        // An oversized icon is scaled to the buffer side; one that fits is not scaled at all.
+        float ratio = config.UserIconScaleRatio(side);
+        if (iconSide > static_cast<int32_t>(side)) {
+            EXPECT_LT(ratio, 1.0f) << "oversized icon must be scaled, side " << iconSide;
+            EXPECT_FLOAT_EQ(ratio, static_cast<float>(side) / static_cast<float>(iconSide));
+        } else {
+            EXPECT_FLOAT_EQ(ratio, 1.0f) << "fitting icon must keep its pixels, side " << iconSide;
+        }
+    }
+}
+
 } // namespace MMI
 } // namespace OHOS
