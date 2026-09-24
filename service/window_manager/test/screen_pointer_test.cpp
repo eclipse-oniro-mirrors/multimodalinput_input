@@ -2535,7 +2535,7 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
     std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
     ASSERT_NE(screenpointer, nullptr);
 
-    const int32_t side = static_cast<int32_t>(DEFAULT_CURSOR_SIZE);
+    const int32_t side = static_cast<int32_t>(screenpointer->GetBufferSize());
     RenderConfig centre;
     centre.style_ = MOUSE_ICON::CURSOR_CIRCLE;
     centre.align_ = ICON_TYPE::ANGLE_CENTER;

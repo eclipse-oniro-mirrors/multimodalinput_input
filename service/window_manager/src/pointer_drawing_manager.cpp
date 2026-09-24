@@ -1226,20 +1226,24 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             // inside the buffer when the hard cursor buffer shrinks. The soft cursor path derives
             // the same way -- both share DEFAULT_CURSOR_SIZE, so neither can keep a 512 of its own.
             //
-            // The pivot is consumed by canvas.Rotate() in the same coordinate system the image is
-            // drawn in, so it must be buffer-centre based, exactly as the soft cursor path is.
-            // Using the clamped size (the size actually drawn) keeps the pivot inside the glyph:
-            // with the unclamped size, gear 7 would put it at 128 + 254*0.675 = 299.5, outside a
-            // 256 buffer.
+            // The spinner pivot is the glyph's own centre, which the draw origin places at
+            // origin + size*ratio. It must NOT be measured from the buffer centre: with the image
+            // centred, origin is already size/2 away from the centre, so adding the buffer focus
+            // double-counts and puts the pivot outside the buffer entirely (128 + 254*0.675 = 299.5
+            // for a 256 buffer). Sweeping about that point threw the ink up to 300 px off-screen;
+            // about the glyph centre it stays fully inside at every gear.
             uint32_t bufferSide = it.second->GetBufferSize();
-            float hardFocus = static_cast<float>(bufferSide) / CALCULATE_IMAGE_MIDDLE;
             float drawnSize = static_cast<float>(cfg.GetClampedImageSize(bufferSide));
+            float drawOrigin = static_cast<float>(bufferSide - cfg.GetClampedImageSize(bufferSide)) /
+                CALCULATE_IMAGE_MIDDLE;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = hardFocus;
-                cfg.rotationFocusY = hardFocus;
+                // LOADING spins about the buffer centre, which is the glyph centre for a
+                // centre-aligned, centred image.
+                cfg.rotationFocusX = static_cast<float>(bufferSide) / CALCULATE_IMAGE_MIDDLE;
+                cfg.rotationFocusY = static_cast<float>(bufferSide) / CALCULATE_IMAGE_MIDDLE;
             } else {
-                cfg.rotationFocusX = hardFocus + drawnSize * RUNNING_X_RATIO;
-                cfg.rotationFocusY = hardFocus + drawnSize * RUNNING_Y_RATIO;
+                cfg.rotationFocusX = drawOrigin + drawnSize * RUNNING_X_RATIO;
+                cfg.rotationFocusY = drawOrigin + drawnSize * RUNNING_Y_RATIO;
             }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);

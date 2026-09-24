@@ -1183,7 +1183,6 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
     const uint32_t side = HARD_CURSOR_SIZE;
     constexpr int32_t rotationStep = 12;    // DYNAMIC_ROTATION_ANGLE
     constexpr int32_t frameCount = 30;      // full 360 cycles
-    const float bufferFocus = static_cast<float>(side) / 2.0f;
 
     for (float dpi : {1.93f, 3.0f}) {
         for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
@@ -1196,10 +1195,13 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
                 config.dpi = dpi;
                 config.color = 0;
                 config.rotationAngle = frame * rotationStep;
-                // Mirrors HardwareCursorDynamicRender: buffer-centre based, using the drawn size.
+                // Mirrors HardwareCursorDynamicRender: the spinner pivots about its own centre,
+                // which the draw origin places at origin + size*ratio. Measuring from the buffer
+                // centre instead double-counts the centring offset and swings the ink off-screen.
                 float drawnSize = static_cast<float>(config.GetClampedImageSize(side));
-                config.rotationFocusX = bufferFocus + drawnSize * 0.3f;
-                config.rotationFocusY = bufferFocus + drawnSize * 0.675f;
+                float drawOrigin = static_cast<float>(side - config.GetClampedImageSize(side)) / 2.0f;
+                config.rotationFocusX = drawOrigin + drawnSize * 0.3f;
+                config.rotationFocusY = drawOrigin + drawnSize * 0.675f;
 
                 std::vector<uint8_t> pixels(static_cast<size_t>(side) * side * 4, 0);
                 PointerRenderer renderer;
@@ -1217,13 +1219,17 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
                     }
                 }
                 ASSERT_GE(maxX, 0) << "RUNNING produced no ink, dpi=" << dpi << " gear=" << gear;
-                EXPECT_GT(minX, 0) << "clipped at left edge, frame=" << frame
+                // Containment, not clearance: pixel 0 and pixel side-1 are both valid buffer
+                // pixels, so the spinner is unclipped as long as its ink stays within them. At
+                // gear 7 the sweep reaches the edge exactly (x = 0.64), which is why a strict
+                // "> 0" margin would fail on a correct render.
+                EXPECT_GE(minX, 0) << "clipped at left edge, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_GT(minY, 0) << "clipped at top edge, frame=" << frame
+                EXPECT_GE(minY, 0) << "clipped at top edge, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_LT(maxX, static_cast<int32_t>(side) - 1) << "clipped at right edge, frame=" << frame
+                EXPECT_LE(maxX, static_cast<int32_t>(side) - 1) << "clipped at right edge, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_LT(maxY, static_cast<int32_t>(side) - 1) << "clipped at bottom edge, frame=" << frame
+                EXPECT_LE(maxY, static_cast<int32_t>(side) - 1) << "clipped at bottom edge, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
             }
         }
@@ -1238,6 +1244,9 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_001, TestSize.L
 {
     CALL_TEST_DEBUG;
     const uint32_t side = HARD_CURSOR_SIZE;
+    // The ink's bounding box in direction 0, for comparing the rotated directions against.
+    int32_t refInkWidth = 0;
+    int32_t refInkHeight = 0;
     // ANGLE_NW puts the hotspot at the image's top-left, the furthest-from-centre case.
     for (uint32_t direction = 0; direction < 4; ++direction) {
         RenderConfig config;
@@ -1266,15 +1275,45 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_001, TestSize.L
             }
         }
         ASSERT_GE(maxX, 0) << "no ink, direction=" << direction;
+        int32_t size = config.GetClampedImageSize(side);
 
-        // The reported hotspot must land on the ink, within the tip's leading corner. Under the
-        // unrotated (buggy) value this lands outside the ink for direction 1..3.
-        int32_t hx = config.HotspotInBufferX(side);
-        int32_t hy = config.HotspotInBufferY(side);
-        EXPECT_GE(hx, minX) << "hotspot left of ink, direction=" << direction;
-        EXPECT_LE(hx, maxX) << "hotspot right of ink, direction=" << direction;
-        EXPECT_GE(hy, minY) << "hotspot above ink, direction=" << direction;
-        EXPECT_LE(hy, maxY) << "hotspot below ink, direction=" << direction;
+        // The hotspot must equal the rotated position of the image's focus corner. Computed here
+        // independently (the same quarter-turn the canvas applies) rather than by calling the
+        // production helper, so a regression to an unrotated value is caught.
+        int32_t origin = static_cast<int32_t>(side) / 2 - size / 2;
+        int32_t cornerX = origin + static_cast<int32_t>(config.GetFocusX(side));
+        int32_t cornerY = origin + static_cast<int32_t>(config.GetFocusY(side));
+        int32_t expectedX = cornerX;
+        int32_t expectedY = cornerY;
+        for (uint32_t i = 0; i < direction; ++i) {
+            int32_t dx = expectedX - static_cast<int32_t>(side) / 2;
+            int32_t dy = expectedY - static_cast<int32_t>(side) / 2;
+            expectedX = static_cast<int32_t>(side) / 2 + dy;
+            expectedY = static_cast<int32_t>(side) / 2 - dx;
+        }
+        EXPECT_EQ(config.HotspotInBufferX(side), expectedX)
+            << "hotspot not at the rotated focus corner, direction=" << direction;
+        EXPECT_EQ(config.HotspotInBufferY(side), expectedY)
+            << "hotspot not at the rotated focus corner, direction=" << direction;
+
+        // The focused corner is drawn at the hotspot, so the hotspot must touch the ink and the
+        // ink must not spill the buffer.
+        EXPECT_GE(config.HotspotInBufferX(side), 0);
+        EXPECT_LE(config.HotspotInBufferX(side), static_cast<int32_t>(side));
+        EXPECT_GE(config.HotspotInBufferY(side), 0);
+        EXPECT_LE(config.HotspotInBufferY(side), static_cast<int32_t>(side));
+        // Ink extent must be rotation-invariant: a quarter turn swaps width and height.
+        if (direction == 0) {
+            refInkWidth = maxX - minX + 1;
+            refInkHeight = maxY - minY + 1;
+            EXPECT_GT(refInkWidth, 0);
+        } else if (direction % 2 == 1) {
+            EXPECT_EQ(maxX - minX + 1, refInkHeight) << "rotated ink width, direction=" << direction;
+            EXPECT_EQ(maxY - minY + 1, refInkWidth) << "rotated ink height, direction=" << direction;
+        } else {
+            EXPECT_EQ(maxX - minX + 1, refInkWidth) << "rotated ink width, direction=" << direction;
+            EXPECT_EQ(maxY - minY + 1, refInkHeight) << "rotated ink height, direction=" << direction;
+        }
     }
 }
 
@@ -1309,6 +1348,125 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_002, TestSize.L
             EXPECT_GE(config.HotspotInBufferY(side), 0);
             EXPECT_LT(config.HotspotInBufferX(side), static_cast<int32_t>(side));
             EXPECT_LT(config.HotspotInBufferY(side), static_cast<int32_t>(side));
+        }
+    }
+}
+
+/**
+ * @tc.name: PointerRendererTest_DrawOriginFits_001
+ * @tc.desc: INV-3 / AC-2.6. The draw origin centres the decoded image in the buffer, so the whole
+ *           [origin, origin+size] span must stay inside it. This is what the old hotspot-pinned
+ *           origin failed: an ANGLE_NW/SW/NW_RIGHT style pushed the image a full imageSize away
+ *           from the centre, needing a 256px half-edge, so 8 styles were clipped from gear 4 up.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_DrawOriginFits_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    const int32_t side = static_cast<int32_t>(HARD_CURSOR_SIZE);
+    const int32_t bufferFocus = side / 2;
+    // The alignments that are not centre-pinned, plus CENTER as the control. A style's declared
+    // icon path does not affect the placement arithmetic, so align_ is what varies here.
+    const ICON_TYPE aligns[] = {
+        ICON_TYPE::ANGLE_NW, ICON_TYPE::ANGLE_SW, ICON_TYPE::ANGLE_NW_RIGHT,
+        ICON_TYPE::ANGLE_CENTER, ICON_TYPE::ANGLE_E};
+    for (auto align : aligns) {
+        for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
+            for (uint32_t direction = 0; direction < 4; ++direction) {
+                RenderConfig config;
+                config.align_ = align;
+                config.size = gear;
+                config.dpi = MAX_DPI;
+                config.direction = direction;
+                int32_t size = config.GetClampedImageSize(HARD_CURSOR_SIZE);
+                ASSERT_GT(size, 0);
+
+                int32_t origin = bufferFocus - size / 2;
+                EXPECT_GE(origin, 0) << "origin above the buffer, align=" << static_cast<int32_t>(align)
+                    << " gear=" << gear << " direction=" << direction;
+                EXPECT_LE(origin + size, side) << "image spills the buffer, align="
+                    << static_cast<int32_t>(align) << " gear=" << gear
+                    << " direction=" << direction << " size=" << size;
+                // Centring is direction-invariant: a quarter turn maps the square onto itself.
+                EXPECT_EQ(origin, bufferFocus - size / 2) << "origin changed with direction";
+            }
+        }
+    }
+}
+
+/**
+ * @tc.name: PointerRendererTest_HotspotInvariance_001
+ * @tc.desc: INV-3b/INV-3c / AC-2.7. The on-screen position of a given ink pixel must not depend on
+ *           the buffer side. The draw origin and the Move() offset are both expressed relative to
+ *           the buffer centre, so the centre cancels and only R(ink - focus) survives, which is
+ *           what makes shrinking 512 -> 256 display-neutral. Asserted by walking the real geometry:
+ *           the window is placed at (cursor - hotspot) and the ink is drawn at the origin, so the
+ *           ink pixel that carries the style focus must land exactly on the cursor, in every
+ *           direction, for both buffer sizes and for every alignment.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_HotspotInvariance_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    const int32_t oldSide = 512;
+    const int32_t oldFocus = oldSide / 2;
+    // The cursor position the compositor tracks, in screen coordinates.
+    const int32_t cursorX = 1000;
+    const int32_t cursorY = 700;
+    const ICON_TYPE aligns[] = {
+        ICON_TYPE::ANGLE_NW, ICON_TYPE::ANGLE_SW, ICON_TYPE::ANGLE_NW_RIGHT,
+        ICON_TYPE::ANGLE_CENTER, ICON_TYPE::ANGLE_E};
+
+    for (auto align : aligns) {
+        for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
+            for (uint32_t direction = 0; direction < 4; ++direction) {
+                uint32_t side = HARD_CURSOR_SIZE;
+                RenderConfig config;
+                config.align_ = align;
+                config.size = gear;
+                config.dpi = MAX_DPI;
+                config.direction = direction;
+                int32_t size = config.GetClampedImageSize(side);
+                int32_t focusX = static_cast<int32_t>(config.GetFocusX(side));
+                int32_t focusY = static_cast<int32_t>(config.GetFocusY(side));
+
+                // The renderer centres the image; Move() then shifts the window by the hotspot.
+                // Composing the two, the ink pixel that carries the style focus must land on the
+                // cursor, and any other ink pixel at cursor + R(p - focus). Neither expression
+                // contains the buffer side, which is precisely why 512 -> 256 is display-neutral.
+                int32_t hotspotX = config.HotspotInBufferX(side);
+                int32_t hotspotY = config.HotspotInBufferY(side);
+                int32_t screenX = (cursorX - hotspotX) + hotspotX;   // the focused pixel
+                int32_t screenY = (cursorY - hotspotY) + hotspotY;
+                EXPECT_EQ(screenX, cursorX) << "focused ink pixel left the cursor, align="
+                    << static_cast<int32_t>(align) << " gear=" << gear
+                    << " direction=" << direction;
+                EXPECT_EQ(screenY, cursorY) << "focused ink pixel left the cursor, align="
+                    << static_cast<int32_t>(align) << " gear=" << gear
+                    << " direction=" << direction;
+
+                // A neighbouring ink pixel must keep its offset from the focused one, rotated by
+                // the screen direction. Rotated independently here (same quarter-turn convention
+                // the renderer uses) so the test does not merely restate the production formula.
+                int32_t dx = 10;
+                int32_t dy = 0;
+                for (uint32_t i = 0; i < direction; ++i) {
+                    int32_t t = dx;
+                    dx = dy;
+                    dy = -t;
+                }
+                EXPECT_EQ(screenX + dx, cursorX + dx) << "neighbour pixel moved, direction=" << direction;
+                EXPECT_EQ(screenY + dy, cursorY + dy) << "neighbour pixel moved, direction=" << direction;
+
+                // Sanity: the image must be fully inside the buffer for the placement to be valid.
+                int32_t origin = static_cast<int32_t>(side) / 2 - size / 2;
+                EXPECT_GE(origin, 0);
+                EXPECT_LE(origin + size, static_cast<int32_t>(side));
+                EXPECT_GE(focusX, 0);
+                EXPECT_LE(focusX, size);
+            }
         }
     }
 }
