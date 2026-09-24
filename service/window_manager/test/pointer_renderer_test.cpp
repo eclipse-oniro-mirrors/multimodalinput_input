@@ -1549,9 +1549,10 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_UserIconPlacement_001, TestSiz
 
 /**
  * @tc.name: PointerRendererTest_SoftBufferSide_001
- * @tc.desc: A soft-only device (no hard cursor) must keep a buffer large enough for its glyph.
- *           Forcing a flat 256 clipped a 480dpi gear-7 cursor, whose ink runs to ~395px. The side
- *           is derived from canvasWidth_ = (imageWidth_/64 + 1)*64, which is always >= the image.
+ * @tc.desc: A standalone soft cursor (no hard cursor) must keep a buffer large enough for its
+ *           glyph; forcing a flat 256 clipped a 480dpi gear-7 cursor. The side comes from
+ *           canvasWidth_ = (imageWidth_/64 + 1)*64, which is always >= the image. This models the
+ *           soft path's own sizing (a 512 buffer), not the hard cursor's 256 one.
  * @tc.type: Function
  * @tc.require:
  */
@@ -1559,7 +1560,8 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_SoftBufferSide_001, TestSize.L
 {
     CALL_TEST_DEBUG;
     constexpr int32_t initStep = 64;    // POINTER_WINDOW_INIT_SIZE
-    // (dpi, gear) pairs including the review's 480dpi gear-7 counterexample.
+    // (dpi, gear) pairs including the 480dpi gear-7 counterexample from the review. The soft path
+    // sizes from the image the soft renderer produces, so the soft buffer side is used here.
     const std::pair<float, uint32_t> cases[] = {
         {1.93f, 1}, {1.93f, 7}, {3.0f, 7}, {5.0f, 7}, {8.0f, 1}, {8.0f, 6}, {8.0f, 7}};
     for (auto [dpi, gear] : cases) {
@@ -1567,16 +1569,23 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_SoftBufferSide_001, TestSize.L
         config.align_ = ICON_TYPE::ANGLE_CENTER;
         config.size = gear;
         config.dpi = dpi;
-        int32_t image = config.GetImageSize();
+        // Use the soft buffer side for the size the image is drawn at, so this reflects what the
+        // standalone soft path actually renders rather than the hard cursor's clamped size.
+        int32_t image = config.GetClampedImageSize(SOFT_CURSOR_SIZE);
         int32_t canvas = (image / initStep + 1) * initStep;
-        // The canvas the soft-only path requests must fit the whole glyph.
         EXPECT_GE(canvas, image) << "dpi=" << dpi << " gear=" << gear << " image=" << image;
-        // A flat 256 would clip anything larger, which is what regressed.
         if (image > 256) {
             EXPECT_GT(canvas, 256) << "a >256px glyph needs a >256 buffer, dpi=" << dpi
                 << " gear=" << gear << " image=" << image;
         }
     }
+    // The 480dpi case must reproduce an image large enough to exceed 256, otherwise the guard
+    // above is vacuous.
+    RenderConfig big;
+    big.align_ = ICON_TYPE::ANGLE_CENTER;
+    big.size = 1;
+    big.dpi = 8.0f;
+    EXPECT_GT(big.GetImageSize(), 256) << "the oversized-cursor case no longer overflows";
 }
 } // namespace MMI
 } // namespace OHOS

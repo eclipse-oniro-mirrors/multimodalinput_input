@@ -73,9 +73,9 @@ public:
     buffer_ptr_t RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer);
     buffer_ptr_t GetCurrentBuffer();
     // Caches the hotspot for the given path. isHard selects which copy to update: the two paths
-    // run on different threads and must not share one value. bufferSide is the side of the buffer
-    // the image is actually drawn into, which is not always DEFAULT_CURSOR_SIZE (a soft-only
-    // device sizes its buffer from the glyph; see GetSoftBufferSide).
+    // run on different threads with their own RenderConfig and must not share one value.
+    // bufferSide is the side of the buffer the image was actually drawn into, which is not always
+    // DEFAULT_CURSOR_SIZE.
     void UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide);
 
     bool Move(int32_t x, int32_t y);
@@ -92,20 +92,6 @@ public:
     // rotation pivot must derive it from this rather than a fixed constant, so the pivot stays
     // inside the buffer when the hard cursor buffer shrinks.
     uint32_t GetBufferSize() const;
-
-    // The side the soft path's buffer is actually requested at. Recorded by GetSurfaceBuffer so
-    // the hotspot and the MoveSoft node bounds use the same number the buffer was created with:
-    // a soft-only device sizes it from the rendered glyph (wide for large-pointer/high-dpi), while
-    // a device with a hard cursor uses DEFAULT_CURSOR_SIZE.
-    int32_t GetSoftBufferSide() const
-    {
-        return softBufferSide_;
-    }
-
-    void SetSoftBufferSide(int32_t side)
-    {
-        softBufferSide_ = (side > 0) ? side : DEFAULT_CURSOR_SIZE;
-    }
 
     uint32_t GetScreenWidth() const
     {
@@ -285,10 +271,6 @@ private:
     int32_t hotspotHardY_{DEFAULT_CURSOR_SIZE / 2};
     int32_t hotspotSoftX_{DEFAULT_CURSOR_SIZE / 2};
     int32_t hotspotSoftY_{DEFAULT_CURSOR_SIZE / 2};
-    // The side of the buffer each path actually draws into. Defaults to the shared constant; the
-    // soft path overrides it when it sizes its buffer from the glyph.
-    int32_t hardBufferSide_ {DEFAULT_CURSOR_SIZE};
-    int32_t softBufferSide_ {DEFAULT_CURSOR_SIZE};
     buffer_ptr_t transparentBuffer_{nullptr};
     buffer_ptr_t defaultBuffer_{nullptr};
     std::shared_mutex bufferMutex_;

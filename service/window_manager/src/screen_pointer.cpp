@@ -311,11 +311,9 @@ void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, 
     if (isHard) {
         hotspotHardX_ = x;
         hotspotHardY_ = y;
-        hardBufferSide_ = side;
     } else {
         hotspotSoftX_ = x;
         hotspotSoftY_ = y;
-        softBufferSide_ = side;
     }
 }
 
@@ -685,14 +683,16 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     int32_t px = x - hotspotSoftX_;
     int32_t py = y - hotspotSoftY_;
 
-    // The node is sized to the buffer the image was actually drawn into, so on a soft-only device
-    // whose buffer is larger than the shared constant the node does not crop the glyph.
-    uint32_t side = static_cast<uint32_t>(softBufferSide_);
+    // MoveSoft only serves the placeholder soft path that coexists with a hard cursor, whose buffer
+    // is DEFAULT_CURSOR_SIZE. A standalone soft cursor (no hard cursor) is positioned by
+    // PointerDrawingManager::UpdateSurfaceNodeBounds using canvasWidth_/canvasHeight_ instead, so
+    // it is not reached here and needs no separate side.
     if (!IsMirror()) {
         int64_t nodeId = surfaceNode_->GetId();
-        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, side, side);
+        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, DEFAULT_CURSOR_SIZE,
+            DEFAULT_CURSOR_SIZE);
     } else {
-        surfaceNode_->SetBounds(px, py, side, side);
+        surfaceNode_->SetBounds(px, py, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
     }
     MMI_HILOGD("Pointer Window SetBounds ScreenId:%{public}" PRIu64
         ", surfaceNodeId=%{public}" PRId64 ", pos=(%{private}d, %{private}d)",

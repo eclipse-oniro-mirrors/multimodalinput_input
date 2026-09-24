@@ -452,34 +452,6 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
     // extent.
     const int32_t imageSize = cfg.GetClampedImageSize(width);
-    // Clamp the inter-frame delta so the farthest trail copy still lands on the canvas. The buffer
-    // is half what it was, so a fast flick used to push the outermost copies off the edge and the
-    // trail simply disappeared; clamping keeps a shorter trail instead of dropping it. The bound is
-    // what fits between the glyph's origin and the far edge, divided by the largest trail ratio.
-    const float maxRatio = DEFAULT_OFFSET[BLUR_NUM - 1];
-    int32_t limitX = static_cast<int32_t>(static_cast<float>(static_cast<int32_t>(width) - offsetX - imageSize) /
-        maxRatio);
-    int32_t limitY = static_cast<int32_t>(static_cast<float>(static_cast<int32_t>(height) - offsetY - imageSize) /
-        maxRatio);
-    if (limitX < 0) {
-        limitX = 0;
-    }
-    if (limitY < 0) {
-        limitY = 0;
-    }
-    if (dx > limitX) {
-        dx = limitX;
-    } else if (dx < -limitX) {
-        // The negative direction is bounded by the space on the glyph's other side.
-        int32_t limitNegX = static_cast<int32_t>(static_cast<float>(offsetX) / maxRatio);
-        dx = (dx < -limitNegX) ? -limitNegX : dx;
-    }
-    if (dy > limitY) {
-        dy = limitY;
-    } else if (dy < -limitY) {
-        int32_t limitNegY = static_cast<int32_t>(static_cast<float>(offsetY) / maxRatio);
-        dy = (dy < -limitNegY) ? -limitNegY : dy;
-    }
     for (int32_t i = 1; i <= BLUR_NUM; i++) {
         if (!images[i]) {
             MMI_HILOGE("Blur pointer image %{public}d is null", i);
