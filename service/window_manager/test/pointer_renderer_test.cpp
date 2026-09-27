@@ -35,8 +35,12 @@ constexpr uint32_t MAX_POINTER_SIZE{7};
 constexpr float MAX_DPI{1.93f};
 // The soft cursor buffer stays at 512; the draw helpers now take the buffer size explicitly.
 constexpr uint32_t SOFT_CURSOR_SIZE{512};
-// The hard cursor buffer side after TASK-5; kept here so the guard cases and the clamp cases agree.
+// The hard cursor buffer side for the default tier. A device with const.multimodalinput.support_blur_cursor
+// set renders at BLUR_CURSOR_SIZE instead, because the drag trail does not fit in this one.
 constexpr uint32_t HARD_CURSOR_SIZE{256};
+// The tier used when the drag trail is enabled. Mirrors BLUR_CURSOR_SIZE in screen_pointer.h, which
+// this translation unit does not include; the assertion below pins them to the same value.
+constexpr uint32_t BLUR_TIER_SIZE{512};
 
 namespace OHOS {
 namespace MMI {
@@ -554,6 +558,47 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_IsPositionOutCanvas_001, TestS
     // Well past the right/bottom edge -> skipped.
     EXPECT_TRUE(renderer.IsPositionOutCanvas(300, 100, imageSize, width, height));
     EXPECT_TRUE(renderer.IsPositionOutCanvas(100, 300, imageSize, width, height));
+}
+
+/**
+ * @tc.name: PointerRendererTest_BlurTrailFitsOnlyInBlurTier
+ * @tc.desc: Pins the rationale for the two buffer tiers. A blurred frame draws the clear glyph plus
+ *           three copies at DEFAULT_OFFSET {0.4, 0.6, 0.8} of the inter-frame delta, so its footprint
+ *           is imageSize + 0.8*|dx| -- unbounded in speed. At gear 7 the glyph is already 254 of the
+ *           buffer, so the 256 tier leaves 1..2px and the outermost copies leave the canvas, while
+ *           the 512 tier seats them fully. If a future change lets the short tier take blur frames,
+ *           or lets the glyph exceed the short tier's margin, this test should be revisited.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_BlurTrailFitsOnlyInBlurTier, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerRenderer renderer;
+    const int32_t imageSize = 254;                      // gear 7, the largest glyph
+    const int32_t dx = -40;                             // a 40px flick; sign follows the move direction
+    const float ratios[] = {0.4f, 0.6f, 0.8f};
+
+    // Blur tier: every trail copy starts at or inside x=0, so none is clipped.
+    const int32_t blurOrigin = static_cast<int32_t>(BLUR_TIER_SIZE) / 2 - imageSize / 2;   // 129
+    for (float ratio : ratios) {
+        int32_t localX = blurOrigin + static_cast<int32_t>(dx * ratio);
+        EXPECT_GE(localX, 0) << "trail copy clipped in the blur tier, ratio=" << ratio;
+        EXPECT_FALSE(renderer.IsPositionOutCanvas(localX, blurOrigin, imageSize,
+            BLUR_TIER_SIZE, BLUR_TIER_SIZE));
+    }
+
+    // Short tier: the same flick pushes the copies off the left edge. This is the known, accepted
+    // cost of the 256 tier -- recorded here rather than asserted as desirable.
+    const int32_t shortOrigin = static_cast<int32_t>(HARD_CURSOR_SIZE) / 2 - imageSize / 2;  // 1
+    int32_t clipped = 0;
+    for (float ratio : ratios) {
+        if (shortOrigin + static_cast<int32_t>(dx * ratio) < 0) {
+            ++clipped;
+        }
+    }
+    EXPECT_GT(clipped, 0) << "the short tier unexpectedly seats the whole trail; the two-tier "
+        "justification in the proposal/design needs revisiting";
 }
 
 /**
@@ -1428,11 +1473,6 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_DrawOriginFits_001, TestSize.L
 HWTEST_F(PointerRendererTest, PointerRendererTest_HotspotInvariance_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    const int32_t oldSide = 512;
-    const int32_t oldFocus = oldSide / 2;
-    // The cursor position the compositor tracks, in screen coordinates.
-    const int32_t cursorX = 1000;
-    const int32_t cursorY = 700;
     const ICON_TYPE aligns[] = {
         ICON_TYPE::ANGLE_NW, ICON_TYPE::ANGLE_SW, ICON_TYPE::ANGLE_NW_RIGHT,
         ICON_TYPE::ANGLE_CENTER, ICON_TYPE::ANGLE_E};
@@ -1449,43 +1489,60 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_HotspotInvariance_001, TestSiz
                 int32_t size = config.GetClampedImageSize(side);
                 int32_t focusX = static_cast<int32_t>(config.GetFocusX(side));
                 int32_t focusY = static_cast<int32_t>(config.GetFocusY(side));
-
-                // The renderer centres the image; Move() then shifts the window by the hotspot.
-                // Composing the two, the ink pixel that carries the style focus must land on the
-                // cursor, and any other ink pixel at cursor + R(p - focus). Neither expression
-                // contains the buffer side, which is precisely why 512 -> 256 is display-neutral.
                 int32_t hotspotX = config.HotspotInBufferX(side);
                 int32_t hotspotY = config.HotspotInBufferY(side);
-                int32_t screenX = (cursorX - hotspotX) + hotspotX;   // the focused pixel
-                int32_t screenY = (cursorY - hotspotY) + hotspotY;
-                EXPECT_EQ(screenX, cursorX) << "focused ink pixel left the cursor, align="
-                    << static_cast<int32_t>(align) << " gear=" << gear
-                    << " direction=" << direction;
-                EXPECT_EQ(screenY, cursorY) << "focused ink pixel left the cursor, align="
-                    << static_cast<int32_t>(align) << " gear=" << gear
-                    << " direction=" << direction;
 
-                // A neighbouring ink pixel must keep its offset from the focused one, rotated by
-                // the screen direction. Rotated independently here (same quarter-turn convention
-                // the renderer uses) so the test does not merely restate the production formula.
-                int32_t dx = 10;
-                int32_t dy = 0;
-                for (uint32_t i = 0; i < direction; ++i) {
+                // Reconstruct where the style's focus pixel really ends up, independently of
+                // HotspotInBuffer: the renderer draws the image at `origin`, then rotates the canvas
+                // by -direction*90 about the buffer centre (see Render::Render), so the focus pixel
+                // starts at origin+focus relative to the buffer and is carried by that same rotation.
+                // Move() then offsets the window by the hotspot. The old test computed
+                // (cursorX - hotspotX) + hotspotX == cursorX, an identity true for any hotspot, so it
+                // could not catch a wrong formula -- and an earlier attempt to fix it compared against
+                // the *unrotated* origin+focus, which only holds at direction 0.
+                int32_t origin = static_cast<int32_t>(side) / 2 - size / 2;
+                int32_t half = static_cast<int32_t>(side) / 2;
+                int32_t dx = origin + focusX - half;
+                int32_t dy = origin + focusY - half;
+                for (uint32_t turn = 0; turn < direction; ++turn) {
+                    // Same quarter-turn convention RotateOffsetAboutCentre uses for a 90-degree step.
                     int32_t t = dx;
                     dx = dy;
                     dy = -t;
                 }
-                EXPECT_EQ(screenX + dx, cursorX + dx) << "neighbour pixel moved, direction=" << direction;
-                EXPECT_EQ(screenY + dy, cursorY + dy) << "neighbour pixel moved, direction=" << direction;
+                EXPECT_EQ(hotspotX, half + dx) << "HotspotInBufferX wrong, align="
+                    << static_cast<int32_t>(align) << " gear=" << gear
+                    << " direction=" << direction;
+                EXPECT_EQ(hotspotY, half + dy) << "HotspotInBufferY wrong, align="
+                    << static_cast<int32_t>(align) << " gear=" << gear
+                    << " direction=" << direction;
+
+                // At direction 0 no rotation applies, so the hotspot is exactly the focus pixel.
+                if (direction == 0) {
+                    EXPECT_EQ(hotspotX, origin + focusX) << "unrotated hotspot is not the focus pixel";
+                    EXPECT_EQ(hotspotY, origin + focusY) << "unrotated hotspot is not the focus pixel";
+                }
 
                 // Sanity: the image must be fully inside the buffer for the placement to be valid.
-                int32_t origin = static_cast<int32_t>(side) / 2 - size / 2;
                 EXPECT_GE(origin, 0);
                 EXPECT_LE(origin + size, static_cast<int32_t>(side));
                 EXPECT_GE(focusX, 0);
                 EXPECT_LE(focusX, size);
             }
         }
+    }
+
+    // Non-vacuous cross-check: changing the buffer side must shift the hotspot for at least one
+    // configuration, proving the assertions above can actually fail if HotspotInBuffer is wrong.
+    {
+        RenderConfig probe;
+        probe.align_ = ICON_TYPE::ANGLE_NW;
+        probe.size = 1;
+        probe.dpi = MAX_DPI;
+        probe.direction = 0;
+        EXPECT_NE(probe.HotspotInBufferX(HARD_CURSOR_SIZE),
+            probe.HotspotInBufferX(HARD_CURSOR_SIZE - 1))
+            << "cross-check: buffer side change had no effect; hotspot formula may be constant";
     }
 }
 

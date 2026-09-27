@@ -35,12 +35,20 @@ using screen_info_ptr_t = sptr<OHOS::Rosen::ScreenInfo>;
 using mode_t = OHOS::Rosen::ScreenSourceMode;
 using rotation_t = OHOS::Rosen::Rotation;
 
-// Side length of every cursor buffer: the hard-cursor common/default/transparent buffers, and the
-// soft-cursor surface buffer. The draw origin centres the image in it, HotspotInBuffer() is
-// computed against it, and Move()/MoveSoft() offset the node bounds by that hotspot, so all four
-// must agree on one number -- they did not when the soft path derived its size from the separate
-// setcanvassize parameter.
+// Side length of the cursor buffers. DEFAULT_CURSOR_SIZE is used when
+// const.multimodalinput.support_blur_cursor is false (or absent); BLUR_CURSOR_SIZE is used when
+// that property is true. All paths -- the hard-cursor common/default/transparent buffers, the
+// soft-cursor placeholder surface buffer, the draw origin, HotspotInBuffer(), and
+// Move()/MoveSoft() -- must agree on the same value.
 constexpr int32_t DEFAULT_CURSOR_SIZE{256};
+constexpr int32_t BLUR_CURSOR_SIZE{512};
+
+// The single source of truth for the choice above. Both the ScreenPointer that allocates the
+// buffers and the drawing path that requests a soft placeholder buffer call this rather than
+// reading the property themselves, so the property name, its default and the tier mapping exist in
+// exactly one place. The property is const.-prefixed (read-only, fixed at boot), so the value is
+// resolved once and cached; callers may invoke this per screen or per frame.
+int32_t GetCursorBufferSize();
 
 uint32_t GetScreenInfoWidth(const screen_info_ptr_t);
 uint32_t GetScreenInfoHeight(const screen_info_ptr_t);
@@ -260,6 +268,11 @@ private:
     std::shared_ptr<OHOS::Rosen::RSUIContext> rsUIContext_{nullptr};
 
     RenderConfig defaultCursorCfg_;
+    // Resolved once in Init() from const.multimodalinput.support_blur_cursor: BLUR_CURSOR_SIZE when
+    // true, DEFAULT_CURSOR_SIZE otherwise. All paths that allocate or size a buffer, compute a
+    // hotspot, or position a node must derive their side from this member rather than from the
+    // compile-time constant, so they all agree as a set.
+    uint32_t bufferSize_ {DEFAULT_CURSOR_SIZE};
     // Hotspot position within the rendered buffer, cached for Move()/MoveSoft(), which receive only
     // a position. Held per path: the two are driven from different threads with their own
     // RenderConfig (the soft path renders at the screen dpi and has its own direction), so a single

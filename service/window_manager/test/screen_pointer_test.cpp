@@ -2497,7 +2497,11 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_ResolveScreenLiteInfo_005, TestSiz
 
 /**
  * @tc.name: ScreenPointerTest_GetBufferSize_001
- * @tc.desc: Test the hard cursor buffer side length is 256 and the derived focus is 128
+ * @tc.desc: The buffer side is one of exactly two tiers, chosen by const.multimodalinput.support_blur_cursor
+ *           at boot: 512 with the drag trail enabled, 256 otherwise. The test asserts the tier is one
+ *           of those two and that the ScreenPointer agrees with the shared resolver, rather than
+ *           pinning 256 -- the property is read through a cached static, so a test that hardcoded one
+ *           tier would fail on a device configured for the other.
  * @tc.type: Function
  * @tc.require:
  */
@@ -2510,10 +2514,16 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetBufferSize_001, TestSize.Level1
     OLD::DisplayInfo di;
     auto screenpointer = std::make_unique<ScreenPointer>(hwcmgr, handler, di);
     ASSERT_NE(screenpointer, nullptr);
-    // The hard cursor buffer shrinks from 512 to 256: 10 buffers per screen means 10MB -> 2.5MB.
-    EXPECT_EQ(screenpointer->GetBufferSize(), 256u);
-    // The rotation pivot and the MoveHard/MoveSoft offset both derive from this, so both are 128.
-    EXPECT_EQ(screenpointer->GetBufferSize() / 2u, 128u);
+
+    // Exactly two tiers are allowed; anything else means the mapping drifted.
+    int32_t resolved = GetCursorBufferSize();
+    EXPECT_TRUE(resolved == DEFAULT_CURSOR_SIZE || resolved == BLUR_CURSOR_SIZE)
+        << "unexpected cursor buffer tier: " << resolved;
+    // The instance and the shared resolver must not disagree -- they are the same decision.
+    EXPECT_EQ(screenpointer->GetBufferSize(), static_cast<uint32_t>(resolved));
+    // The rotation pivot and the Move/MoveSoft offsets both derive from the side, so the focus is
+    // exactly half of whichever tier was selected.
+    EXPECT_EQ(screenpointer->GetBufferSize() % 2u, 0u) << "side must be even for an exact half-side focus";
 }
 
 /**

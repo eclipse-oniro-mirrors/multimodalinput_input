@@ -177,6 +177,8 @@ ScreenPointer::~ScreenPointer()
 
 bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 {
+    // Before InitSurface: that call sizes the surface and canvas nodes from bufferSize_.
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
         return false;
@@ -199,8 +201,8 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 
     // Init buffers
     OHOS::BufferRequestConfig bufferCfg = {
-        .width = DEFAULT_CURSOR_SIZE,
-        .height = DEFAULT_CURSOR_SIZE,
+        .width = static_cast<int32_t>(bufferSize_),
+        .height = static_cast<int32_t>(bufferSize_),
         .strideAlignment = STRIDE_ALIGNMENT,
         .format = GRAPHIC_PIXEL_FMT_RGBA_8888,
         .usage = BUFFER_USAGE_CPU_READ | BUFFER_USAGE_CPU_WRITE | BUFFER_USAGE_MEM_DMA | BUFFER_USAGE_HW_COMPOSER
@@ -319,7 +321,7 @@ void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, 
 
 buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer)
 {
-    UpdateHotspotInBuffer(cfg, true, DEFAULT_CURSOR_SIZE);
+    UpdateHotspotInBuffer(cfg, true, static_cast<int32_t>(bufferSize_));
     if (cfg.style_ == MOUSE_ICON::TRANSPARENT_ICON) {
         MMI_HILOGD("The buffer transparent buffer.");
         isCommonBuffer = false;
@@ -409,14 +411,14 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
     if (needDrawPointer) {
         surfaceNode_->AttachToDisplay(screenId_);
     }
-    surfaceNode_->SetBounds(0, 0, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+    surfaceNode_->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
     MMI_HILOGI("AttachToDisplay %{public}" PRIu64 " completed, needDrawPointer=%{public}d", screenId_, needDrawPointer);
 
     // create canvas node
     canvasNode_ = Rosen::RSCanvasNode::Create(false, false, rsUIContext_);
     CHKPF(canvasNode_);
-    canvasNode_->SetBounds(0, 0, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
-    canvasNode_->SetFrame(0, 0, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+    canvasNode_->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
+    canvasNode_->SetFrame(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
 #ifndef USE_ROSEN_DRAWING
     canvasNode_->SetBackgroundColor(SK_ColorTRANSPARENT);
 #else
@@ -618,9 +620,19 @@ void ScreenPointer::CalculateHwcPositionForMirror(int32_t& x, int32_t& y)
     y += paddingTop_;
 }
 
+int32_t GetCursorBufferSize()
+{
+    // const. properties are read-only and fixed at boot, so the tier cannot change while the
+    // process lives. A function-local static keeps the parameter lookup off the per-frame draw
+    // path without needing an ownership story for a global; thread-safe init is guaranteed.
+    static const int32_t side = OHOS::system::GetBoolParameter(
+        "const.multimodalinput.support_blur_cursor", false) ? BLUR_CURSOR_SIZE : DEFAULT_CURSOR_SIZE;
+    return side;
+}
+
 uint32_t ScreenPointer::GetBufferSize() const
 {
-    return DEFAULT_CURSOR_SIZE;
+    return bufferSize_;
 }
 
 bool ScreenPointer::Move(int32_t x, int32_t y)
@@ -697,15 +709,15 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     int32_t py = y - hotspotSoftY_;
 
     // MoveSoft only serves the placeholder soft path that coexists with a hard cursor, whose buffer
-    // is DEFAULT_CURSOR_SIZE. A standalone soft cursor (no hard cursor) is positioned by
+    // side is bufferSize_. A standalone soft cursor (no hard cursor) is positioned by
     // PointerDrawingManager::UpdateSurfaceNodeBounds using canvasWidth_/canvasHeight_ instead, so
     // it is not reached here and needs no separate side.
     if (!IsMirror()) {
         int64_t nodeId = surfaceNode_->GetId();
-        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, DEFAULT_CURSOR_SIZE,
-            DEFAULT_CURSOR_SIZE);
+        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, static_cast<int32_t>(bufferSize_),
+            static_cast<int32_t>(bufferSize_));
     } else {
-        surfaceNode_->SetBounds(px, py, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+        surfaceNode_->SetBounds(px, py, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
     }
     MMI_HILOGD("Pointer Window SetBounds ScreenId:%{public}" PRIu64
         ", surfaceNodeId=%{public}" PRId64 ", pos=(%{private}d, %{private}d)",

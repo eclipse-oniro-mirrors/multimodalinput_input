@@ -1223,7 +1223,7 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         if (it.second->IsMirror() || it.first == displayId) {
             // Hard cursor: derive the pivot from this ScreenPointer's buffer size so it stays
             // inside the buffer when the hard cursor buffer shrinks. The placeholder soft path
-            // derives the same way -- it shares DEFAULT_CURSOR_SIZE with the hard cursor, so
+            // derives the same way -- it shares bufferSize_ with the hard cursor, so
             // neither can keep a size of its own.
             //
             // The spinner pivot is the glyph's own centre, which the draw origin places at
@@ -1312,9 +1312,9 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             // the static soft path does. Without this a style or size change leaves the previous
             // hotspot in place and MoveSoft offsets by it -- e.g. switching the default arrow to
             // LOADING kept hot spot 108 where 128 is correct, shifting the spinner by 20px.
-            // The animated soft path renders at DEFAULT_CURSOR_SIZE, the same side its buffer is
+            // The animated soft path renders at bufferSize_, the same side its buffer is
             // requested at and the same the node bounds use.
-            int32_t softSide = DEFAULT_CURSOR_SIZE;
+            int32_t softSide = static_cast<int32_t>(it.second->GetBufferSize());
             it.second->UpdateHotspotInBuffer(cfg, false, softSide);
             // Same pivot rule as the hard path: the spinner turns about its own centre, which the
             // draw origin places at origin + size*ratio. Deriving it from the buffer centre
@@ -2046,8 +2046,13 @@ sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Sur
         // this side, so it must not take a size of its own. Deriving it from GetCanvasSize() here made the image
         // lay out for a 512 buffer while the hotspot was computed for a 256 one: a constant
         // (128,128) misalignment.
-        width = DEFAULT_CURSOR_SIZE;
-        height = DEFAULT_CURSOR_SIZE;
+        //
+        // No ScreenPointer is in scope here and there is no single one to ask: this serves whichever
+        // screen's layer was passed, while every screen resolves the same boot-fixed tier. So take
+        // the side from the shared resolver rather than caching a second copy of the decision.
+        int32_t hardSide = GetCursorBufferSize();
+        width = hardSide;
+        height = hardSide;
     } else {
         // Without a hard cursor the soft cursor is the only cursor, so the buffer has to fit the
         // rendered glyph. canvasWidth_/Height_ are derived from the pointer size and dpi (rounded
@@ -3608,7 +3613,7 @@ void PointerDrawingManager::SoftwareCursorRender(MOUSE_ICON mouseStyle, int32_t 
             cfg.align_ = CursorDrawingInformation::GetInstance().MouseIcon2IconType(cfg.style_);
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
         }
-        it.second->UpdateHotspotInBuffer(cfg, false, DEFAULT_CURSOR_SIZE);
+        it.second->UpdateHotspotInBuffer(cfg, false, static_cast<int32_t>(it.second->GetBufferSize()));
         DrawSoftCursor(it.second->GetSurfaceNode(), cfg);
     }
     MMI_HILOGD("SoftwareCursorRender success");
