@@ -333,6 +333,19 @@ buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommo
     return GetCommonBuffer();
 }
 
+// Decides whether a frame can be served the one-shot defaultBuffer_, which InitDefaultBuffer renders
+// exactly once from defaultCursorCfg_ (DIRECTION0, no blur) and is never redrawn afterwards --
+// DrawHardCursor skips Render() for it. Anything this rejects falls through to commonBuffers_ and is
+// re-rendered every frame.
+//
+// RenderConfig::operator== only compares style_, GetImageSize() and color, so each term below has to
+// be spelled out; every one of them changes the pixels while leaving operator== equal:
+//   - direction: a rotated screen turns the glyph about the buffer focus, so DIRECTION0's cached
+//     image is wrong. Rotating away drops to the per-frame path and rotating back re-enters this one.
+//   - isBlur: the trail is composed per frame from the pointer's own motion, so a blurred frame can
+//     never reuse a cached image. Omitting this term would hand moving cursors the static buffer and
+//     the trail would never appear at all.
+//   - align_/isHard: change the draw origin and the target buffer pool respectively.
 bool ScreenPointer::IsDefaultCfg(const RenderConfig &cfg)
 {
     return (cfg == defaultCursorCfg_) && (cfg.direction == defaultCursorCfg_.direction)

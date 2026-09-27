@@ -50,7 +50,9 @@ namespace OHOS::MMI {
 
 // The buffer focus is the centre of the actual buffer, derived from its size rather than a fixed
 // constant. Everything that anchors to the buffer centre (rotation pivots, draw origins) must come
-// from here so the hard cursor (256) and the soft cursor (512) both stay pixel-identical.
+// from here so every caller stays pixel-identical whatever side it renders at: the hard cursor and
+// the placeholder soft cursor both use DEFAULT_CURSOR_SIZE, while a standalone soft cursor sizes
+// its buffer from the glyph (canvasWidth_/canvasHeight_) and so can be larger.
 static int32_t BufferFocus(uint32_t side)
 {
     return static_cast<int32_t>(side / CALCULATE_IMAGE_MIDDLE);
@@ -351,7 +353,8 @@ int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, 
     canvas.Bind(bitmap);
     canvas.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
     // The focus is the buffer centre, derived from the actual buffer size rather than a fixed
-    // constant, so hard cursor (256) and soft cursor (512) buffers both stay pixel-identical.
+    // constant, so every buffer side stays pixel-identical -- the hard and placeholder soft paths
+    // at DEFAULT_CURSOR_SIZE, a standalone soft cursor at its glyph-derived size.
     int32_t focusX = BufferFocus(width);
     int32_t focusY = BufferFocus(height);
     if (cfg.direction) {

@@ -51,7 +51,9 @@ public:
     // Clamps GetImageSize() to fit a buffer of the given side length, preserving the 1:1 aspect ratio.
     // Gear 1 has a zero suppression exponent, so imageSize = 40 * dpi is unbounded and can exceed the
     // buffer; every other gear is already bounded by MAX_DPI. Takes the side as a parameter so the
-    // soft (512) and hard (256) paths share one implementation without either hardcoding the other's size.
+    // hard, placeholder-soft and standalone-soft paths share one implementation without any of them
+    // hardcoding another's size -- the first two render at DEFAULT_CURSOR_SIZE, the last at a
+    // glyph-derived side that can exceed it.
     int32_t GetClampedImageSize(uint32_t bufferSide) const;
     // The side the image is actually drawn at. For built-in SVGs this is GetClampedImageSize();
     // for an app-supplied pixelmap it is the icon's own long side, capped at the buffer side, so

@@ -1222,8 +1222,9 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
             // Hard cursor: derive the pivot from this ScreenPointer's buffer size so it stays
-            // inside the buffer when the hard cursor buffer shrinks. The soft cursor path derives
-            // the same way -- both share DEFAULT_CURSOR_SIZE, so neither can keep a 512 of its own.
+            // inside the buffer when the hard cursor buffer shrinks. The placeholder soft path
+            // derives the same way -- it shares DEFAULT_CURSOR_SIZE with the hard cursor, so
+            // neither can keep a size of its own.
             //
             // The spinner pivot is the glyph's own centre, which the draw origin places at
             // origin + size*ratio. It must NOT be measured from the buffer centre: with the image
@@ -3545,6 +3546,10 @@ void PointerDrawingManager::CreateRenderConfig(RenderConfig& cfg, std::shared_pt
     cfg.x = x * sp->GetScale();
     cfg.y = y * sp->GetScale();
     cfg.screenId = screenId;
+    // The trail is deliberately narrow in scope: the hard cursor's DEFAULT arrow only, and only on
+    // devices that opt in via const.multimodalinput.support_blur_cursor. Every other style, the soft
+    // path (BlurRender requires isHard) and non-opted devices render without it. This bounds the
+    // gear-7 trail clipping in a 256 buffer to that one style on those devices.
     cfg.isBlur = isBlur && isHard && mouseStyle == MOUSE_ICON::DEFAULT && GetCursorBlurEnabled();
     float scale = isHard ? sp->GetScale() : 1.0f;
     cfg.dpi = sp->GetDPI() * scale;
