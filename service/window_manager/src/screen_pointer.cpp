@@ -147,6 +147,7 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, const O
         std::swap(width_, height_);
     }
     dpi_ = float(di.dpi) / BASELINE_DENSITY;
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with DisplayInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
 }
@@ -165,6 +166,7 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, screen_
     width_ = result.width;
     height_ = result.height;
     rotation_ = result.rotation;
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with ScreenInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
 }
@@ -308,8 +310,18 @@ void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, 
     // (SoftwareCursorRender, which has no buffer to request) each keep their own copy, because
     // they run on different threads with different RenderConfigs.
     int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
-    int32_t x = cfg.HotspotInBufferX(side);
-    int32_t y = cfg.HotspotInBufferY(side);
+    int32_t x, y;
+    if (side == BLUR_CURSOR_SIZE) {
+        // 512-tier blur draw origin is BufferFocus - GetFocusX/Y (pre-centring layout).
+        // In that layout, origin + styleFocus = BufferFocus for all styles, so the cursor
+        // tip always lands at side/2. Move() must subtract side/2 to place it correctly.
+        x = side / 2;
+        y = side / 2;
+    } else {
+        // 256-tier uses the centred layout; hotspot is derived from CalcDrawOriginX/Y.
+        x = cfg.HotspotInBufferX(side);
+        y = cfg.HotspotInBufferY(side);
+    }
     if (isHard) {
         hotspotHardX_ = x;
         hotspotHardY_ = y;
