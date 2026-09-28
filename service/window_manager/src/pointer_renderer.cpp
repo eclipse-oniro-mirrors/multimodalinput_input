@@ -435,19 +435,8 @@ void PointerRenderer::DrawDefaultPointer(uint32_t width, uint32_t height, const 
         MMI_HILOGE("Default pointer image is null");
         return;
     }
-    // 512-tier blur renders use the pre-centring origin (BufferFocus - GetFocusX/Y) to
-    // preserve the original trail geometry: a DEFAULT glyph lands at origin 256 with
-    // 256px of left/upper slack for trails. The proposal requires this tier to be
-    // unchanged. The 256-tier uses CalcDrawOriginX/Y (centred layout).
-    int32_t originX, originY;
-    if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-        originX = BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX(width));
-        originY = BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY(height));
-    } else {
-        originX = CalcDrawOriginX(width, cfg);
-        originY = CalcDrawOriginY(height, cfg);
-    }
-    defaultCanvas_.DrawImage(*images[0], originX, originY, Rosen::Drawing::SamplingOptions());
+    defaultCanvas_.DrawImage(*images[0], CalcDrawOriginX(width, cfg), CalcDrawOriginY(height, cfg),
+        Rosen::Drawing::SamplingOptions());
 }
 
 void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg,
@@ -461,16 +450,8 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     int32_t dx = lastCfg.x - cfg.x;
     int32_t dy = lastCfg.y - cfg.y;
     AdjustDeltaForDirection(dx, dy, cfg.direction, cfg.displayDirection);
-    // 512-tier uses the pre-centring origin (BufferFocus - GetFocusX/Y) to preserve
-    // original trail geometry. 256-tier uses CalcDrawOriginX/Y (centred layout).
-    int32_t offsetX, offsetY;
-    if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-        offsetX = BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX(width));
-        offsetY = BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY(height));
-    } else {
-        offsetX = CalcDrawOriginX(width, cfg);
-        offsetY = CalcDrawOriginY(height, cfg);
-    }
+    const int32_t offsetX = CalcDrawOriginX(width, cfg);
+    const int32_t offsetY = CalcDrawOriginY(height, cfg);
     // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
     // extent.
     const int32_t imageSize = cfg.GetClampedImageSize(width);
@@ -481,7 +462,7 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
         }
         int32_t localX = offsetX + dx * DEFAULT_OFFSET[i - 1];
         int32_t localY = offsetY + dy * DEFAULT_OFFSET[i - 1];
-        if (IsPositionOutCanvas(localX, localY, imageSize, width, height, width)) {
+        if (IsPositionOutCanvas(localX, localY, imageSize, width, height)) {
             MMI_HILOGD("The blur image is out of bounds, no need to draw");
             continue;
         }
@@ -515,14 +496,12 @@ void PointerRenderer::AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t
 // subtracted imageSize/2 from them, which double-counted the offset: at gear 7 the image is
 // centred with origin 1, so the check saw left = -126 and skipped every horizontal blur frame.
 bool PointerRenderer::IsPositionOutCanvas(int32_t left, int32_t top, int32_t imageSize,
-    uint32_t width, uint32_t height, uint32_t bufferSide)
+    uint32_t width, uint32_t height)
 {
     int32_t right = left + imageSize;
     int32_t bottom = top + imageSize;
-    // 512-tier preserves the original strict boundary (no slack) so that the trail
-    // filter behaviour matches the pre-change code exactly. 256-tier allows a quarter
-    // of the image to hang off each edge so partially visible trails still draw.
-    int32_t slack = (bufferSide == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) ? 0 : imageSize / 4;
+    // Allow a quarter of the image to hang off each edge so a partially visible blur still draws.
+    int32_t slack = imageSize / 4;
     return right < -slack || left > static_cast<int32_t>(width) + slack ||
             bottom < -slack || top > static_cast<int32_t>(height) + slack;
 }

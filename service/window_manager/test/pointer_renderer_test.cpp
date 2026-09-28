@@ -1258,9 +1258,7 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
                 config.dpi = dpi;
                 config.color = 0;
                 config.rotationAngle = frame * rotationStep;
-                // Match HardwareCursorDynamicRender exactly: iOrigin = int(side/2) - int(imageSize/2),
-                // pivot = iOrigin + int(imageSize * ratio). Integer truncation is intentional —
-                // using float ratio directly shifts the pivot and changes the rasterised trajectory.
+                // Match HardwareCursorDynamicRender exactly: iOrigin + int(imageSize * ratio).
                 float drawnSize = static_cast<float>(config.GetClampedImageSize(side));
                 int32_t iSize = static_cast<int32_t>(drawnSize);
                 int32_t iOrigin = static_cast<int32_t>(side) / 2 - iSize / 2;
