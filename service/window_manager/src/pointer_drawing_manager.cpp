@@ -3582,10 +3582,24 @@ void PointerDrawingManager::CreateRenderConfig(RenderConfig& cfg, std::shared_pt
         MMI_HILOGD("Set mouseIcon by userIcon_");
         cfg.userIconPixelMap = GetUserIconCopy();
         CHKPV(cfg.userIconPixelMap);
-        cfg.userIconHotSpotX = userIconHotSpotX_ * scale;
-        cfg.userIconHotSpotY = userIconHotSpotY_ * scale;
+        // Cap the mirror upscale so the resulting pixelmap never exceeds the buffer side.
+        // Without this, a 200x200 icon upscaled 2x to 400x400 on a 4K mirror screen would
+        // then be downscaled again by UserIconScale (400 > 256), yielding ~160x160 -- smaller
+        // than the original and smaller than the 512-tier produced (where 400 <= 512 fit as-is).
+        float effectiveScale = scale;
+        if (scale > 1.0f) {
+            Media::ImageInfo iconInfo;
+            cfg.userIconPixelMap->GetImageInfo(iconInfo);
+            int32_t longSide = std::max(iconInfo.size.width, iconInfo.size.height);
+            if (longSide > 0) {
+                float maxScale = static_cast<float>(sp->GetBufferSize()) / static_cast<float>(longSide);
+                effectiveScale = std::min(scale, maxScale);
+            }
+        }
+        cfg.userIconHotSpotX = userIconHotSpotX_ * effectiveScale;
+        cfg.userIconHotSpotY = userIconHotSpotY_ * effectiveScale;
         cfg.userIconFollowSystem = userIconFollowSystem_;
-        ScalePixelMap(cfg.userIconPixelMap.get(), scale, scale);
+        ScalePixelMap(cfg.userIconPixelMap.get(), effectiveScale, effectiveScale);
     }
 }
 
