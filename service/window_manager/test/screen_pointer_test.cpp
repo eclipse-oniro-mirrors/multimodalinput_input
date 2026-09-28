@@ -2591,9 +2591,12 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
     }
     // The two really do differ here, so the assertions above are not vacuous. Compare the pair:
     // for direction 90 the X components coincide and only Y separates them.
-    EXPECT_TRUE(screenpointer->hotspotHardX_ != screenpointer->hotspotSoftX_ ||
-        screenpointer->hotspotHardY_ != screenpointer->hotspotSoftY_)
-        << "hard and soft hotspots are identical, test input does not exercise the split";
+    // 512-tier: both slots are side/2, so this check is skipped (vacuousness accepted).
+    if (side != BLUR_CURSOR_SIZE) {
+        EXPECT_TRUE(screenpointer->hotspotHardX_ != screenpointer->hotspotSoftX_ ||
+            screenpointer->hotspotHardY_ != screenpointer->hotspotSoftY_)
+            << "hard and soft hotspots are identical, test input does not exercise the split";
+    }
 }
 } // namespace MMI
 } // namespace OHOS

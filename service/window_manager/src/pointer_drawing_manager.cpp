@@ -1235,25 +1235,25 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             uint32_t bufferSide = it.second->GetBufferSize();
             float drawnSize = static_cast<float>(cfg.GetClampedImageSize(bufferSide));
             int32_t iSize = static_cast<int32_t>(drawnSize);
-            // iOrigin matches CalcDrawOriginX: BufferFocus(side) - int(imageSize/2).
-            int32_t iOrigin = static_cast<int32_t>(bufferSide) / 2 - iSize / 2;
-            if (mouseStyle == MOUSE_ICON::LOADING) {
-                // Pivot = iOrigin + GetFocusX/Y (unrotated local style focus).
-                // For ANGLE_CENTER 73px: iOrigin=92, GetFocusX=37, pivot=129.
-                // canvas.Rotate operates in buffer-local coordinates before direction
-                // rotation is applied, so HotspotInBufferX/Y (which includes direction
-                // rotation) must not be used here.
-                cfg.rotationFocusX = static_cast<float>(
-                    iOrigin + static_cast<int32_t>(cfg.GetFocusX(bufferSide)));
-                cfg.rotationFocusY = static_cast<float>(
-                    iOrigin + static_cast<int32_t>(cfg.GetFocusY(bufferSide)));
+            // iOrigin replicates TierOriginX: 512-tier uses BufferFocus - GetFocusX;
+            // 256-tier uses CalcDrawOriginX = BufferFocus(side) - int(imageSize/2).
+            int32_t iOriginBase;
+            if (bufferSide == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+                iOriginBase = static_cast<int32_t>(bufferSide) / 2 -
+                    static_cast<int32_t>(cfg.GetFocusX(bufferSide));
             } else {
-                // Pivot = iOrigin + int(imageSize * ratio). Integer truncation preserves
-                // the old rasterised trajectory (48px: relative pivot (14,32)).
+                iOriginBase = static_cast<int32_t>(bufferSide) / 2 - iSize / 2;
+            }
+            if (mouseStyle == MOUSE_ICON::LOADING) {
                 cfg.rotationFocusX = static_cast<float>(
-                    iOrigin + static_cast<int32_t>(drawnSize * RUNNING_X_RATIO));
+                    iOriginBase + static_cast<int32_t>(cfg.GetFocusX(bufferSide)));
                 cfg.rotationFocusY = static_cast<float>(
-                    iOrigin + static_cast<int32_t>(drawnSize * RUNNING_Y_RATIO));
+                    iOriginBase + static_cast<int32_t>(cfg.GetFocusY(bufferSide)));
+            } else {
+                cfg.rotationFocusX = static_cast<float>(
+                    iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_X_RATIO));
+                cfg.rotationFocusY = static_cast<float>(
+                    iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_Y_RATIO));
             }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);
@@ -1328,17 +1328,23 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             // instead double-counts the centring offset and swings the ink out of the buffer.
             float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
             int32_t iSoftSize = static_cast<int32_t>(softSize);
-            int32_t iSoftOrigin = softSide / 2 - iSoftSize / 2;
+            int32_t iSoftOriginBase;
+            if (static_cast<uint32_t>(softSide) == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+                iSoftOriginBase = softSide / 2 -
+                    static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide)));
+            } else {
+                iSoftOriginBase = softSide / 2 - iSoftSize / 2;
+            }
             if (mouseStyle == MOUSE_ICON::LOADING) {
                 cfg.rotationFocusX = static_cast<float>(
-                    iSoftOrigin + static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide))));
+                    iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide))));
                 cfg.rotationFocusY = static_cast<float>(
-                    iSoftOrigin + static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(softSide))));
+                    iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(softSide))));
             } else {
                 cfg.rotationFocusX = static_cast<float>(
-                    iSoftOrigin + static_cast<int32_t>(softSize * RUNNING_X_RATIO));
+                    iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_X_RATIO));
                 cfg.rotationFocusY = static_cast<float>(
-                    iSoftOrigin + static_cast<int32_t>(softSize * RUNNING_Y_RATIO));
+                    iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_Y_RATIO));
             }
             DrawDynamicSoftCursor(sn, cfg);
         } else {

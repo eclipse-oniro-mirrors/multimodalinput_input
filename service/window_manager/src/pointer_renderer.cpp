@@ -375,8 +375,8 @@ int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, 
     OHOS::Rosen::Drawing::Canvas canvas;
     canvas.Bind(bitmap);
     canvas.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
-    int32_t focusX = TierOriginX(width, cfg) + static_cast<int32_t>(cfg.GetFocusX(width));
-    int32_t focusY = TierOriginY(height, cfg) + static_cast<int32_t>(cfg.GetFocusY(height));
+    int32_t focusX = BufferFocus(width);
+    int32_t focusY = BufferFocus(height);
     if (cfg.direction) {
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
@@ -428,8 +428,7 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         defaultCanvas_.Save();
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        defaultCanvas_.Rotate(degree, TierOriginX(width, cfg) + static_cast<int32_t>(cfg.GetFocusX(width)),
-            TierOriginY(height, cfg) + static_cast<int32_t>(cfg.GetFocusY(height)));
+        defaultCanvas_.Rotate(degree, BufferFocus(width), BufferFocus(height));
     }
     defaultCanvas_.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
     const auto& lastCfg = GetPointerCfg(cfg);
@@ -482,7 +481,14 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
         }
         int32_t localX = offsetX + dx * DEFAULT_OFFSET[i - 1];
         int32_t localY = offsetY + dy * DEFAULT_OFFSET[i - 1];
-        if (IsPositionOutCanvas(localX, localY, imageSize, width, height)) {
+        // For the 512-tier, TierOriginX returns a centre-semantics value matching the
+        // original GetOffsetX(). IsPositionOutCanvas uses top-left semantics, so shift
+        // by -imageSize/2 to replicate the original boundary check.
+        int32_t checkX = (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) ?
+            localX - imageSize / 2 : localX;
+        int32_t checkY = (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) ?
+            localY - imageSize / 2 : localY;
+        if (IsPositionOutCanvas(checkX, checkY, imageSize, width, height)) {
             MMI_HILOGD("The blur image is out of bounds, no need to draw");
             continue;
         }
@@ -936,8 +942,7 @@ int32_t PointerRenderer::DynamicRender(uint8_t *addr, uint32_t width, uint32_t h
     if (cfg.direction) {
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        canvas.Rotate(degree, TierOriginX(width, cfg) + static_cast<int32_t>(cfg.GetFocusX(width)),
-            TierOriginY(height, cfg) + static_cast<int32_t>(cfg.GetFocusY(height)));
+        canvas.Rotate(degree, BufferFocus(width), BufferFocus(height));
     }
 
     if (DrawImage(canvas, width, height, cfg) != RET_OK) {
