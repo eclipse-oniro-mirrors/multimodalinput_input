@@ -1244,9 +1244,13 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
 {
     CALL_TEST_DEBUG;
     const uint32_t side = HARD_CURSOR_SIZE;
-    // Render into a canvas twice as wide as the buffer so ink that would be clipped at the
-    // buffer edge becomes visible here instead, making containment failures detectable.
-    const uint32_t renderSide = side * 2;
+    // Render into a larger canvas by adding a margin on each side. The logical 256-tier
+    // layout is preserved because canvasSide (384) is neither DEFAULT_CURSOR_SIZE nor
+    // BLUR_CURSOR_SIZE, so TierOriginX uses CalcDrawOriginX with the canvas half as the
+    // buffer focus. Ink that escapes [margin, margin+side-1] due to a wrong pivot is
+    // visible in the outer strip rather than silently clipped, covering all four edges.
+    const int32_t margin = static_cast<int32_t>(side) / 4;   // 64px — canvasSide = 384
+    const uint32_t canvasSide = side + static_cast<uint32_t>(margin) * 2;
     constexpr int32_t rotationStep = 12;    // DYNAMIC_ROTATION_ANGLE
     constexpr int32_t frameCount = 30;      // full 360 cycles
 
@@ -1261,26 +1265,25 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
                 config.dpi = dpi;
                 config.color = 0;
                 config.rotationAngle = frame * rotationStep;
-                // Match HardwareCursorDynamicRender: iOriginBase = side/2 - GetFocusX (256-tier)
-                // or side/2 - imageSize/2 (256-tier). For HARD_CURSOR_SIZE (256-tier):
+                // Pivot uses the canvasSide-based origin to match TierOriginX(canvasSide):
+                //   iOrigin = canvasSide/2 - imageSize/2 = side/2 + margin - imageSize/2
+                // Image size is clamped to 'side' (not canvasSide) to match production limits.
                 float drawnSize = static_cast<float>(config.GetClampedImageSize(side));
                 int32_t iSize = static_cast<int32_t>(drawnSize);
-                int32_t iOrigin = static_cast<int32_t>(side) / 2 - iSize / 2;
+                int32_t iOrigin = static_cast<int32_t>(canvasSide) / 2 - iSize / 2;
                 config.rotationFocusX = static_cast<float>(
                     iOrigin + static_cast<int32_t>(drawnSize * 0.3f));
                 config.rotationFocusY = static_cast<float>(
                     iOrigin + static_cast<int32_t>(drawnSize * 0.675f));
 
-                // Render into the oversized canvas; DynamicRender draws at the pivot computed
-                // above regardless of the buffer dimensions passed in.
-                std::vector<uint8_t> pixels(static_cast<size_t>(renderSide) * renderSide * 4, 0);
+                std::vector<uint8_t> pixels(static_cast<size_t>(canvasSide) * canvasSide * 4, 0);
                 PointerRenderer renderer;
-                ASSERT_EQ(renderer.DynamicRender(pixels.data(), renderSide, renderSide, config), RET_OK);
+                ASSERT_EQ(renderer.DynamicRender(pixels.data(), canvasSide, canvasSide, config), RET_OK);
 
                 int32_t minX = INT32_MAX, minY = INT32_MAX, maxX = -1, maxY = -1;
-                for (uint32_t y = 0; y < renderSide; ++y) {
-                    for (uint32_t x = 0; x < renderSide; ++x) {
-                        if (pixels[(static_cast<size_t>(y) * renderSide + x) * 4 + 3] != 0) {
+                for (uint32_t y = 0; y < canvasSide; ++y) {
+                    for (uint32_t x = 0; x < canvasSide; ++x) {
+                        if (pixels[(static_cast<size_t>(y) * canvasSide + x) * 4 + 3] != 0) {
                             minX = std::min(minX, static_cast<int32_t>(x));
                             maxX = std::max(maxX, static_cast<int32_t>(x));
                             minY = std::min(minY, static_cast<int32_t>(y));
@@ -1289,15 +1292,14 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
                     }
                 }
                 ASSERT_GE(maxX, 0) << "RUNNING produced no ink, dpi=" << dpi << " gear=" << gear;
-                // Ink must stay within the original buffer area (not the oversized canvas).
-                // If the pivot is wrong, the rotation swings ink outside [0, side-1].
-                EXPECT_GE(minX, 0) << "clipped at left edge, frame=" << frame
+                // Ink must stay within the logical window [margin, margin+side-1].
+                EXPECT_GE(minX, margin) << "ink left of logical buffer, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_GE(minY, 0) << "clipped at top edge, frame=" << frame
+                EXPECT_GE(minY, margin) << "ink above logical buffer, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_LE(maxX, static_cast<int32_t>(side) - 1) << "ink outside buffer right edge, frame=" << frame
+                EXPECT_LE(maxX, margin + static_cast<int32_t>(side) - 1) << "ink right of logical buffer, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_LE(maxY, static_cast<int32_t>(side) - 1) << "ink outside buffer bottom edge, frame=" << frame
+                EXPECT_LE(maxY, margin + static_cast<int32_t>(side) - 1) << "ink below logical buffer, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
             }
         }
