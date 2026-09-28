@@ -37,8 +37,11 @@ public:
     float dpi { 0 };
     bool isHard { false };
     int32_t rotationAngle { 0 };
-    uint32_t rotationFocusX { 0 };
-    uint32_t rotationFocusY { 0 };
+    // float so sub-pixel pivot positions (e.g. 128.5 for a 73px glyph centred in a
+    // 256 buffer) are preserved through to canvas.Rotate(), which takes float.
+    // uint32_t would truncate 128.5 → 128, producing a 1px pivot error doubled at 180°.
+    float rotationFocusX { 0.0f };
+    float rotationFocusY { 0.0f };
     pixelmap_ptr_t userIconPixelMap { nullptr };
     int32_t userIconHotSpotX { 0 };
     int32_t userIconHotSpotY { 0 };
