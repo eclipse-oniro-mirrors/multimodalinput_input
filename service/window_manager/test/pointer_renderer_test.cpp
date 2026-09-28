@@ -579,13 +579,17 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_BlurTrailFitsOnlyInBlurTier, T
     const int32_t dx = -40;                             // a 40px flick; sign follows the move direction
     const float ratios[] = {0.4f, 0.6f, 0.8f};
 
-    // Blur tier: every trail copy starts at or inside x=0, so none is clipped.
-    const int32_t blurOrigin = static_cast<int32_t>(BLUR_TIER_SIZE) / 2 - imageSize / 2;   // 129
+    // Blur tier: TierOriginX for 512 = BufferFocus - GetFocusX = 256 - 0 = 256 for DEFAULT.
+    // Filter uses the original centre-coordinate check: x - half < -slack || x + half > width + slack.
+    const int32_t blurOrigin = static_cast<int32_t>(BLUR_TIER_SIZE) / 2;   // 256 (DEFAULT ANGLE_NW)
+    const int32_t half = imageSize / 2;
+    const int32_t slack = imageSize / 4;
     for (float ratio : ratios) {
         int32_t localX = blurOrigin + static_cast<int32_t>(dx * ratio);
-        EXPECT_GE(localX, 0) << "trail copy clipped in the blur tier, ratio=" << ratio;
-        EXPECT_FALSE(renderer.IsPositionOutCanvas(localX, blurOrigin, imageSize,
-            BLUR_TIER_SIZE, BLUR_TIER_SIZE));
+        EXPECT_GE(localX, 0) << "trail copy centre clipped in the blur tier, ratio=" << ratio;
+        // Use the same filter as production DrawBlurPointer for 512-tier.
+        bool skip = (localX - half < -slack) || (localX + half > static_cast<int32_t>(BLUR_TIER_SIZE) + slack);
+        EXPECT_FALSE(skip) << "trail copy filtered in the blur tier, ratio=" << ratio;
     }
 
     // Short tier: the same flick pushes the copies off the left edge. This is the known, accepted

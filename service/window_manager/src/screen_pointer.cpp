@@ -179,8 +179,16 @@ ScreenPointer::~ScreenPointer()
 
 bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 {
-    // Before InitSurface: that call sizes the surface and canvas nodes from bufferSize_.
-    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
+    // Mirror screens and off-screen-rendering extended screens need a 512 buffer because
+    // the cursor is upscaled (GetScale() > 1) to match the target resolution. A 256 buffer
+    // would clip the upscaled user icon: a 200×200 icon at scale 2.0 becomes 400×400, which
+    // fits in 512 but overflows 256. For all other screens the tier is driven by
+    // const.multimodalinput.support_blur_cursor as usual.
+    if (IsMirror() || (IsExtend() && GetIsCurrentOffScreenRendering())) {
+        bufferSize_ = static_cast<uint32_t>(BLUR_CURSOR_SIZE);
+    } else {
+        bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
+    }
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
         return false;
