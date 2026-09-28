@@ -455,12 +455,12 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     int32_t dx = lastCfg.x - cfg.x;
     int32_t dy = lastCfg.y - cfg.y;
     AdjustDeltaForDirection(dx, dy, cfg.direction, cfg.displayDirection);
-    // Trail anchors use the same origin as the main cursor frame so that all four
-    // draws (one main + three trail) share one coordinate system.  Move() derives its
-    // hotspot compensation from CalcDrawOriginX/Y; using a different formula here
-    // would displace every trail frame relative to the cursor.
-    const int32_t offsetX = CalcDrawOriginX(width, cfg);
-    const int32_t offsetY = CalcDrawOriginY(height, cfg);
+    // Trail frames are overlay draws that do not affect Move() compensation (which is
+    // derived from the main frame's CalcDrawOriginX/Y).  The anchor must match the
+    // pre-centring 512 origin — BufferFocus(width) — so trail spacing and clipping
+    // behaviour are identical to the old 512-only code regardless of buffer tier.
+    const int32_t offsetX = static_cast<int32_t>(BufferFocus(width));
+    const int32_t offsetY = static_cast<int32_t>(BufferFocus(height));
     // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
     // extent.
     const int32_t imageSize = cfg.GetClampedImageSize(width);
