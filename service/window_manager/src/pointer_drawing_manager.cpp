@@ -1236,16 +1236,21 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             float drawnSize = static_cast<float>(cfg.GetClampedImageSize(bufferSide));
             float drawOrigin = static_cast<float>(bufferSide - cfg.GetClampedImageSize(bufferSide)) /
                 CALCULATE_IMAGE_MIDDLE;
+            // The pivot must match the integer draw origin that CalcDrawOriginX/Y produces:
+            //   intOrigin = BufferFocus(side) - int(imageSize / 2)
+            // Using the float drawOrigin = (side - imageSize) / 2.0f differs by up to 0.5px
+            // when imageSize is odd (e.g. 73px: intOrigin=92, floatOrigin=91.5). canvas.Rotate
+            // now takes a float pivot so we preserve the sub-pixel centre without truncating it,
+            // but the base must be intOrigin to match where DrawImage actually placed the glyph.
+            float intOriginX = static_cast<float>(
+                static_cast<int32_t>(bufferSide) / 2 -
+                static_cast<int32_t>(drawnSize) / 2);
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                // LOADING spins about the drawn glyph's centre: drawOrigin + drawnSize/2.
-                // rotationFocusX/Y are float so the sub-pixel value is preserved into
-                // canvas.Rotate() without truncation.
-                float glyphCentre = drawOrigin + drawnSize / CALCULATE_IMAGE_MIDDLE;
-                cfg.rotationFocusX = glyphCentre;
-                cfg.rotationFocusY = glyphCentre;
+                cfg.rotationFocusX = intOriginX + drawnSize / CALCULATE_IMAGE_MIDDLE;
+                cfg.rotationFocusY = intOriginX + drawnSize / CALCULATE_IMAGE_MIDDLE;
             } else {
-                cfg.rotationFocusX = drawOrigin + drawnSize * RUNNING_X_RATIO;
-                cfg.rotationFocusY = drawOrigin + drawnSize * RUNNING_Y_RATIO;
+                cfg.rotationFocusX = intOriginX + drawnSize * RUNNING_X_RATIO;
+                cfg.rotationFocusY = intOriginX + drawnSize * RUNNING_Y_RATIO;
             }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);
@@ -1321,15 +1326,16 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
             float softOrigin = static_cast<float>(softSide -
                 cfg.GetClampedImageSize(softSide)) / CALCULATE_IMAGE_MIDDLE;
+            // Same rule as the hard path: use the integer draw origin so the pivot
+            // matches where DrawImage placed the glyph.
+            float intSoftOriginX = static_cast<float>(
+                softSide / 2 - static_cast<int32_t>(softSize) / 2);
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                // Same rule as the hard path: glyph centre = drawOrigin + size/2.
-                // rotationFocusX/Y are float, so the sub-pixel value is preserved.
-                float glyphCentre = softOrigin + softSize / CALCULATE_IMAGE_MIDDLE;
-                cfg.rotationFocusX = glyphCentre;
-                cfg.rotationFocusY = glyphCentre;
+                cfg.rotationFocusX = intSoftOriginX + softSize / CALCULATE_IMAGE_MIDDLE;
+                cfg.rotationFocusY = intSoftOriginX + softSize / CALCULATE_IMAGE_MIDDLE;
             } else {
-                cfg.rotationFocusX = softOrigin + softSize * RUNNING_X_RATIO;
-                cfg.rotationFocusY = softOrigin + softSize * RUNNING_Y_RATIO;
+                cfg.rotationFocusX = intSoftOriginX + softSize * RUNNING_X_RATIO;
+                cfg.rotationFocusY = intSoftOriginX + softSize * RUNNING_Y_RATIO;
             }
             DrawDynamicSoftCursor(sn, cfg);
         } else {
