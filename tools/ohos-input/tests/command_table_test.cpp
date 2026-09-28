@@ -37,7 +37,8 @@ HWTEST_F(CommandTableTest, GetCommand_KnownName_Found, TestSize.Level1)
 HWTEST_F(CommandTableTest, GetCommand_AllKnownNames_Found, TestSize.Level1)
 {
     const std::vector<std::string> expectedNames {
-        "mouse-click", "mouse-double-click", "mouse-scroll", "mouse-move", "mouse-drag", "key-press"
+        "mouse-click", "mouse-double-click", "mouse-scroll", "mouse-move", "mouse-drag", "key-press",
+        "touch-tap", "touch-swipe"
     };
     for (const auto &name : expectedNames) {
         EXPECT_NE(GetCommand(name), nullptr) << name << " not registered";

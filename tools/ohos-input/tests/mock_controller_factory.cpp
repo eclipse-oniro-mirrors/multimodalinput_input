@@ -21,6 +21,7 @@
 #include "input_manager.h"
 #include "keyboard_controller_impl.h"
 #include "mouse_controller_impl.h"
+#include "touch_controller_impl.h"
 
 namespace OHOS::MMI::InputCli {
 namespace {
@@ -45,9 +46,18 @@ void ResetMockControllerState()
 
 void MockControllerFixture::Configure(std::vector<RecordedCall> &calls, const MockControllerOptions &options)
 {
-    MockControllerState() = { &calls, options.mouseCreateResult, options.keyboardCreateResult,
-        options.mouseFailureCall, options.mouseFailureResult, options.keyboardFailureCall,
-        options.keyboardFailureResult, options.recordDestruction };
+    MockControllerState() = {};
+    MockControllerState().calls = &calls;
+    MockControllerState().mouseCreateResult = options.mouseCreateResult;
+    MockControllerState().keyboardCreateResult = options.keyboardCreateResult;
+    MockControllerState().mouseFailureCall = options.mouseFailureCall;
+    MockControllerState().mouseFailureResult = options.mouseFailureResult;
+    MockControllerState().keyboardFailureCall = options.keyboardFailureCall;
+    MockControllerState().keyboardFailureResult = options.keyboardFailureResult;
+    MockControllerState().recordDestruction = options.recordDestruction;
+    MockControllerState().touchCreateResult = options.touchCreateResult;
+    MockControllerState().touchFailureCall = options.touchFailureCall;
+    MockControllerState().touchFailureResult = options.touchFailureResult;
 }
 
 int32_t MockControllerFixture::MouseCreateCount() const
@@ -58,6 +68,11 @@ int32_t MockControllerFixture::MouseCreateCount() const
 int32_t MockControllerFixture::KeyboardCreateCount() const
 {
     return MockControllerState().keyboardCreateCount;
+}
+
+int32_t MockControllerFixture::TouchCreateCount() const
+{
+    return MockControllerState().touchCreateCount;
 }
 
 } // namespace OHOS::MMI::InputCli
@@ -74,6 +89,7 @@ InputManager *InputManager::GetInstance()
 
 MouseControllerImpl::MouseControllerImpl() = default;
 KeyboardControllerImpl::KeyboardControllerImpl() = default;
+TouchControllerImpl::TouchControllerImpl() = default;
 
 MouseControllerImpl::~MouseControllerImpl()
 {
@@ -177,5 +193,38 @@ int32_t InputManager::CreateKeyboardController(std::shared_ptr<KeyboardControlle
     }
     controller = std::make_shared<KeyboardControllerImpl>();
     return state.keyboardCreateResult;
+}
+
+int32_t InputManager::CreateTouchController(std::shared_ptr<TouchControllerImpl> &controller)
+{
+    MockControllerConfig &state = MockControllerState();
+    ++state.touchCreateCount;
+    if (state.calls != nullptr) {
+        state.calls->push_back({ "CreateTouchController", {} });
+    }
+    controller.reset();
+    if (state.calls == nullptr || state.touchCreateResult != 0) {
+        return state.touchCreateResult;
+    }
+    controller = std::make_shared<TouchControllerImpl>();
+    return 0;
+}
+
+int32_t TouchControllerImpl::TouchDown(int32_t touchId, int32_t displayId, int32_t x, int32_t y)
+{
+    MockControllerState().calls->push_back({ "TouchDown", { touchId, displayId, x, y } });
+    return ResultFor("TouchDown", MockControllerState().touchFailureCall, MockControllerState().touchFailureResult);
+}
+
+int32_t TouchControllerImpl::TouchMove(int32_t touchId, int32_t displayId, int32_t x, int32_t y)
+{
+    MockControllerState().calls->push_back({ "TouchMove", { touchId, displayId, x, y } });
+    return ResultFor("TouchMove", MockControllerState().touchFailureCall, MockControllerState().touchFailureResult);
+}
+
+int32_t TouchControllerImpl::TouchUp(int32_t touchId, int32_t displayId, int32_t x, int32_t y)
+{
+    MockControllerState().calls->push_back({ "TouchUp", { touchId, displayId, x, y } });
+    return ResultFor("TouchUp", MockControllerState().touchFailureCall, MockControllerState().touchFailureResult);
 }
 } // namespace OHOS::MMI

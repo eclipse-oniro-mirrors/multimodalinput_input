@@ -30,6 +30,8 @@
 #include "mouse_move_to_command.h"
 #include "printer.h"
 #include "mouse_scroll_command.h"
+#include "touch_swipe_command.h"
+#include "touch_tap_command.h"
 
 namespace OHOS::MMI::InputCli {
 namespace {
@@ -48,6 +50,8 @@ const std::vector<std::shared_ptr<Command>> &CommandTable()
         std::make_shared<MouseMoveToCommand>(),
         std::make_shared<MouseDragCommand>(),
         std::make_shared<KeyPressCommand>(),
+        std::make_shared<TouchTapCommand>(),
+        std::make_shared<TouchSwipeCommand>(),
     };
     return commands;
 }

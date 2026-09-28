@@ -37,6 +37,7 @@ struct RecordedCall {
 struct CommandResult {
     int32_t code;
     std::string stdoutText;
+    std::string stderrText;
 };
 
 class StdoutRedirectGuard final {
@@ -54,12 +55,29 @@ private:
     std::streambuf *previous_;
 };
 
+class StderrRedirectGuard final {
+public:
+    explicit StderrRedirectGuard(std::streambuf *replacement) : previous_(std::cerr.rdbuf(replacement)) {}
+    ~StderrRedirectGuard()
+    {
+        std::cerr.rdbuf(previous_);
+    }
+
+    StderrRedirectGuard(const StderrRedirectGuard &) = delete;
+    StderrRedirectGuard &operator=(const StderrRedirectGuard &) = delete;
+
+private:
+    std::streambuf *previous_;
+};
+
 inline CommandResult Run(const std::vector<std::string> &arguments)
 {
     std::ostringstream output;
+    std::ostringstream error;
     StdoutRedirectGuard redirectGuard(output.rdbuf());
+    StderrRedirectGuard errorRedirectGuard(error.rdbuf());
     int32_t code = ExecuteCommand(arguments);
-    return { code, output.str() };
+    return { code, output.str(), error.str() };
 }
 
 inline nlohmann::json ParseJson(const CommandResult &result)

@@ -2,7 +2,7 @@
 
 ## 概述
 
-面向 AI Agent 应用的键鼠输入模拟工具。基于 multimodalinput 部件内建 Controller 接口（MouseController / KeyboardController）模拟鼠标点击、双击、滚动、移动、拖动与键盘按键等输入操作，输出统一 JSON 结果，供自动化框架解析。仅支持 PC（2in1）设备形态部署。
+面向 AI Agent 与自动化测试的输入模拟工具。基于 multimodalinput 部件内建 Controller 接口模拟鼠标、键盘和触屏输入。仅支持启用 Controller 注入能力的 PC（2in1）产品。
 
 ## 功能列表
 
@@ -12,6 +12,8 @@
 - **移动鼠标光标**：将光标移动到指定显示器的指定位置
 - **模拟鼠标拖动**：按住按键从起点拖至终点，支持跨显示器与按时长插值步进
 - **模拟键盘按键**：按 OHOS 键码注入按键，支持 ctrl/alt/shift/meta 修饰键组合
+- **模拟触屏点击**：指定显示器、坐标和按压时长
+- **模拟触屏滑动**：按约 16ms 间隔线性插值移动至目标坐标
 
 ## 依赖
 
@@ -20,6 +22,7 @@
 - `InputManager` - Controller 创建入口（libmmi-client 内建接口）
 - `MouseController` - 鼠标事件注入（移动、按键、滚轮轴会话）
 - `KeyboardController` - 键盘事件注入（按键按下与抬起）
+- `TouchControllerImpl` - 触屏事件注入（DOWN、MOVE、UP）
 
 ### 权限
 
@@ -48,9 +51,12 @@ ohos-input <subcommand> --help
 | mouse-move | 移动鼠标光标到指定位置 | `--x --y`（必填）；`--displayId --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
 | mouse-drag | 模拟鼠标拖动（支持跨显示器） | `--srcX --srcY --dstX --dstY`（必填）；`--srcDisplayId --dstDisplayId --button --duration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
 | key-press | 模拟键盘按键 | `--key`（必填）；`--holdDuration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
+| touch-tap | 模拟触屏点击 | `--x --y`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC 产品，启用 Controller 注入能力 |
+| touch-swipe | 模拟触屏滑动 | `--srcX --srcY --dstX --dstY`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC 产品，启用 Controller 注入能力 |
 
 **前置依赖说明**：
-- **无**：命令可直接执行，无需前置条件；执行时由 CLI 自动创建所需 Controller（提供 `--modifier` 时额外创建键盘 Controller）
+- 鼠标和键盘命令无需额外前置条件。CLI 会自动创建所需 Controller；提供 `--modifier` 时还会创建 KeyboardController。
+- 触屏命令仅支持启用 Controller 注入能力的 PC 产品。构建时需启用 `input_controller_inject_enable`，并由 `OHOS_BUILD_ENABLE_CONTROLLER_INJECT` 编译开关启用相关实现。
 
 ## 参数说明
 
@@ -118,9 +124,35 @@ ohos-input key-press [options]
 
 修饰键仅支持 `ctrl` / `alt` / `shift` / `meta`（映射 LEFT 变体键码 2072/2045/2047/2076），按下顺序为书写顺序，抬起顺序为逆序；`--key` 键码不得与已选修饰键键码重复。
 
+### touch-tap
+
+```
+ohos-input touch-tap [options]
+  --displayId <number>  显示器 ID（可选，>=0，默认 0）
+  --x <integer>         目标 X 坐标（必填，>=0）
+  --y <integer>         目标 Y 坐标（必填，>=0）
+  --duration <number>   按下持续时间 ms（可选，[0,5000]，默认 100）
+```
+
+坐标和 `displayId` 必须为非负 int32。命令依次注入 DOWN、等待和 UP。`duration=0` 时，命令立即注入 DOWN 和 UP。
+
+### touch-swipe
+
+```
+ohos-input touch-swipe [options]
+  --displayId <number>  显示器 ID（可选，>=0，默认 0）
+  --srcX <integer>      起点 X 坐标（必填，>=0）
+  --srcY <integer>      起点 Y 坐标（必填，>=0）
+  --dstX <integer>      终点 X 坐标（必填，>=0）
+  --dstY <integer>      终点 Y 坐标（必填，>=0）
+  --duration <number>   滑动总时长 ms（可选，[0,5000]，默认 500）
+```
+
+坐标和 `displayId` 必须为非负 int32。命令按约 16ms 间隔线性插值注入 MOVE，并在终点注入 UP。`duration=0` 时不注入 MOVE。
+
 ## 输出格式
 
-所有命令将 JSON 输出到 stdout，结构如下：
+鼠标、键盘及触屏命令复用 `OutputPrinter` 输出 JSON 到 stdout。成功结构为 `{"type":"result","status":"success","data":{...}}`；失败结构为 `{"type":"result","status":"failed","errCode":"ERR_*","errMsg":"...","suggestion":"..."}`。
 
 ### 成功响应
 
@@ -234,6 +266,32 @@ ohos-input key-press --key 2035 --modifier ctrl|shift
 {"type":"result","status":"success","data":{"action":"key-press","key":2017}}
 ```
 
+### touch-tap
+
+```bash
+# 使用默认显示器和默认按下时长
+ohos-input touch-tap --x 500 --y 800
+
+# 在指定显示器按下 200ms
+ohos-input touch-tap --displayId 0 --x 500 --y 800 --duration 200
+
+# 输出示例：
+{"type":"result","status":"success","data":{"action":"touch-tap","displayId":0,"x":500,"y":800,"duration":200}}
+```
+
+### touch-swipe
+
+```bash
+# 使用默认显示器和默认滑动时长
+ohos-input touch-swipe --srcX 100 --srcY 500 --dstX 900 --dstY 500
+
+# 在指定显示器滑动 500ms
+ohos-input touch-swipe --displayId 0 --srcX 100 --srcY 500 --dstX 900 --dstY 500 --duration 500
+
+# 输出示例：
+{"type":"result","status":"success","data":{"action":"touch-swipe","displayId":0,"srcX":100,"srcY":500,"dstX":900,"dstY":500,"duration":500}}
+```
+
 ## 典型工作流
 
 ```bash
@@ -254,6 +312,12 @@ ohos-input mouse-scroll --clicks -3
 
 # 6. 拖动对象到新位置
 ohos-input mouse-drag --srcX 100 --srcY 100 --dstX 300 --dstY 300 --duration 500
+
+# 7. 在指定坐标模拟触屏单击
+ohos-input touch-tap --displayId 0 --x 500 --y 800 --duration 100
+
+# 8. 从起点滑动到终点
+ohos-input touch-swipe --displayId 0 --srcX 100 --srcY 500 --dstX 900 --dstY 500 --duration 500
 ```
 
 ## 安装

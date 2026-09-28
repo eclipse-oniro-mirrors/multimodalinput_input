@@ -1,7 +1,7 @@
 {
   "name": "ohos-input",
   "version": "1.0.0",
-  "description": "Keyboard and mouse input simulation tool. Used for AI Agent applications to simulate keyboard and mouse operations on devices. Only supported on PC products.",
+  "description": "Simulates mouse, keyboard, and touch input through system input controllers. Used by authorized automation and AI Agent applications. Controller injection is available only on supported PC products with the feature enabled.",
   "executablePath": "/system/bin/cli_tool/executable/ohos-input",
   "requirePermissions": [
     "ohos.permission.CONTROL_DEVICE"
@@ -393,6 +393,76 @@
           }
         },
         "required": ["action", "key"]
+      }
+    },
+    "touch-tap": {
+      "description": "Simulate a touch-screen tap on a PC product. Used by authorized automation callers. Requires the input-controller injection feature.",
+      "requirePermissions": ["ohos.permission.CONTROL_DEVICE"],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayId": { "type": "integer", "description": "Target display ID", "minimum": 0, "default": 0 },
+          "x": { "type": "integer", "description": "Target X coordinate", "minimum": 0 },
+          "y": { "type": "integer", "description": "Target Y coordinate", "minimum": 0 },
+          "duration": { "type": "integer", "description": "Press duration in milliseconds", "minimum": 0, "maximum": 5000, "default": 100 }
+        },
+        "required": ["x", "y"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "description": "Response type", "enum": ["result"] },
+          "status": { "type": "string", "description": "Command result status", "enum": ["success"] },
+          "data": {
+            "type": "object",
+            "properties": {
+              "action": { "type": "string", "description": "Executed action" },
+              "displayId": { "type": "integer", "description": "Target display ID" },
+              "x": { "type": "integer", "description": "Target X coordinate" },
+              "y": { "type": "integer", "description": "Target Y coordinate" },
+              "duration": { "type": "integer", "description": "Press duration in milliseconds" }
+            },
+            "required": ["action", "displayId", "x", "y", "duration"]
+          }
+        },
+        "required": ["type", "status", "data"]
+      }
+    },
+    "touch-swipe": {
+      "description": "Simulate a linear touch-screen swipe on a PC product. Used by authorized automation callers. Requires the input-controller injection feature.",
+      "requirePermissions": ["ohos.permission.CONTROL_DEVICE"],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayId": { "type": "integer", "description": "Target display ID", "minimum": 0, "default": 0 },
+          "srcX": { "type": "integer", "description": "Starting X coordinate", "minimum": 0 },
+          "srcY": { "type": "integer", "description": "Starting Y coordinate", "minimum": 0 },
+          "dstX": { "type": "integer", "description": "Ending X coordinate", "minimum": 0 },
+          "dstY": { "type": "integer", "description": "Ending Y coordinate", "minimum": 0 },
+          "duration": { "type": "integer", "description": "Swipe duration in milliseconds", "minimum": 0, "maximum": 5000, "default": 500 }
+        },
+        "required": ["srcX", "srcY", "dstX", "dstY"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "description": "Response type", "enum": ["result"] },
+          "status": { "type": "string", "description": "Command result status", "enum": ["success"] },
+          "data": {
+            "type": "object",
+            "properties": {
+              "action": { "type": "string", "description": "Executed action" },
+              "displayId": { "type": "integer", "description": "Target display ID" },
+              "srcX": { "type": "integer", "description": "Starting X coordinate" },
+              "srcY": { "type": "integer", "description": "Starting Y coordinate" },
+              "dstX": { "type": "integer", "description": "Ending X coordinate" },
+              "dstY": { "type": "integer", "description": "Ending Y coordinate" },
+              "duration": { "type": "integer", "description": "Swipe duration in milliseconds" }
+            },
+            "required": ["action", "displayId", "srcX", "srcY", "dstX", "dstY", "duration"]
+          }
+        },
+        "required": ["type", "status", "data"]
       }
     }
   }
