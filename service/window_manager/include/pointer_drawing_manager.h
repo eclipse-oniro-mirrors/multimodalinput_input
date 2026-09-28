@@ -343,6 +343,9 @@ private:
     void DestroyPointerWindowOfHardCursor();
     void DestroyPointerWindowOfSoftCursor();
     void ScalePixelMap(Media::PixelMap* pixelMap, float xScale, float yScale);
+    std::vector<sptr<OHOS::Rosen::ScreenInfo>> FilterOutScreensWithDisableCursor(
+        const std::vector<sptr<OHOS::Rosen::ScreenInfo>> &screens);
+    bool IsDisableCursorScreen(uint64_t rsId);
 private:
     bool hasDisplay_ { false };
     bool hasPointerDevice_ { false };
@@ -437,6 +440,7 @@ private:
     std::atomic<bool> moveFinished_ { false };
     std::mutex cursorBlurEnableMutex_;
     bool isRsRemoteDied_ { false };
+    std::atomic<bool> isPointerCallbackInited_ { false };
     std::atomic<bool> isHardCursorSurfaceNodeInited_ { false };
 };
 } // namespace MMI

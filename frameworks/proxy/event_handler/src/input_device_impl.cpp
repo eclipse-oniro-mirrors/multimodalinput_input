@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Huawei Device Co., Ltd.
+ * Copyright (c) 2021-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -29,9 +29,18 @@ constexpr std::string_view INPUT_DEV_CHANGE_ADD_DEV { "add" };
 constexpr std::string_view INPUT_DEV_CHANGE_REMOVE_DEV { "remove" };
 }
 
-InputDeviceImpl& InputDeviceImpl::GetInstance()
+InputDeviceImpl* InputDeviceImpl::GetInstance()
 {
-    static InputDeviceImpl instance;
+    // The singleton is intentionally leaked (never-destruct pattern): a plain static object
+    // would be destructed in the static destruction phase, while IPC callback threads or the
+    // destructors of other static objects may still access this instance afterwards, causing
+    // use-after-free. The instance stays alive until process exit and the OS reclaims its
+    // memory, so it is never deleted here. One-time initialization is still thread-safe,
+    // guaranteed by C++11 magic statics. Returns nullptr on allocation failure.
+    static InputDeviceImpl *instance = new (std::nothrow) InputDeviceImpl();
+    if (instance == nullptr) {
+        MMI_HILOGE("Failed to allocate InputDeviceImpl");
+    }
     return instance;
 }
 

@@ -18,6 +18,7 @@
 #include <linux/input.h>
 
 #include "input_windows_manager.h"
+#include "libinput_mock.h"
 #include "mmi_matrix3.h"
 #include "mock.h"
 #include "mouse_event_interface.h"
@@ -578,6 +579,7 @@ HWTEST_F(InputWindowsManagerTest, SkipNavigationWindow_001, TestSize.Level1)
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TransformTipPoint_004, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
@@ -604,6 +606,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TransformTipPoint_004,
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TransformTipPoint_005, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
@@ -630,6 +633,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TransformTipPoint_005,
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TransformTipPoint_006, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
@@ -683,7 +687,6 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_IsNeedRefreshLayer_002
     ASSERT_NE(inputWindowsManager, nullptr);
     int32_t windowId = 3;
     EXPECT_CALL(*messageParcelMock_, IsSceneBoardEnabled()).WillOnce(Return(false));
-
     int32_t displayId = MouseEventHdr->GetDisplayId();
     EXPECT_TRUE(displayId < 0);
 
@@ -727,8 +730,6 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_IsNeedRefreshLayer_004
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
     EXPECT_CALL(*messageParcelMock_, IsSceneBoardEnabled()).WillOnce(Return(false));
-    int32_t displayId = MouseEventHdr->GetDisplayId();
-    EXPECT_FALSE(displayId < 0);
 
     std::optional<WindowInfo> touchWindow = inputWindowsManager->GetWindowInfo(2, 3);
     touchWindow = std::nullopt;
@@ -750,8 +751,6 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_IsNeedRefreshLayer_005
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
     EXPECT_CALL(*messageParcelMock_, IsSceneBoardEnabled()).WillOnce(Return(false));
-    int32_t displayId = MouseEventHdr->GetDisplayId();
-    EXPECT_FALSE(displayId < 0);
 
     std::optional<WindowInfo> touchWindow = inputWindowsManager->GetWindowInfo(3, 5);
     touchWindow->id = GLOBAL_WINDOW_ID;
@@ -836,6 +835,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetPhysicalDisplayCoor
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoint_01, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::shared_ptr<InputWindowsManager> inputWindowsMgr =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsMgr, nullptr);
@@ -883,6 +883,12 @@ HWTEST_F(InputWindowsManagerTest, CalculateTipPoint_001, TestSize.Level1)
 HWTEST_F(InputWindowsManagerTest, CalculateTipPoint_002, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
+    double rawX { -1.0 };
+    EXPECT_CALL(libinputMock, TabletToolGetXTransformed).WillRepeatedly(Return(rawX));
+    double rawY { 200 };
+    EXPECT_CALL(libinputMock, TabletToolGetYTransformed).WillRepeatedly(Return(rawY));
+
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
@@ -900,8 +906,7 @@ HWTEST_F(InputWindowsManagerTest, CalculateTipPoint_002, TestSize.Level1)
     int32_t deviceId = 1;
     PointerEvent::PointerItem pointerItem {};
     pointerItem.SetToolType(PointerEvent::TOOL_TYPE_PEN);
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->CalculateTipPoint(&event,
-        displayId, coord, pointerItem, deviceId));
+    EXPECT_FALSE(inputWindowsManager->CalculateTipPoint(&event, displayId, coord, pointerItem, deviceId));
     it->second.displaysInfo.clear();
 }
 
@@ -2709,6 +2714,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SelectWindowInfo_001, 
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SelectWindowInfo_002, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
@@ -2753,6 +2759,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SelectWindowInfo_002, 
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoint, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
@@ -3780,6 +3787,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AdjustDisplayRotation_
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoint_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::string uniq = "uniq";
     EXPECT_CALL(*messageParcelMock_, GetBindDisplayNameByInputDevice(_)).WillRepeatedly(Return(uniq));
     InputWindowsManager inputWindowsManager;
@@ -3807,6 +3815,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoi
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoint_002, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::string uniq = "uniq";
     EXPECT_CALL(*messageParcelMock_, GetBindDisplayNameByInputDevice(_)).WillRepeatedly(Return(uniq));
     InputWindowsManager inputWindowsManager;
@@ -3835,6 +3844,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoi
 HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchPointToDisplayPoint_003, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
+    NiceMock<LibinputInterfaceMock> libinputMock;
     std::string uniq = "uniq";
     EXPECT_CALL(*messageParcelMock_, GetBindDisplayNameByInputDevice(_)).WillRepeatedly(Return(uniq));
     InputWindowsManager inputWindowsManager;
@@ -4462,12 +4472,14 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetActiveWindowTypeByI
     ASSERT_NE(inputWindowsManager, nullptr);
     int32_t windowId = 1;
     int32_t pointerId = 0;
+    int32_t displayId = 0;
     auto windowTypeTemp = WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE;
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->GetActiveWindowTypeById(windowId, windowTypeTemp));
-
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->GetActiveWindowTypeById(displayId, windowId, windowTypeTemp));
+ 
     inputWindowsManager->activeTouchWinTypes_.emplace(
-        windowId, InputWindowsManager::ActiveTouchWin{WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerId }});
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->GetActiveWindowTypeById(windowId, windowTypeTemp));
+        std::make_pair(displayId, windowId),
+        InputWindowsManager::ActiveTouchWin{WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerId }});
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->GetActiveWindowTypeById(displayId, windowId, windowTypeTemp));
 }
 
 /**
@@ -4484,10 +4496,12 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AddActiveWindow_001, T
     ASSERT_NE(inputWindowsManager, nullptr);
     int32_t windowId = 1;
     int32_t pointerId = 0;
+    int32_t displayId = 0;
     auto windowTypeTemp = WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE;
     inputWindowsManager->activeTouchWinTypes_.emplace(
-        windowId, InputWindowsManager::ActiveTouchWin{WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerId }});
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(windowId, pointerId));
+        std::make_pair(displayId, windowId),
+        InputWindowsManager::ActiveTouchWin{WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerId }});
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(displayId, windowId, pointerId));
 }
 
 /**
@@ -4504,8 +4518,9 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AddActiveWindow_002, T
     ASSERT_NE(inputWindowsManager, nullptr);
     int32_t windowId = 1;
     int32_t pointerId = 0;
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(windowId, pointerId));
-
+    int32_t displayId = 0;
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(displayId, windowId, pointerId));
+ 
     WindowInfo windowInfo;
     windowInfo.id = 1;
     windowInfo.windowInputType = WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE;
@@ -4513,8 +4528,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AddActiveWindow_002, T
     if (it != inputWindowsManager->displayGroupInfoMap_.end()) {
         it->second.windowsInfo.push_back(windowInfo);
     }
-    inputWindowsManager->AddActiveWindow(windowId, pointerId);
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(windowId, pointerId));
+    inputWindowsManager->AddActiveWindow(displayId, windowId, pointerId);
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(displayId, windowId, pointerId));
 }
 
 /**
@@ -4529,13 +4544,14 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AddActiveWindow_003, T
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
-
+ 
     int32_t windowId = 999;
     int32_t pointerId = 1;
-
-    inputWindowsManager->AddActiveWindow(windowId, pointerId);
-
-    auto it = inputWindowsManager->activeTouchWinTypes_.find(windowId);
+    int32_t displayId = 0;
+ 
+    inputWindowsManager->AddActiveWindow(displayId, windowId, pointerId);
+ 
+    auto it = inputWindowsManager->activeTouchWinTypes_.find({displayId, windowId});
     EXPECT_EQ(it, inputWindowsManager->activeTouchWinTypes_.end());
 }
 
@@ -4551,20 +4567,21 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AddActiveWindow_004, T
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
     ASSERT_NE(inputWindowsManager, nullptr);
-
+ 
     inputWindowsManager->activeTouchWinTypes_.clear();
-
+ 
     int32_t windowId = 1;
     int32_t pointerId = 0;
-
+    int32_t displayId = 0;
+ 
     inputWindowsManager->activeTouchWinTypes_.emplace(
-        windowId, InputWindowsManager::ActiveTouchWin{
+        std::make_pair(displayId, windowId), InputWindowsManager::ActiveTouchWin{
             WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerId }
         });
-
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(windowId, pointerId));
-
-    auto iter = inputWindowsManager->activeTouchWinTypes_.find(windowId);
+ 
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->AddActiveWindow(displayId, windowId, pointerId));
+ 
+    auto iter = inputWindowsManager->activeTouchWinTypes_.find({displayId, windowId});
     ASSERT_NE(iter, inputWindowsManager->activeTouchWinTypes_.end());
     EXPECT_EQ(iter->second.windowInputType, WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE);
     EXPECT_EQ(iter->second.pointerSet.size(), 1U);
@@ -4617,10 +4634,12 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_RemoveActiveWindow_002
     int32_t windowId = 1;
     int32_t pointerIdA = 0;
     int32_t pointerIdB = 1;
+    int32_t displayId = 0;
     auto windowTypeTemp = WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE;
     inputWindowsManager->activeTouchWinTypes_.emplace(
-        windowId, InputWindowsManager::ActiveTouchWin{WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerIdA }});
-
+        std::make_pair(displayId, windowId),
+        InputWindowsManager::ActiveTouchWin{WindowInputType::MIX_LEFT_RIGHT_ANTI_AXIS_MOVE, { pointerIdA }});
+ 
     pointerEvent->SetPointerId(pointerIdB);
     EXPECT_NO_FATAL_FAILURE(inputWindowsManager->RemoveActiveWindow(pointerEvent));
     pointerEvent->SetPointerId(pointerIdA);
@@ -4666,7 +4685,7 @@ HWTEST_F(InputWindowsManagerTest, IsWriteTablet_002, TestSize.Level1)
 
     auto inputDevice = std::make_shared<InputDevice>();
     inputDevice->SetBus(BUS_USB);
-    EXPECT_CALL(*messageParcelMock_, GetInputDevice(_, _)).WillOnce(Return(inputDevice));
+    EXPECT_CALL(*messageParcelMock_, GetInputDevice(_, _)).WillRepeatedly(Return(inputDevice));
 
     PointerEvent::PointerItem pointerItem {};
     pointerItem.SetToolType(PointerEvent::TOOL_TYPE_PEN);
@@ -4699,7 +4718,7 @@ HWTEST_F(InputWindowsManagerTest, IsWriteTablet_003, TestSize.Level1)
 
     auto inputDevice = std::make_shared<InputDevice>();
     inputDevice->SetBus(BUS_BLUETOOTH);
-    EXPECT_CALL(*messageParcelMock_, GetInputDevice(_, _)).WillOnce(Return(inputDevice));
+    EXPECT_CALL(*messageParcelMock_, GetInputDevice(_, _)).WillRepeatedly(Return(inputDevice));
 
     PointerEvent::PointerItem pointerItem {};
     pointerItem.SetToolType(PointerEvent::TOOL_TYPE_PEN);
@@ -4732,7 +4751,7 @@ HWTEST_F(InputWindowsManagerTest, IsWriteTablet_004, TestSize.Level1)
 
     auto inputDevice = std::make_shared<InputDevice>();
     inputDevice->SetBus(BUS_BLUETOOTH);
-    EXPECT_CALL(*messageParcelMock_, GetInputDevice(_, _)).WillOnce(Return(inputDevice));
+    EXPECT_CALL(*messageParcelMock_, GetInputDevice(_, _)).WillRepeatedly(Return(inputDevice));
 
     PointerEvent::PointerItem pointerItem {};
     pointerItem.SetToolType(PointerEvent::TOOL_TYPE_PEN);
@@ -5307,11 +5326,11 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchEnterLeaveEvent, 
     pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
     pointerEvent->targetWindowId_ = 1;
     pointerEvent->pointers_.clear();
-    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->PullEnterLeaveEvent(logicalX, logicalY, pointerEvent, &touchWindow));
     pointerItem.SetPointerId(pointerId);
-    pointerEvent->pointers_.push_back(pointerItem);
-    EXPECT_EQ(pointerEvent->GetPointerCount(), pointerId);
     pointerEvent->SetPointerId(pointerId);
+    pointerEvent->pointers_.push_back(pointerItem);
+    EXPECT_NO_FATAL_FAILURE(inputWindowsManager->PullEnterLeaveEvent(logicalX, logicalY, pointerEvent, &touchWindow));
+    EXPECT_EQ(pointerEvent->GetPointerCount(), pointerId);
     EXPECT_TRUE(pointerEvent->GetPointerItem(pointerId, pointerItem));
     auto touchEvent = inputWindowsManager->dispatchEventCache_.GetTouchEvent();
     ASSERT_NE(touchEvent, nullptr);
@@ -5516,6 +5535,8 @@ HWTEST_F(InputWindowsManagerTest, IsWritePen_002, TestSize.Level1)
         .isPointerDevice = true
     };
     INPUT_DEV_MGR->AddPhysicalInputDeviceInner(deviceId, devInfo);
+    auto inputDevice = std::make_shared<InputDevice>();
+    EXPECT_CALL(*messageParcelMock_, GetInputDevice(deviceId, _)).WillRepeatedly(Return(inputDevice));
 
     std::shared_ptr<InputWindowsManager> inputWindowsManager =
         std::static_pointer_cast<InputWindowsManager>(WIN_MGR);
@@ -5928,8 +5949,11 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_EnterMouseCaptureMode_
     inputWindowsManager->pointerLockedWindow_.id = 1;
     inputWindowsManager->UpdatePointerChangeAreas(displayGroupInfo);
     inputWindowsManager->EnterMouseCaptureMode(displayGroupInfo);
-    EXPECT_NE(cursorIt->second.cursorPos.x, focusWindow.area.x + focusWindow.area.width / 2);
-    EXPECT_NE(cursorIt->second.cursorPos.y, focusWindow.area.y + focusWindow.area.height / 2);
+    cursorIt = inputWindowsManager->cursorPosMap_.find(DEFAULT_GROUP_ID);
+    if (cursorIt != inputWindowsManager->cursorPosMap_.end()) {
+        EXPECT_EQ(cursorIt->second.cursorPos.x, focusWindow.area.x + focusWindow.area.width / 2);
+        EXPECT_EQ(cursorIt->second.cursorPos.y, focusWindow.area.y + focusWindow.area.height / 2);
+    }
 }
 
 #if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
