@@ -304,21 +304,13 @@ buffer_ptr_t ScreenPointer::GetCommonBuffer()
 
 void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide)
 {
-    // The draw origin centres the image in the buffer, so the hotspot no longer sits at the buffer
-    // centre. Cache where it did land: Move()/MoveSoft() take only a position and must offset by
-    // this rather than by half the buffer side. The hard path (RequestBuffer) and the soft path
-    // (SoftwareCursorRender, which has no buffer to request) each keep their own copy, because
-    // they run on different threads with different RenderConfigs.
     int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
     int32_t x, y;
     if (side == BLUR_CURSOR_SIZE) {
-        // 512-tier blur draw origin is BufferFocus - GetFocusX/Y (pre-centring layout).
-        // In that layout, origin + styleFocus = BufferFocus for all styles, so the cursor
-        // tip always lands at side/2. Move() must subtract side/2 to place it correctly.
+        // 512-tier: draw origin is BufferFocus - GetFocusX/Y; hotspot = origin + focus = side/2.
         x = side / 2;
         y = side / 2;
     } else {
-        // 256-tier uses the centred layout; hotspot is derived from CalcDrawOriginX/Y.
         x = cfg.HotspotInBufferX(side);
         y = cfg.HotspotInBufferY(side);
     }

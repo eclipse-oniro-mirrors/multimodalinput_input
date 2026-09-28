@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include "image_source.h"
 #include "message_parcel.h"
+#include "screen_pointer.h"
 #include "window_info.h"
 #include "util.h"
 
@@ -121,6 +122,28 @@ static int32_t CalcDrawOriginX(uint32_t width, const RenderConfig &cfg)
 static int32_t CalcDrawOriginY(uint32_t height, const RenderConfig &cfg)
 {
     return BufferFocus(height) - static_cast<int32_t>(cfg.GetPlacedImageSize(height) / CALCULATE_IMAGE_MIDDLE);
+}
+
+// Tier-aware draw origin. 512-tier (blur) uses the pre-centring formula
+// BufferFocus - GetFocusX/Y, which matches the original GetOffsetX/Y from the
+// merge-base and preserves the original trail geometry (default glyph at 256,
+// 256px of slack).  256-tier uses the centred formula CalcDrawOriginX/Y.
+// The corresponding hotspot is: 512 → side/2;  256 → HotspotInBufferX/Y.
+// Every draw site must use this helper so the draw and hotspot stay consistent.
+static int32_t TierOriginX(uint32_t width, const RenderConfig &cfg)
+{
+    if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+        return BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX(width));
+    }
+    return CalcDrawOriginX(width, cfg);
+}
+
+static int32_t TierOriginY(uint32_t height, const RenderConfig &cfg)
+{
+    if (height == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+        return BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY(height));
+    }
+    return CalcDrawOriginY(height, cfg);
 }
 
 int32_t RenderConfig::GetImageSize() const
@@ -352,11 +375,8 @@ int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, 
     OHOS::Rosen::Drawing::Canvas canvas;
     canvas.Bind(bitmap);
     canvas.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
-    // The focus is the buffer centre, derived from the actual buffer size rather than a fixed
-    // constant, so every buffer side stays pixel-identical -- the hard and placeholder soft paths
-    // at DEFAULT_CURSOR_SIZE, a standalone soft cursor at its glyph-derived size.
-    int32_t focusX = BufferFocus(width);
-    int32_t focusY = BufferFocus(height);
+    int32_t focusX = TierOriginX(width, cfg) + static_cast<int32_t>(cfg.GetFocusX(width));
+    int32_t focusY = TierOriginY(height, cfg) + static_cast<int32_t>(cfg.GetFocusY(height));
     if (cfg.direction) {
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
@@ -369,8 +389,7 @@ int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, 
         image = UserIconScale(width, height, cfg);
     }
     CHKPR(image, RET_ERR);
-    // Draw image on canvas: the draw origin places the style's focus onto the buffer focus.
-    canvas.DrawImage(*image, CalcDrawOriginX(width, cfg), CalcDrawOriginY(height, cfg),
+    canvas.DrawImage(*image, TierOriginX(width, cfg), TierOriginY(height, cfg),
         Rosen::Drawing::SamplingOptions());
     errno_t ret = memcpy_s(addr, addrSize, bitmap.GetPixels(), bitmap.ComputeByteSize());
     if (ret != EOK) {
@@ -409,7 +428,8 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         defaultCanvas_.Save();
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        defaultCanvas_.Rotate(degree, BufferFocus(width), BufferFocus(height));
+        defaultCanvas_.Rotate(degree, TierOriginX(width, cfg) + static_cast<int32_t>(cfg.GetFocusX(width)),
+            TierOriginY(height, cfg) + static_cast<int32_t>(cfg.GetFocusY(height)));
     }
     defaultCanvas_.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
     const auto& lastCfg = GetPointerCfg(cfg);
@@ -435,20 +455,8 @@ void PointerRenderer::DrawDefaultPointer(uint32_t width, uint32_t height, const 
         MMI_HILOGE("Default pointer image is null");
         return;
     }
-    // 512-tier blur draws use the pre-centring origin (BufferFocus - GetFocusX/Y) so that
-    // trail positions match the original geometry. The corresponding hotspot for Move() is
-    // BufferFocus (not the draw origin): in the original layout origin + styleFocus = BufferFocus,
-    // so the hotspot was always at the buffer centre regardless of style.
-    // 256-tier uses the centred layout (CalcDrawOriginX/Y) and HotspotInBufferX/Y.
-    int32_t originX, originY;
-    if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-        originX = BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX(width));
-        originY = BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY(height));
-    } else {
-        originX = CalcDrawOriginX(width, cfg);
-        originY = CalcDrawOriginY(height, cfg);
-    }
-    defaultCanvas_.DrawImage(*images[0], originX, originY, Rosen::Drawing::SamplingOptions());
+    defaultCanvas_.DrawImage(*images[0], TierOriginX(width, cfg), TierOriginY(height, cfg),
+        Rosen::Drawing::SamplingOptions());
 }
 
 void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg,
@@ -462,17 +470,8 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     int32_t dx = lastCfg.x - cfg.x;
     int32_t dy = lastCfg.y - cfg.y;
     AdjustDeltaForDirection(dx, dy, cfg.direction, cfg.displayDirection);
-    // 512-tier uses the pre-centring origin (BufferFocus - GetFocusX/Y) to preserve
-    // original trail geometry. 256-tier uses CalcDrawOriginX/Y (centred layout).
-    // Both tiers use current IsPositionOutCanvas (top-left semantics, slack=imageSize/4).
-    int32_t offsetX, offsetY;
-    if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-        offsetX = BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX(width));
-        offsetY = BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY(height));
-    } else {
-        offsetX = CalcDrawOriginX(width, cfg);
-        offsetY = CalcDrawOriginY(height, cfg);
-    }
+    const int32_t offsetX = TierOriginX(width, cfg);
+    const int32_t offsetY = TierOriginY(height, cfg);
     // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
     // extent.
     const int32_t imageSize = cfg.GetClampedImageSize(width);
@@ -868,7 +867,7 @@ int32_t PointerRenderer::DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, uint32_
             PushImg(width, cfg, loadingImg);
         }
         canvas.Rotate(cfg.rotationAngle, cfg.rotationFocusX, cfg.rotationFocusY);
-        canvas.DrawImage(*loadingImg, CalcDrawOriginX(width, cfg), CalcDrawOriginY(height, cfg),
+        canvas.DrawImage(*loadingImg, TierOriginX(width, cfg), TierOriginY(height, cfg),
             Rosen::Drawing::SamplingOptions());
     } else {
         RenderConfig runingLCfg = cfg;
@@ -882,8 +881,8 @@ int32_t PointerRenderer::DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, uint32_
             PushImg(width, runingLCfg, runningImgLeft);
         }
         CHKPR(runningImgLeft, RET_ERR);
-        canvas.DrawImage(*runningImgLeft, CalcDrawOriginX(width, runingLCfg),
-            CalcDrawOriginY(height, runingLCfg), Rosen::Drawing::SamplingOptions());
+        canvas.DrawImage(*runningImgLeft, TierOriginX(width, runingLCfg),
+            TierOriginY(height, runingLCfg), Rosen::Drawing::SamplingOptions());
 
         RenderConfig runingRCfg = cfg;
         runingRCfg.style_ = MOUSE_ICON::RUNNING_RIGHT;
@@ -897,8 +896,8 @@ int32_t PointerRenderer::DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, uint32_
         }
         canvas.Rotate(runingRCfg.rotationAngle, runingRCfg.rotationFocusX, runingRCfg.rotationFocusY);
         CHKPR(runningImgRight, RET_ERR);
-        canvas.DrawImage(*runningImgRight, CalcDrawOriginX(width, runingRCfg),
-            CalcDrawOriginY(height, runingRCfg), Rosen::Drawing::SamplingOptions());
+        canvas.DrawImage(*runningImgRight, TierOriginX(width, runingRCfg),
+            TierOriginY(height, runingRCfg), Rosen::Drawing::SamplingOptions());
     }
     return RET_OK;
 }
@@ -937,7 +936,8 @@ int32_t PointerRenderer::DynamicRender(uint8_t *addr, uint32_t width, uint32_t h
     if (cfg.direction) {
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        canvas.Rotate(degree, BufferFocus(width), BufferFocus(height));
+        canvas.Rotate(degree, TierOriginX(width, cfg) + static_cast<int32_t>(cfg.GetFocusX(width)),
+            TierOriginY(height, cfg) + static_cast<int32_t>(cfg.GetFocusY(height)));
     }
 
     if (DrawImage(canvas, width, height, cfg) != RET_OK) {

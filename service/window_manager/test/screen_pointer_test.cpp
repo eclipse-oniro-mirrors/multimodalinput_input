@@ -2558,22 +2558,37 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
 
     // Each path caches into its own slot.
     screenpointer->UpdateHotspotInBuffer(corner, true, side);
-    EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side));
-    EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side));
-    // An ANGLE_NW hotspot is the image corner, never the buffer centre.
-    EXPECT_NE(screenpointer->hotspotHardX_, side / 2);
+    if (side == BLUR_CURSOR_SIZE) {
+        // 512-tier: draw origin is BufferFocus-GetFocusX/Y; hotspot = origin+focus = side/2.
+        EXPECT_EQ(screenpointer->hotspotHardX_, side / 2);
+        EXPECT_EQ(screenpointer->hotspotHardY_, side / 2);
+    } else {
+        EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side));
+        EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side));
+        // 256-tier ANGLE_NW hotspot is the image corner, never the buffer centre.
+        EXPECT_NE(screenpointer->hotspotHardX_, side / 2);
+    }
 
     // A subsequent soft write must not disturb the hard value, even for a config whose hotspot
     // differs -- this is the cross-thread clobber the split storage prevents.
     RenderConfig softCfg = corner;
     softCfg.direction = 1;      // direction 90 rotates the hotspot about the buffer centre
     screenpointer->UpdateHotspotInBuffer(softCfg, false, side);
-    EXPECT_EQ(screenpointer->hotspotSoftX_, softCfg.HotspotInBufferX(side));
-    EXPECT_EQ(screenpointer->hotspotSoftY_, softCfg.HotspotInBufferY(side));
-    EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side))
-        << "soft write changed the hard hotspot";
-    EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side))
-        << "soft write changed the hard hotspot";
+    if (side == BLUR_CURSOR_SIZE) {
+        EXPECT_EQ(screenpointer->hotspotSoftX_, side / 2);
+        EXPECT_EQ(screenpointer->hotspotSoftY_, side / 2);
+        EXPECT_EQ(screenpointer->hotspotHardX_, side / 2)
+            << "soft write changed the hard hotspot";
+        EXPECT_EQ(screenpointer->hotspotHardY_, side / 2)
+            << "soft write changed the hard hotspot";
+    } else {
+        EXPECT_EQ(screenpointer->hotspotSoftX_, softCfg.HotspotInBufferX(side));
+        EXPECT_EQ(screenpointer->hotspotSoftY_, softCfg.HotspotInBufferY(side));
+        EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side))
+            << "soft write changed the hard hotspot";
+        EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side))
+            << "soft write changed the hard hotspot";
+    }
     // The two really do differ here, so the assertions above are not vacuous. Compare the pair:
     // for direction 90 the X components coincide and only Y separates them.
     EXPECT_TRUE(screenpointer->hotspotHardX_ != screenpointer->hotspotSoftX_ ||
