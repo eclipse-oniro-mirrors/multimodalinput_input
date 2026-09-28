@@ -147,6 +147,10 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, const O
         std::swap(width_, height_);
     }
     dpi_ = float(di.dpi) / BASELINE_DENSITY;
+    // Resolve the buffer tier at construction so GetBufferSize() is valid before Init() runs.
+    // Init() repeats the same call; GetCursorBufferSize() is a cached static so the cost is
+    // a single branch.
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with DisplayInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
 }
@@ -165,6 +169,9 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, screen_
     width_ = result.width;
     height_ = result.height;
     rotation_ = result.rotation;
+    // Same as the DisplayInfo constructor: resolve the tier before Init() so GetBufferSize()
+    // is valid from construction.
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with ScreenInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
 }

@@ -1237,11 +1237,17 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             float drawOrigin = static_cast<float>(bufferSide - cfg.GetClampedImageSize(bufferSide)) /
                 CALCULATE_IMAGE_MIDDLE;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                // LOADING spins about the drawn glyph's centre. That is origin + size/2, not the
-                // buffer centre: for an odd size the two differ by half a pixel (a 73px glyph is
-                // centred at 128.5 in a 256 buffer), which the rotation doubles to a full pixel
-                // at 180 degrees.
-                float glyphCentre = drawOrigin + drawnSize / CALCULATE_IMAGE_MIDDLE;
+                // LOADING spins about the drawn glyph's visual centre. CalcDrawOriginX truncates
+                // the float origin to integer before passing it to DrawImage, so the pivot must
+                // match that truncation: use int32 arithmetic for the origin (bufferSide/2 -
+                // imageSize/2) and add the float half-size.  Using the float drawOrigin directly
+                // (which simplifies algebraically to bufferSide/2) ignores the truncation and
+                // lands the pivot at the buffer centre rather than the glyph centre, introducing
+                // a sub-pixel error that doubles to a visible offset at 180 degrees.
+                int32_t iSize = static_cast<int32_t>(drawnSize);
+                float intDrawOrigin = static_cast<float>(
+                    static_cast<int32_t>(bufferSide) / 2 - iSize / 2);
+                float glyphCentre = intDrawOrigin + drawnSize / CALCULATE_IMAGE_MIDDLE;
                 cfg.rotationFocusX = glyphCentre;
                 cfg.rotationFocusY = glyphCentre;
             } else {
@@ -1323,8 +1329,11 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             float softOrigin = static_cast<float>(softSide -
                 cfg.GetClampedImageSize(softSide)) / CALCULATE_IMAGE_MIDDLE;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                // Same rule as the hard path: the drawn glyph's centre, not the buffer centre.
-                float glyphCentre = softOrigin + softSize / CALCULATE_IMAGE_MIDDLE;
+                // Same rule as the hard path: use integer draw origin to match DrawImage
+                // truncation, then add float half-size for the glyph centre.
+                int32_t iSoftSize = static_cast<int32_t>(softSize);
+                float intSoftOrigin = static_cast<float>(softSide / 2 - iSoftSize / 2);
+                float glyphCentre = intSoftOrigin + softSize / CALCULATE_IMAGE_MIDDLE;
                 cfg.rotationFocusX = glyphCentre;
                 cfg.rotationFocusY = glyphCentre;
             } else {

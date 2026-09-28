@@ -435,7 +435,12 @@ void PointerRenderer::DrawDefaultPointer(uint32_t width, uint32_t height, const 
         MMI_HILOGE("Default pointer image is null");
         return;
     }
-    defaultCanvas_.DrawImage(*images[0], CalcDrawOriginX(width, cfg), CalcDrawOriginY(height, cfg),
+    // Blur renders use the buffer centre as the draw origin so that trail geometry
+    // matches across buffer sizes: a 254px arrow drawn at BufferFocus(512)=256 gives
+    // the same trail spacing as the same arrow at BufferFocus(256)=128.  Using
+    // CalcDrawOriginX (which centres the image in the buffer) shifts the origin by
+    // (side-imageSize)/2, displacing all trail anchors and clipping the farthest frame.
+    defaultCanvas_.DrawImage(*images[0], BufferFocus(width), BufferFocus(height),
         Rosen::Drawing::SamplingOptions());
 }
 
@@ -450,8 +455,13 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     int32_t dx = lastCfg.x - cfg.x;
     int32_t dy = lastCfg.y - cfg.y;
     AdjustDeltaForDirection(dx, dy, cfg.direction, cfg.displayDirection);
-    const int32_t offsetX = CalcDrawOriginX(width, cfg);
-    const int32_t offsetY = CalcDrawOriginY(height, cfg);
+    // Blur trail geometry must use the buffer centre as the draw anchor, not the
+    // image-centred origin that CalcDrawOriginX returns.  Using CalcDrawOriginX shifts
+    // the anchor by (side-imageSize)/2, which displaces every trail frame and clips the
+    // farthest one when the delta is large.  BufferFocus matches the pre-centring origin
+    // and keeps trail spacing identical across the 256 and 512 tiers.
+    const int32_t offsetX = BufferFocus(width);
+    const int32_t offsetY = BufferFocus(height);
     // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
     // extent.
     const int32_t imageSize = cfg.GetClampedImageSize(width);
