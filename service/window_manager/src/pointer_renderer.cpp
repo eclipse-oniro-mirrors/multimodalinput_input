@@ -481,14 +481,20 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
         }
         int32_t localX = offsetX + dx * DEFAULT_OFFSET[i - 1];
         int32_t localY = offsetY + dy * DEFAULT_OFFSET[i - 1];
-        // For the 512-tier, TierOriginX returns a centre-semantics value matching the
-        // original GetOffsetX(). IsPositionOutCanvas uses top-left semantics, so shift
-        // by -imageSize/2 to replicate the original boundary check.
-        int32_t checkX = (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) ?
-            localX - imageSize / 2 : localX;
-        int32_t checkY = (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) ?
-            localY - imageSize / 2 : localY;
-        if (IsPositionOutCanvas(checkX, checkY, imageSize, width, height)) {
+        bool skip;
+        if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+            // 512-tier: localX/Y are centre coordinates (matching original GetOffsetX).
+            // Replicate the original boundary check exactly:
+            //   x - half < -slack || x + half > width + slack (and same for y)
+            // where half = imageSize/2, slack = imageSize/4.
+            int32_t half = imageSize / 2;
+            int32_t slack = imageSize / 4;
+            skip = (localX - half < -slack) || (localX + half > static_cast<int32_t>(width) + slack) ||
+                   (localY - half < -slack) || (localY + half > static_cast<int32_t>(height) + slack);
+        } else {
+            skip = IsPositionOutCanvas(localX, localY, imageSize, width, height);
+        }
+        if (skip) {
             MMI_HILOGD("The blur image is out of bounds, no need to draw");
             continue;
         }
