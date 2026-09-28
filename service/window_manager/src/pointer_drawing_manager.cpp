@@ -1226,21 +1226,21 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             // derives the same way -- it shares bufferSize_ with the hard cursor, so
             // neither can keep a size of its own.
             //
-            // The spinner pivot is the glyph's own centre, which the draw origin places at
-            // origin + size*ratio. It must NOT be measured from the buffer centre: with the image
-            // centred, origin is already size/2 away from the centre, so adding the buffer focus
-            // double-counts and puts the pivot outside the buffer entirely (128 + 254*0.675 = 299.5
-            // for a 256 buffer). Sweeping about that point threw the ink up to 300 px off-screen;
-            // about the glyph centre it stays fully inside at every gear.
+            // Pivot = draw origin + style focus (unrotated local coordinates).
+            // draw origin = iOrigin = int(side/2) - int(imageSize/2), matching CalcDrawOriginX.
+            // LOADING: pivot = iOrigin + GetFocusX/Y (style focus, no rotation applied).
+            // RUNNING: pivot = iOrigin + int(imageSize * ratio) (preserves old integer truncation).
+            // HotspotInBufferX/Y is NOT used here: it applies direction rotation, but the pivot
+            // is in the canvas-local frame where rotation has not yet been applied.
             uint32_t bufferSide = it.second->GetBufferSize();
             float drawnSize = static_cast<float>(cfg.GetClampedImageSize(bufferSide));
             int32_t iSize = static_cast<int32_t>(drawnSize);
-            // CalcDrawOriginX = BufferFocus(side) - int(imageSize/2); replicate in int.
             int32_t iOrigin = static_cast<int32_t>(bufferSide) / 2 - iSize / 2;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                float pivot = static_cast<float>(iOrigin) + drawnSize / CALCULATE_IMAGE_MIDDLE;
-                cfg.rotationFocusX = pivot;
-                cfg.rotationFocusY = pivot;
+                cfg.rotationFocusX = static_cast<float>(
+                    iOrigin + static_cast<int32_t>(cfg.GetFocusX(bufferSide)));
+                cfg.rotationFocusY = static_cast<float>(
+                    iOrigin + static_cast<int32_t>(cfg.GetFocusY(bufferSide)));
             } else {
                 cfg.rotationFocusX = static_cast<float>(iOrigin + static_cast<int32_t>(drawnSize * RUNNING_X_RATIO));
                 cfg.rotationFocusY = static_cast<float>(iOrigin + static_cast<int32_t>(drawnSize * RUNNING_Y_RATIO));
@@ -1313,14 +1313,15 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             // requested at and the same the node bounds use.
             int32_t softSide = static_cast<int32_t>(it.second->GetBufferSize());
             it.second->UpdateHotspotInBuffer(cfg, false, softSide);
-            // Same pivot rule as the hard path: CalcDrawOriginX + int(imageSize * ratio).
+            // Same pivot rule as the hard path: draw origin + style focus (unrotated local).
             float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
             int32_t iSoftSize = static_cast<int32_t>(softSize);
             int32_t iSoftOrigin = softSide / 2 - iSoftSize / 2;
             if (mouseStyle == MOUSE_ICON::LOADING) {
-                float pivot = static_cast<float>(iSoftOrigin) + softSize / CALCULATE_IMAGE_MIDDLE;
-                cfg.rotationFocusX = pivot;
-                cfg.rotationFocusY = pivot;
+                cfg.rotationFocusX = static_cast<float>(
+                    iSoftOrigin + static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide))));
+                cfg.rotationFocusY = static_cast<float>(
+                    iSoftOrigin + static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(softSide))));
             } else {
                 cfg.rotationFocusX = static_cast<float>(
                     iSoftOrigin + static_cast<int32_t>(softSize * RUNNING_X_RATIO));

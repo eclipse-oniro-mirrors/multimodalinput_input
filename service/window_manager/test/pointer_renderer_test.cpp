@@ -1258,13 +1258,16 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
                 config.dpi = dpi;
                 config.color = 0;
                 config.rotationAngle = frame * rotationStep;
-                // Mirrors HardwareCursorDynamicRender: the spinner pivots about its own centre,
-                // which the draw origin places at origin + size*ratio. Measuring from the buffer
-                // centre instead double-counts the centring offset and swings the ink off-screen.
+                // Match HardwareCursorDynamicRender exactly: iOrigin = int(side/2) - int(imageSize/2),
+                // pivot = iOrigin + int(imageSize * ratio). Integer truncation is intentional —
+                // using float ratio directly shifts the pivot and changes the rasterised trajectory.
                 float drawnSize = static_cast<float>(config.GetClampedImageSize(side));
-                float drawOrigin = static_cast<float>(side - config.GetClampedImageSize(side)) / 2.0f;
-                config.rotationFocusX = drawOrigin + drawnSize * 0.3f;
-                config.rotationFocusY = drawOrigin + drawnSize * 0.675f;
+                int32_t iSize = static_cast<int32_t>(drawnSize);
+                int32_t iOrigin = static_cast<int32_t>(side) / 2 - iSize / 2;
+                config.rotationFocusX = static_cast<float>(
+                    iOrigin + static_cast<int32_t>(drawnSize * 0.3f));
+                config.rotationFocusY = static_cast<float>(
+                    iOrigin + static_cast<int32_t>(drawnSize * 0.675f));
 
                 std::vector<uint8_t> pixels(static_cast<size_t>(side) * side * 4, 0);
                 PointerRenderer renderer;

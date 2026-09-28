@@ -108,7 +108,8 @@ private:
     void DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg, const RenderConfig &cfg);
     void AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t direction, uint32_t displayDirection);
     // (left, top) is the image's top-left in buffer coordinates, matching DrawImage's arguments.
-    bool IsPositionOutCanvas(int32_t left, int32_t top, int32_t imageSize, uint32_t width, uint32_t height);
+    bool IsPositionOutCanvas(int32_t left, int32_t top, int32_t imageSize,
+        uint32_t width, uint32_t height, uint32_t bufferSide);
     bool HasPointerCfg(const RenderConfig &cfg);
     void SetPointerCfg(const RenderConfig &cfg);
     const RenderConfig& GetPointerCfg(const RenderConfig &defaultCfg);

@@ -309,14 +309,17 @@ buffer_ptr_t ScreenPointer::GetCommonBuffer()
 
 void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide)
 {
-    // The draw origin centres the image in the buffer, so the hotspot no longer sits at the buffer
-    // centre. Cache where it did land: Move()/MoveSoft() take only a position and must offset by
-    // this rather than by half the buffer side. The hard path (RequestBuffer) and the soft path
-    // (SoftwareCursorRender, which has no buffer to request) each keep their own copy, because
-    // they run on different threads with different RenderConfigs.
     int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
-    int32_t x = cfg.HotspotInBufferX(side);
-    int32_t y = cfg.HotspotInBufferY(side);
+    int32_t x, y;
+    if (side == BLUR_CURSOR_SIZE) {
+        // 512-tier: use pre-centring origin (side/2 - GetFocusX/Y) to match the
+        // blur draw path and preserve original trail/hotspot geometry.
+        x = side / 2 - static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(side)));
+        y = side / 2 - static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(side)));
+    } else {
+        x = cfg.HotspotInBufferX(side);
+        y = cfg.HotspotInBufferY(side);
+    }
     if (isHard) {
         hotspotHardX_ = x;
         hotspotHardY_ = y;
