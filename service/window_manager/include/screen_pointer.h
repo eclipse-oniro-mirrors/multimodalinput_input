@@ -101,6 +101,14 @@ public:
     // inside the buffer when the hard cursor buffer shrinks.
     uint32_t GetBufferSize() const;
 
+    // Resolves the buffer side this screen requires from its current mode and off-screen state.
+    // Mirror screens and off-screen-rendering extended screens scale the cursor up (GetScale() > 1),
+    // so the upscaled glyph no longer fits a 256 buffer and 512 is required; every other screen
+    // follows const.multimodalinput.support_blur_cursor. Evaluated on every mode/display-info change
+    // rather than once in Init(), because the off-screen flag and the mode both arrive after
+    // construction.
+    uint32_t ResolveBufferSide();
+
     uint32_t GetScreenWidth() const
     {
         return width_;

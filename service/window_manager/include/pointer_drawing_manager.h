@@ -212,8 +212,12 @@ private:
     int32_t CreatePointerWindowForScreenPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY);
     int32_t CreatePointerWindowForNoScreenPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY);
     sptr<OHOS::Surface> GetLayer();
-    sptr<OHOS::SurfaceBuffer> GetSurfaceBuffer(sptr<OHOS::Surface> layer);
-    sptr<OHOS::SurfaceBuffer> RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer);
+    // bufferSide is the side resolved by the owning ScreenPointer (which differs per screen:
+    // mirror and off-screen extended screens use 512, others follow the blur switch). Passing it
+    // in keeps the placeholder layer the same side as the hotspot and node bounds computed for
+    // that same screen; the boot-fixed global would disagree on a mirror screen with blur off.
+    sptr<OHOS::SurfaceBuffer> GetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide = 0);
+    sptr<OHOS::SurfaceBuffer> RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide = 0);
     void DoDraw(uint8_t *addr, uint32_t width, uint32_t height, const MOUSE_ICON mouseStyle = MOUSE_ICON::DEFAULT);
     void DrawPixelmap(OHOS::Rosen::Drawing::Canvas &canvas, const MOUSE_ICON mouseStyle);
     void DrawManager();
@@ -282,7 +286,8 @@ private:
     void PostTaskRSLocation(int32_t physicalX, int32_t physicalY, std::shared_ptr<Rosen::RSSurfaceNode> surfaceNode);
     int32_t InitVsync(MOUSE_ICON mouseStyle);
     void DumpScreenInfo(std::ostringstream& oss);
-    int32_t DrawSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> sn, const RenderConfig &cfg);
+    int32_t DrawSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> sn, const RenderConfig &cfg,
+        int32_t bufferSide = 0);
     int32_t DrawHardCursor(std::shared_ptr<ScreenPointer> sp, const RenderConfig &cfg);
     std::vector<std::shared_ptr<ScreenPointer>> GetMirrorScreenPointers();
     std::shared_ptr<ScreenPointer> GetScreenPointer(uint64_t screenId);
@@ -314,7 +319,8 @@ private:
     int32_t GetMainScreenDisplayInfo(const OLD::DisplayGroupInfo &displayGroupInfo,
         OLD::DisplayInfo &mainScreenDisplayInfo) const;
     int32_t DrawDynamicHardwareCursor(std::shared_ptr<ScreenPointer> sp, const RenderConfig &cfg);
-    int32_t DrawDynamicSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> sn, const RenderConfig &cfg);
+    int32_t DrawDynamicSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> sn, const RenderConfig &cfg,
+        int32_t bufferSide = 0);
     void HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, uint64_t displayId);
     void SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, uint64_t displayId);
     void UpdateMirrorScreens(std::shared_ptr<ScreenPointer> sp, OLD::DisplayInfo displayInfo);

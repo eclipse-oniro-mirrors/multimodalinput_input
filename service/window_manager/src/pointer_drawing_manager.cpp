@@ -900,12 +900,12 @@ int32_t PointerDrawingManager::InitVsync(MOUSE_ICON mouseStyle)
     return RequestNextVSync();
 }
 
-sptr<OHOS::SurfaceBuffer> PointerDrawingManager::RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer)
+sptr<OHOS::SurfaceBuffer> PointerDrawingManager::RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide)
 {
     sptr<OHOS::SurfaceBuffer> buffer;
     if (GetHardCursorEnabled()) {
         for (size_t i = 0; i < RETRY_TIMES; i++) {
-            buffer = GetSurfaceBuffer(layer);
+            buffer = GetSurfaceBuffer(layer, bufferSide);
             if (buffer != nullptr && buffer->GetVirAddr() != nullptr) {
                 return buffer;
             }
@@ -1265,12 +1265,12 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
 }
 
 int32_t PointerDrawingManager::DrawDynamicSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> sn,
-    const RenderConfig &cfg)
+    const RenderConfig &cfg, int32_t bufferSide)
 {
     CHKPR(sn, RET_ERR);
     auto layer = sn->GetSurface();
     CHKPR(layer, RET_ERR);
-    auto buffer = GetSurfaceBuffer(layer);
+    auto buffer = GetSurfaceBuffer(layer, bufferSide);
     CHKPR(buffer, RET_ERR);
     auto addr = static_cast<uint8_t*>(buffer->GetVirAddr());
     CHKPR(addr, RET_ERR);
@@ -1346,12 +1346,13 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
                 cfg.rotationFocusY = static_cast<float>(
                     iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_Y_RATIO));
             }
-            DrawDynamicSoftCursor(sn, cfg);
+            DrawDynamicSoftCursor(sn, cfg, static_cast<int32_t>(it.second->GetBufferSize()));
         } else {
             cfg.style_ = MOUSE_ICON::TRANSPARENT_ICON;
             cfg.align_ = CursorDrawingInformation::GetInstance().MouseIcon2IconType(cfg.style_);
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
-            DrawDynamicSoftCursor(it.second->GetSurfaceNode(), cfg);
+            DrawDynamicSoftCursor(it.second->GetSurfaceNode(), cfg,
+                static_cast<int32_t>(it.second->GetBufferSize()));
         }
     }
 }
@@ -2048,7 +2049,7 @@ sptr<OHOS::Surface> PointerDrawingManager::GetLayer()
     return surfaceNodePtr->GetSurface();
 }
 
-sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Surface> layer)
+sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide)
 {
     CALL_DEBUG_ENTER;
     sptr<OHOS::SurfaceBuffer> buffer;
@@ -2062,10 +2063,11 @@ sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Sur
         // lay out for a 512 buffer while the hotspot was computed for a 256 one: a constant
         // (128,128) misalignment.
         //
-        // No ScreenPointer is in scope here and there is no single one to ask: this serves whichever
-        // screen's layer was passed, while every screen resolves the same boot-fixed tier. So take
-        // the side from the shared resolver rather than caching a second copy of the decision.
-        int32_t hardSide = GetCursorBufferSize();
+        // The side comes from the owning ScreenPointer: it is per-screen now that mirror and
+        // off-screen extended screens resolve 512 while others follow the boot-fixed switch.
+        // Falling back to the global here would size a mirror screen's placeholder 256 while its
+        // hotspot, animation pivot and node bounds were all computed for 512.
+        int32_t hardSide = (bufferSide > 0) ? bufferSide : GetCursorBufferSize();
         width = hardSide;
         height = hardSide;
     } else {
@@ -2548,6 +2550,16 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
     auto sp = GetScreenPointer(displayInfo.rsId);
     if (GetHardCursorEnabled() && sp != nullptr) {
         sp->OnDisplayInfo(displayInfo);
+        // OnDisplayInfo() carries the off-screen-rendering flag, which arrives after the
+        // ScreenPointer was constructed and can move an extended screen onto the 512 side.
+        // Re-drive Init() (the only place with a renderer) when the pool no longer matches.
+        if (sp->GetBufferSize() != sp->ResolveBufferSide()) {
+            MMI_HILOGI("Buffer side changed on display info, re-initialising screenId=%{public}" PRIu64,
+                displayInfo.rsId);
+            if (!sp->Init(pointerRenderer_)) {
+                MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
+            }
+        }
         if (sp->IsMain()) {
             UpdateMirrorScreens(sp, displayInfo);
         }
@@ -3410,6 +3422,16 @@ sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindM
             // Update ScreenPointer when it already exist
             auto sp = GetScreenPointer(sid);
             sp->UpdateScreenInfo(screen, needDrawPointer);
+            // The buffer side depends on the mode and the off-screen flag, both of which can
+            // change here (extend -> mirror, or the off-screen flag arriving late). Init() is
+            // the only place with a renderer to rebuild the pool, so re-drive it whenever the
+            // resolved side no longer matches the one the existing pool was built at.
+            if (sp->GetBufferSize() != sp->ResolveBufferSide()) {
+                MMI_HILOGI("Buffer side changed for screenId=%{public}" PRIu64 ", re-initialising", sid);
+                if (!sp->Init(pointerRenderer_, needDrawPointer)) {
+                    MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, sid);
+                }
+            }
             MMI_HILOGI("Update ScreenPointer, screenId=%{public}" PRIu64, sid);
         } else {
             // Create and init ScreenPointer when it does not exist
@@ -3629,21 +3651,22 @@ void PointerDrawingManager::SoftwareCursorRender(MOUSE_ICON mouseStyle, int32_t 
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
         }
         it.second->UpdateHotspotInBuffer(cfg, false, static_cast<int32_t>(it.second->GetBufferSize()));
-        DrawSoftCursor(it.second->GetSurfaceNode(), cfg);
+        DrawSoftCursor(it.second->GetSurfaceNode(), cfg,
+            static_cast<int32_t>(it.second->GetBufferSize()));
     }
     MMI_HILOGD("SoftwareCursorRender success");
 }
 
 int32_t PointerDrawingManager::DrawSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> surfaceNode,
-    const RenderConfig &cfg)
+    const RenderConfig &cfg, int32_t bufferSide)
 {
     CHKPR(surfaceNode, RET_ERR);
 
     auto layer = surfaceNode->GetSurface();
     CHKPR(layer, RET_ERR);
-    auto buffer = GetSurfaceBuffer(layer);
+    auto buffer = GetSurfaceBuffer(layer, bufferSide);
     if (buffer == nullptr || buffer->GetVirAddr() == nullptr) {
-        buffer = RetryGetSurfaceBuffer(layer);
+        buffer = RetryGetSurfaceBuffer(layer, static_cast<int32_t>(it.second->GetBufferSize()));
     }
     CHKPR(buffer, RET_ERR);
     CHKPR(buffer->GetVirAddr(), RET_ERR);

@@ -179,15 +179,25 @@ ScreenPointer::~ScreenPointer()
 
 bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 {
-    // Mirror screens and off-screen-rendering extended screens need a 512 buffer because
-    // the cursor is upscaled (GetScale() > 1) to match the target resolution. A 256 buffer
-    // would clip the upscaled user icon: a 200×200 icon at scale 2.0 becomes 400×400, which
-    // fits in 512 but overflows 256. For all other screens the tier is driven by
-    // const.multimodalinput.support_blur_cursor as usual.
-    if (IsMirror() || (IsExtend() && GetIsCurrentOffScreenRendering())) {
-        bufferSize_ = static_cast<uint32_t>(BLUR_CURSOR_SIZE);
-    } else {
-        bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
+    // Mirror screens and off-screen-rendering extended screens scale the cursor up
+    // (GetScale() > 1), so the upscaled glyph no longer fits a 256 buffer. The tier can change
+    // after construction -- the off-screen flag and the screen mode both arrive later -- so
+    // rebuild the pool whenever the resolved side differs from the one it was built at.
+    // InitCommonBuffer only tops the pool up to DEFAULT_BUFFER_SIZE, so without this the eight
+    // common buffers would keep their old side while default/transparent were rebuilt, leaving
+    // the hotspot (computed from bufferSize_) out of step with the pixels actually drawn.
+    uint32_t desiredSide = ResolveBufferSide();
+    if (desiredSide != bufferSize_) {
+        MMI_HILOGI("Buffer side change %{public}u -> %{public}u, rebuilding pool",
+            bufferSize_, desiredSide);
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            currentBuffer_ = nullptr;
+            defaultBuffer_ = nullptr;
+            transparentBuffer_ = nullptr;
+            commonBuffers_.clear();
+        }
+        bufferSize_ = desiredSide;
     }
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
@@ -322,6 +332,11 @@ void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, 
         x = cfg.HotspotInBufferX(side);
         y = cfg.HotspotInBufferY(side);
     }
+    // Written under bufferMutex_ so the hotspot and the buffer it belongs to are published as
+    // one frame. Move()/MoveSoft() take the same lock and read both together; without it the
+    // retry thread could pair a newly cached hotspot with the previous buffer (a 256-tier
+    // DEFAULT -> LOADING switch shifts the hotspot 128 -> 108 and moves the arrow by 20px).
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
     if (isHard) {
         hotspotHardX_ = x;
         hotspotHardY_ = y;
@@ -642,6 +657,18 @@ int32_t GetCursorBufferSize()
     return side;
 }
 
+uint32_t ScreenPointer::ResolveBufferSide()
+{
+    // Mirror screens and off-screen-rendering extended screens scale the cursor up
+    // (GetScale() > 1) to match the target resolution, so the upscaled glyph no longer fits a
+    // 256 buffer: a 200x200 icon at scale 2.0 becomes 400x400. Those two therefore require 512.
+    // Every other screen follows the boot-fixed blur switch.
+    if (IsMirror() || (IsExtend() && GetIsCurrentOffScreenRendering())) {
+        return static_cast<uint32_t>(BLUR_CURSOR_SIZE);
+    }
+    return static_cast<uint32_t>(GetCursorBufferSize());
+}
+
 uint32_t ScreenPointer::GetBufferSize() const
 {
     return bufferSize_;
@@ -678,15 +705,25 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
         }
     }
 
-    auto buffer = GetCurrentBuffer();
+    buffer_ptr_t buffer;
+    int32_t hotspotX = 0;
+    int32_t hotspotY = 0;
+    {
+        // One frame: the buffer and its matching hotspot are read under the same lock that
+        // UpdateHotspotInBuffer() writes them, so the pair can never be crossed.
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        buffer = currentBuffer_;
+        hotspotX = hotspotHardX_;
+        hotspotY = hotspotHardY_;
+    }
     CHKPF(buffer);
     auto bh = buffer->GetBufferHandle();
     CHKPF(bh);
     if (IsPositionOutScreen(x, y)) {
         MMI_HILOGE("Position out of screen");
     }
-    int32_t px = x - hotspotHardX_;
-    int32_t py = y - hotspotHardY_;
+    int32_t px = x - hotspotX;
+    int32_t py = y - hotspotY;
     uint32_t bid = bufferId_.load(std::memory_order_relaxed);
     BytraceAdapter::StartHardPointerMove(buffer->GetWidth(), buffer->GetHeight(), bid, screenId_);
     auto ret = hwcMgr_->SetPosition(screenId_, px, py, bh);
@@ -717,8 +754,18 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     if (IsMirror()) {
         CalculateHwcPositionForMirror(x, y);
     }
-    int32_t px = x - hotspotSoftX_;
-    int32_t py = y - hotspotSoftY_;
+    int32_t hotspotX = 0;
+    int32_t hotspotY = 0;
+    {
+        // Same one-frame read as Move(): the soft hotspot is published under bufferMutex_, so
+        // reading it here alongside nothing else still needs the lock to avoid tearing against
+        // UpdateHotspotInBuffer()'s write.
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        hotspotX = hotspotSoftX_;
+        hotspotY = hotspotSoftY_;
+    }
+    int32_t px = x - hotspotX;
+    int32_t py = y - hotspotY;
 
     // MoveSoft only serves the placeholder soft path that coexists with a hard cursor, whose buffer
     // side is bufferSize_. A standalone soft cursor (no hard cursor) is positioned by
