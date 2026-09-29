@@ -7193,6 +7193,14 @@ void InputWindowsManager::DispatchTouch(int32_t pointerAction, int32_t groupId, 
         return;
     }
     LastTouchInfo lastInfo = GetLastTouchInfo(dispatchTouchEvent);
+    if (lastInfo.lastTouchLogicX == -1 && lastInfo.lastTouchLogicY == -1 &&
+        pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_OUT_WINDOW) {
+        MMI_HILOGW("LastTouchInfo not found, fallback to lastLevitateInWindowInfo_ for LEVITATE_OUT");
+        lastInfo.lastTouchWindowInfo = lastLevitateInWindowInfo_;
+        lastInfo.lastTouchLogicX = lastPointerItem.GetDisplayX();
+        lastInfo.lastTouchLogicY = lastPointerItem.GetDisplayY();
+    }
+
     if (pointerAction == PointerEvent::POINTER_ACTION_PULL_IN_WINDOW ||
         pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_IN_WINDOW) {
         WindowInfo touchWindow;
