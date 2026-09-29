@@ -79,6 +79,11 @@ public:
     buffer_ptr_t GetTransparentBuffer();
     buffer_ptr_t GetCommonBuffer();
     buffer_ptr_t RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer);
+    // Publishes the completed frame: atomically commits the hotspot and currentBuffer_ under
+    // bufferMutex_ so that Move()/MoveSoft() always read a matched pair.  Must be called after
+    // Render() and FlushCache() succeed — never before — to prevent MoveRetry from reading a
+    // slot whose pixels haven't been written yet.
+    void PublishFrame(const RenderConfig &cfg, buffer_ptr_t buffer);
     buffer_ptr_t GetCurrentBuffer();
     // Caches the hotspot for the given path. isHard selects which copy to update: the two paths
     // run on different threads with their own RenderConfig and must not share one value.

@@ -3430,7 +3430,11 @@ sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindM
             // resolved side no longer matches the one the existing pool was built at.
             if (sp->GetBufferSize() != sp->ResolveBufferSide()) {
                 MMI_HILOGI("Buffer side changed for screenId=%{public}" PRIu64 ", re-initialising", sid);
-                if (!sp->Init(pointerRenderer_, needDrawPointer)) {
+                if (sp->Init(pointerRenderer_, needDrawPointer)) {
+                    if (sid == displayInfo_.rsId) {
+                        SetSurfaceNode(sp->GetSurfaceNode());
+                    }
+                } else {
                     MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, sid);
                 }
             }
@@ -3714,13 +3718,16 @@ int32_t PointerDrawingManager::DrawHardCursor(std::shared_ptr<ScreenPointer> sp,
         BytraceAdapter::StopHardPointerRender();
     }
 
-    MMI_HILOGI("DrawHardCursor on ScreenPointer success, screenId=%{public}" PRIu64 ", style=%{public}d",
-        sp->GetScreenId(), cfg.style_);
     auto sret = buffer->FlushCache();
     if (sret != RET_OK) {
         MMI_HILOGE("FlushCache ret: %{public}d", sret);
         return sret;
     }
+    // Publish hotspot and currentBuffer_ only after the pixels are on-screen so that
+    // MoveRetry never pairs a freshly-selected slot with stale pixels from the previous frame.
+    sp->PublishFrame(cfg, buffer);
+    MMI_HILOGI("DrawHardCursor on ScreenPointer success, screenId=%{public}" PRIu64 ", style=%{public}d",
+        sp->GetScreenId(), cfg.style_);
     return RET_OK;
 }
 
