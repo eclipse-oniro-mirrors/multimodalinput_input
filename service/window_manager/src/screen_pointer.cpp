@@ -197,8 +197,10 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
             defaultBuffer_ = nullptr;
             transparentBuffer_ = nullptr;
             commonBuffers_.clear();
+            // Write bufferSize_ inside the exclusive lock so soft-render thread reads via
+            // GetBufferSize() are always consistent with the pool state they observe.
+            bufferSize_ = desiredSide;
         }
-        bufferSize_ = desiredSide;
     }
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
