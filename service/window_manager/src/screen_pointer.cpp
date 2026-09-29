@@ -267,7 +267,19 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
         }
         return false;
     }
-    GetCommonBuffer();
+    // Advance bufferId_ to seed the round-robin starting point for the first real draw call,
+    // but do NOT publish currentBuffer_ here: the common buffers are freshly allocated and have
+    // never been rendered into, so making one the current buffer would cause Move() to submit
+    // blank pixels until the first DrawHardCursor() completes and calls PublishFrame().
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        uint32_t poolSize = static_cast<uint32_t>(commonBuffers_.size());
+        if (poolSize > 0) {
+            uint32_t newId = bufferId_.load(std::memory_order_relaxed) + 1;
+            newId %= poolSize;
+            bufferId_.store(newId, std::memory_order_relaxed);
+        }
+    }
     return true;
 }
 
@@ -528,7 +540,11 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
 void ScreenPointer::UpdateScreenInfo(sptr<OHOS::Rosen::ScreenInfo> si, bool needDrawPointer)
 {
     CHKPV(si);
-    CHKPV(surfaceNode_);
+    // Update all screen metadata unconditionally — mode_, width_, height_, dpi_ etc. must
+    // reflect the current screen regardless of whether the surface node exists.  If a previous
+    // Init() failed and left the node null, the IsPoolEmpty() gate will trigger a retry; that
+    // retry must see the correct mode or it will rebuild a 512 pool for a mirror that has since
+    // reverted to extend mode.
     screenId_ = si->GetRsId();
     mode_ = si->GetSourceMode();
     dpi_ = si->GetVirtualPixelRatio();
@@ -540,9 +556,11 @@ void ScreenPointer::UpdateScreenInfo(sptr<OHOS::Rosen::ScreenInfo> si, bool need
     width_ = result.width;
     height_ = result.height;
     rotation_ = result.rotation;
-    if (needDrawPointer) {
-        surfaceNode_->RemoveFromTree();
-        surfaceNode_->AttachToDisplay(screenId_);
+    // Node operations only when the node is present.
+    auto node = GetSurfaceNode();
+    if (needDrawPointer && node != nullptr) {
+        node->RemoveFromTree();
+        node->AttachToDisplay(screenId_);
     }
     RsFlushImplicitTransaction();
     MMI_HILOGI("Update with ScreenInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "

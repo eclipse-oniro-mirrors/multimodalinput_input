@@ -132,6 +132,9 @@ public:
 
     std::shared_ptr<OHOS::Rosen::RSSurfaceNode> GetSurfaceNode()
     {
+        // Snapshot under bufferMutex_ so concurrent InitSurface() null+replace writes
+        // can't race with callers on the soft-cursor render thread.
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
         return surfaceNode_;
     }
 
