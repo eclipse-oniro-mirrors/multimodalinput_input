@@ -1196,6 +1196,7 @@ int32_t PointerDrawingManager::DrawDynamicHardwareCursor(std::shared_ptr<ScreenP
         MMI_HILOGE("FlushCache ret: %{public}d", sret);
         return sret;
     }
+    sp->PublishFrame(cfg, buffer);
     return RET_OK;
 }
 
@@ -2553,13 +2554,15 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
         // OnDisplayInfo() carries the off-screen-rendering flag, which arrives after the
         // ScreenPointer was constructed and can move an extended screen onto the 512 side.
         // Re-drive Init() (the only place with a renderer) when the pool no longer matches.
-        if (sp->GetBufferSize() != sp->ResolveBufferSide()) {
-            MMI_HILOGI("Buffer side changed on display info, re-initialising screenId=%{public}" PRIu64,
+        if (sp->GetBufferSize() != sp->ResolveBufferSide() || sp->IsPoolEmpty()) {
+            MMI_HILOGI("Buffer side changed or pool empty on display info, re-initialising screenId=%{public}" PRIu64,
                 displayInfo.rsId);
-            if (!sp->Init(pointerRenderer_)) {
+            if (sp->Init(pointerRenderer_)) {
+                if (displayInfo.rsId == displayInfo_.rsId) {
+                    SetSurfaceNode(sp->GetSurfaceNode());
+                }
+            } else {
                 MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
-            } else if (displayInfo.rsId == displayInfo_.rsId) {
-                SetSurfaceNode(sp->GetSurfaceNode());
             }
         }
         if (sp->IsMain()) {
@@ -3428,8 +3431,8 @@ sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindM
             // change here (extend -> mirror, or the off-screen flag arriving late). Init() is
             // the only place with a renderer to rebuild the pool, so re-drive it whenever the
             // resolved side no longer matches the one the existing pool was built at.
-            if (sp->GetBufferSize() != sp->ResolveBufferSide()) {
-                MMI_HILOGI("Buffer side changed for screenId=%{public}" PRIu64 ", re-initialising", sid);
+            if (sp->GetBufferSize() != sp->ResolveBufferSide() || sp->IsPoolEmpty()) {
+                MMI_HILOGI("Buffer side changed or pool empty for screenId=%{public}" PRIu64 ", re-initialising", sid);
                 if (sp->Init(pointerRenderer_, needDrawPointer)) {
                     if (sid == displayInfo_.rsId) {
                         SetSurfaceNode(sp->GetSurfaceNode());

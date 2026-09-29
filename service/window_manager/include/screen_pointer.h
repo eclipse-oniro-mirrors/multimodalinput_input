@@ -106,6 +106,12 @@ public:
     // inside the buffer when the hard cursor buffer shrinks.
     uint32_t GetBufferSize() const;
 
+    // Returns true when the buffer pool was never successfully built, or was cleared by a failed
+    // rebuild. Callers that gate re-init on GetBufferSize()==ResolveBufferSide() must also check
+    // this: a failed rebuild leaves bufferSize_ at desiredSide (so the tier comparison is equal)
+    // while the pool is empty, and without this guard the re-init would never retry.
+    bool IsPoolEmpty() const;
+
     // Resolves the buffer side this screen requires from its current mode and off-screen state.
     // Mirror screens and off-screen-rendering extended screens scale the cursor up (GetScale() > 1),
     // so the upscaled glyph no longer fits a 256 buffer and 512 is required; every other screen
@@ -299,7 +305,7 @@ private:
     int32_t hotspotSoftY_{DEFAULT_CURSOR_SIZE / 2};
     buffer_ptr_t transparentBuffer_{nullptr};
     buffer_ptr_t defaultBuffer_{nullptr};
-    std::shared_mutex bufferMutex_;
+    mutable std::shared_mutex bufferMutex_;
     buffer_ptr_t currentBuffer_{nullptr};
     std::vector<buffer_ptr_t> commonBuffers_;
     std::atomic<uint32_t> bufferId_ {0};

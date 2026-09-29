@@ -240,7 +240,9 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
             commonBuffers_.clear();
             currentBuffer_ = nullptr;
         }
-        bufferSize_ = prevBufferSize;
+        // Do NOT restore prevBufferSize: leaving bufferSize_=desiredSide ensures the next
+        // GetBufferSize()==ResolveBufferSide() comparison is still equal, so IsPoolEmpty()
+        // is required alongside that check to detect and retry a failed rebuild.
         return false;
     }
     if (!InitTransparentBuffer(bufferCfg)) {
@@ -252,7 +254,6 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
             commonBuffers_.clear();
             currentBuffer_ = nullptr;
         }
-        bufferSize_ = prevBufferSize;
         return false;
     }
     if (!InitCommonBuffer(bufferCfg)) {
@@ -264,7 +265,6 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
             commonBuffers_.clear();
             currentBuffer_ = nullptr;
         }
-        bufferSize_ = prevBufferSize;
         return false;
     }
     GetCommonBuffer();
@@ -402,11 +402,17 @@ buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommo
 
 void ScreenPointer::PublishFrame(const RenderConfig &cfg, buffer_ptr_t buffer)
 {
-    // Called after Render() and FlushCache() succeed. Atomically commits the completed buffer and
-    // its matching hotspot so Move()/MoveSoft() never read a pair from different frames or tiers.
+    // Derive the hotspot from the buffer's own side length, not bufferSize_, so a concurrent
+    // tier-change rebuild cannot cause a mismatch: if a 256-tier buffer is flushed while a 512
+    // rebuild completes, the hotspot is still computed from 256 (the buffer that was drawn into).
+    if (!buffer) {
+        return;
+    }
+    int32_t side = buffer->GetWidth();
+    if (side <= 0) {
+        side = DEFAULT_CURSOR_SIZE;
+    }
     std::unique_lock<std::shared_mutex> lock(bufferMutex_);
-    int32_t side = (static_cast<int32_t>(bufferSize_) == BLUR_CURSOR_SIZE)
-        ? BLUR_CURSOR_SIZE : DEFAULT_CURSOR_SIZE;
     hotspotHardX_ = (side == BLUR_CURSOR_SIZE) ? (side / 2) : cfg.HotspotInBufferX(side);
     hotspotHardY_ = (side == BLUR_CURSOR_SIZE) ? (side / 2) : cfg.HotspotInBufferY(side);
     currentBuffer_ = buffer;
@@ -455,11 +461,14 @@ buffer_ptr_t ScreenPointer::CreateSurfaceBuffer(const OHOS::BufferRequestConfig 
 
 bool ScreenPointer::InitSurface(bool needDrawPointer)
 {
-    // Remove surfaceNode from render tree
-    if (surfaceNode_ != nullptr) {
+    // Null the old node under bufferMutex_ first, so a concurrent MoveSoft() that snapshots
+    // surfaceNode_ under the same lock sees nullptr and returns early rather than using a
+    // node that is about to be destroyed.
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
         surfaceNode_ = nullptr;
-        RsFlushImplicitTransaction();
     }
+    RsFlushImplicitTransaction();
 
     // create RSUIDirector and RSUIContext
     if (!InitRSUIContext(screenId_)) {
@@ -467,31 +476,31 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
         return false;
     }
 
-    // create SurfaceNode
+    // Build the SurfaceNode into a local variable; publish it under bufferMutex_ only after
+    // it is fully configured so MoveSoft() never snapshots a half-initialised node.
+    std::shared_ptr<Rosen::RSSurfaceNode> newNode;
     Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
     surfaceNodeConfig.SurfaceNodeName = RS_SURFACE_NODE_NAME;
-    surfaceNode_ = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, Rosen::RSSurfaceNodeType::CURSOR_NODE,
+    newNode = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, Rosen::RSSurfaceNodeType::CURSOR_NODE,
         true, false, rsUIContext_);
-    CHKPF(surfaceNode_);
-    surfaceNode_->SetSkipCheckInMultiInstance(true);
+    CHKPF(newNode);
+    newNode->SetSkipCheckInMultiInstance(true);
     MMI_HILOGI("SurfaceNode::Create success");
 
-    // set soft cursor buffer size
-    auto surface = surfaceNode_->GetSurface();
+    auto surface = newNode->GetSurface();
     CHKPF(surface);
     surface->SetQueueSize(DEFAULT_BUFFER_SIZE);
 
-    surfaceNode_->SetVisible(true);
-    surfaceNode_->SetSnapshotSkipLayer(true);
-    surfaceNode_->SetFrameGravity(Rosen::Gravity::TOP_LEFT);
-    surfaceNode_->SetPositionZ(Rosen::RSSurfaceNode::POINTER_WINDOW_POSITION_Z);
+    newNode->SetVisible(true);
+    newNode->SetSnapshotSkipLayer(true);
+    newNode->SetFrameGravity(Rosen::Gravity::TOP_LEFT);
+    newNode->SetPositionZ(Rosen::RSSurfaceNode::POINTER_WINDOW_POSITION_Z);
     if (needDrawPointer) {
-        surfaceNode_->AttachToDisplay(screenId_);
+        newNode->AttachToDisplay(screenId_);
     }
-    surfaceNode_->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
+    newNode->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
     MMI_HILOGI("AttachToDisplay %{public}" PRIu64 " completed, needDrawPointer=%{public}d", screenId_, needDrawPointer);
 
-    // create canvas node
     canvasNode_ = Rosen::RSCanvasNode::Create(false, false, rsUIContext_);
     CHKPF(canvasNode_);
     canvasNode_->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
@@ -501,11 +510,16 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
 #else
     canvasNode_->SetBackgroundColor(Rosen::Drawing::Color::COLOR_TRANSPARENT);
 #endif // USE_ROSEN_DRAWING
-
     canvasNode_->SetCornerRadius(1);
     canvasNode_->SetPositionZ(Rosen::RSSurfaceNode::POINTER_WINDOW_POSITION_Z);
     canvasNode_->SetRotation(float(rotation_.load()));
-    surfaceNode_->AddChild(canvasNode_, RS_NODE_CANVAS_INDEX);
+    newNode->AddChild(canvasNode_, RS_NODE_CANVAS_INDEX);
+
+    // Publish the fully-configured node atomically so MoveSoft() snapshots a complete node.
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        surfaceNode_ = std::move(newNode);
+    }
 
     MMI_HILOGI("InitSurface completed");
     return true;
@@ -724,6 +738,12 @@ uint32_t ScreenPointer::GetBufferSize() const
     return bufferSize_;
 }
 
+bool ScreenPointer::IsPoolEmpty() const
+{
+    std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+    return commonBuffers_.empty();
+}
+
 bool ScreenPointer::Move(int32_t x, int32_t y)
 {
     if (isVirtualExtend_) {
@@ -788,7 +808,15 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
 
 bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
 {
-    if (surfaceNode_ == nullptr) {
+    // Snapshot surfaceNode_ under bufferMutex_ so we can't race with InitSurface(), which
+    // nulls and replaces it under the same lock.  After the snapshot, the local shared_ptr
+    // keeps the node alive even if InitSurface() runs concurrently and replaces the member.
+    std::shared_ptr<Rosen::RSSurfaceNode> node;
+    {
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        node = surfaceNode_;
+    }
+    if (node == nullptr) {
         MMI_HILOGW("SurfaceNode is null in MoveSoft");
         return false;
     }
@@ -807,9 +835,6 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     int32_t hotspotX = 0;
     int32_t hotspotY = 0;
     {
-        // Same one-frame read as Move(): the soft hotspot is published under bufferMutex_, so
-        // reading it here alongside nothing else still needs the lock to avoid tearing against
-        // UpdateHotspotInBuffer()'s write.
         std::shared_lock<std::shared_mutex> lock(bufferMutex_);
         hotspotX = hotspotSoftX_;
         hotspotY = hotspotSoftY_;
@@ -817,20 +842,16 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     int32_t px = x - hotspotX;
     int32_t py = y - hotspotY;
 
-    // MoveSoft only serves the placeholder soft path that coexists with a hard cursor, whose buffer
-    // side is bufferSize_. A standalone soft cursor (no hard cursor) is positioned by
-    // PointerDrawingManager::UpdateSurfaceNodeBounds using canvasWidth_/canvasHeight_ instead, so
-    // it is not reached here and needs no separate side.
     if (!IsMirror()) {
-        int64_t nodeId = surfaceNode_->GetId();
+        int64_t nodeId = node->GetId();
         rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, static_cast<int32_t>(bufferSize_),
             static_cast<int32_t>(bufferSize_));
     } else {
-        surfaceNode_->SetBounds(px, py, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
+        node->SetBounds(px, py, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
     }
     MMI_HILOGD("Pointer Window SetBounds ScreenId:%{public}" PRIu64
         ", surfaceNodeId=%{public}" PRId64 ", pos=(%{private}d, %{private}d)",
-        screenId_, surfaceNode_->GetId(), px, py);
+        screenId_, node->GetId(), px, py);
     return true;
 }
 
