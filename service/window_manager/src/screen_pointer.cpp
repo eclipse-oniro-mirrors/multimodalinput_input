@@ -187,6 +187,7 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
     // common buffers would keep their old side while default/transparent were rebuilt, leaving
     // the hotspot (computed from bufferSize_) out of step with the pixels actually drawn.
     uint32_t desiredSide = ResolveBufferSide();
+    uint32_t prevBufferSize = bufferSize_;
     if (desiredSide != bufferSize_) {
         MMI_HILOGI("Buffer side change %{public}u -> %{public}u, rebuilding pool",
             bufferSize_, desiredSide);
@@ -201,6 +202,7 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
     }
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
+        bufferSize_ = prevBufferSize;
         return false;
     }
 
@@ -231,14 +233,17 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
     };
     if (!InitDefaultBuffer(bufferCfg, render)) {
         MMI_HILOGE("ScreenPointer InitDefaultBuffer failed");
+        bufferSize_ = prevBufferSize;
         return false;
     }
     if (!InitTransparentBuffer(bufferCfg)) {
         MMI_HILOGE("ScreenPointer InitTransparentBuffer failed");
+        bufferSize_ = prevBufferSize;
         return false;
     }
     if (!InitCommonBuffer(bufferCfg)) {
         MMI_HILOGE("ScreenPointer InitCommonBuffer failed");
+        bufferSize_ = prevBufferSize;
         return false;
     }
     GetCommonBuffer();
@@ -304,19 +309,16 @@ buffer_ptr_t ScreenPointer::GetTransparentBuffer()
 
 buffer_ptr_t ScreenPointer::GetCommonBuffer()
 {
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
     uint32_t bufferSize = static_cast<uint32_t>(commonBuffers_.size());
     if (bufferSize != DEFAULT_BUFFER_SIZE) {
         MMI_HILOGE("The buffer size is incorrect, size:%{public}u", bufferSize);
         return nullptr;
     }
-
     uint32_t newId = bufferId_.load(std::memory_order_relaxed) + 1;
     newId %= bufferSize;
     bufferId_.store(newId, std::memory_order_relaxed);
-    {
-        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
-        currentBuffer_ = commonBuffers_[newId];
-    }
+    currentBuffer_ = commonBuffers_[newId];
     return commonBuffers_[newId];
 }
 
@@ -348,18 +350,53 @@ void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, 
 
 buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer)
 {
-    UpdateHotspotInBuffer(cfg, true, static_cast<int32_t>(bufferSize_));
+    // Compute hotspot coords before taking the lock (pure arithmetic, no shared state).
+    int32_t bufferSide = static_cast<int32_t>(bufferSize_);
+    int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
+    int32_t x, y;
+    if (side == BLUR_CURSOR_SIZE) {
+        x = side / 2;
+        y = side / 2;
+    } else {
+        x = cfg.HotspotInBufferX(side);
+        y = cfg.HotspotInBufferY(side);
+    }
+
+    // Each branch publishes hotspotHard and currentBuffer_ in a single lock
+    // acquisition so Move()/MoveSoft() can never read a mismatched pair.
     if (cfg.style_ == MOUSE_ICON::TRANSPARENT_ICON) {
         MMI_HILOGD("The buffer transparent buffer.");
         isCommonBuffer = false;
-        return GetTransparentBuffer();
-    } else if (IsDefaultCfg(cfg)) {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        hotspotHardX_ = x;
+        hotspotHardY_ = y;
+        currentBuffer_ = transparentBuffer_;
+        return transparentBuffer_;
+    }
+    if (IsDefaultCfg(cfg)) {
         MMI_HILOGD("The buffer default buffer.");
         isCommonBuffer = false;
-        return GetDefaultBuffer();
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        hotspotHardX_ = x;
+        hotspotHardY_ = y;
+        currentBuffer_ = defaultBuffer_;
+        return defaultBuffer_;
     }
+    // Common buffer: size check, id advance, hotspot, and currentBuffer_ under one lock.
     isCommonBuffer = true;
-    return GetCommonBuffer();
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+    uint32_t bufferSize = static_cast<uint32_t>(commonBuffers_.size());
+    if (bufferSize != DEFAULT_BUFFER_SIZE) {
+        MMI_HILOGE("The buffer size is incorrect, size:%{public}u", bufferSize);
+        return nullptr;
+    }
+    uint32_t newId = bufferId_.load(std::memory_order_relaxed) + 1;
+    newId %= bufferSize;
+    bufferId_.store(newId, std::memory_order_relaxed);
+    hotspotHardX_ = x;
+    hotspotHardY_ = y;
+    currentBuffer_ = commonBuffers_[newId];
+    return commonBuffers_[newId];
 }
 
 // Decides whether a frame can be served the one-shot defaultBuffer_, which InitDefaultBuffer renders

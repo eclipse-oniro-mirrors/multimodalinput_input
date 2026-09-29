@@ -2558,6 +2558,8 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
                 displayInfo.rsId);
             if (!sp->Init(pointerRenderer_)) {
                 MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
+            } else if (displayInfo.rsId == displayInfo_.rsId) {
+                SetSurfaceNode(sp->GetSurfaceNode());
             }
         }
         if (sp->IsMain()) {
@@ -3666,7 +3668,7 @@ int32_t PointerDrawingManager::DrawSoftCursor(std::shared_ptr<Rosen::RSSurfaceNo
     CHKPR(layer, RET_ERR);
     auto buffer = GetSurfaceBuffer(layer, bufferSide);
     if (buffer == nullptr || buffer->GetVirAddr() == nullptr) {
-        buffer = RetryGetSurfaceBuffer(layer, static_cast<int32_t>(it.second->GetBufferSize()));
+        buffer = RetryGetSurfaceBuffer(layer, bufferSide);
     }
     CHKPR(buffer, RET_ERR);
     CHKPR(buffer->GetVirAddr(), RET_ERR);
