@@ -5592,6 +5592,23 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindo
 }
 
 /**
+ * @tc.name: PointerDrawingManagerTest_IsCursorOnOtherForegroundUser_001
+ * @tc.desc: Single foreground user must keep the immediate-apply behavior, the guard
+ *           only defers applying when multiple foreground users exist and the cursor
+ *           stays on another user's display group.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_IsCursorOnOtherForegroundUser_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    // No foreground account can be queried in the test environment, which is the
+    // single foreground user form: the guard must not defer the apply.
+    EXPECT_FALSE(pointerDrawingManager.IsCursorOnOtherForegroundUser(100));
+}
+
+/**
  * @tc.name: PointerDrawingManagerTest_IsDisableCursorScreen_001
  * @tc.desc: Test IsDisableCursorScreen whether the screen cursor is disabled
  * @tc.type: FUNC

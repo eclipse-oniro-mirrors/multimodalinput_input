@@ -2432,7 +2432,7 @@ int32_t PointerDrawingManager::SetPointerColor(int32_t userId, int32_t color)
 {
     CALL_DEBUG_ENTER;
     MMI_HILOGI("PointerColor:%{public}x, userId:%{private}d", color, userId);
-    originSetColor_ = color;
+    int32_t originColor = color;
     // ARGB从表面看比RGB多了个A，也是一种色彩模式，是在RGB的基础上添加了Alpha（透明度）通道。
     // 透明度也是以0到255表示的，所以也是总共有256级，透明是0，不透明是255。
     // 这个color每8位代表一个通道值，分别是alpha和rgb，总共32位。
@@ -2445,6 +2445,10 @@ int32_t PointerDrawingManager::SetPointerColor(int32_t userId, int32_t color)
         return RET_ERR;
     }
     MMI_HILOGD("Set pointer color successfully, color:%{public}d", color);
+    if (IsCursorOnOtherForegroundUser(userId)) {
+        return RET_OK;
+    }
+    originSetColor_ = originColor;
     int32_t ret = -1;
     if (!WIN_MGR->GetExtraData().drawCursor) {
         auto surfaceNodePtr = GetSurfaceNode();
@@ -2582,6 +2586,9 @@ int32_t PointerDrawingManager::SetPointerSize(int32_t userId, int32_t size)
     }
     MMI_HILOGI("Set pointer size successfully, size:%{public}d", size);
 
+    if (IsCursorOnOtherForegroundUser(userId)) {
+        return RET_OK;
+    }
     CHKPR(GetSurfaceNode(), RET_OK);
     imageWidth_ = pow(INCREASE_RATIO, size - 1) * displayInfo_.dpi * GetIndependentPixels() / BASELINE_DENSITY;
     imageHeight_ = pow(INCREASE_RATIO, size - 1) * displayInfo_.dpi * GetIndependentPixels() / BASELINE_DENSITY;
@@ -2666,6 +2673,22 @@ int32_t PointerDrawingManager::GetCurrentUser()
         userId = ACCOUNT_MGR->QueryCurrentAccountId();
     }
     return userId > 0 ? userId : DEFAULT_USER_ID;
+}
+
+bool PointerDrawingManager::IsCursorOnOtherForegroundUser(int32_t userId)
+{
+    std::vector<int32_t> foregroundUserIds = ACCOUNT_MGR->QueryForegroundOsAccountIds();
+    if (foregroundUserIds.size() <= 1) {
+        MMI_HILOGD("Not multi foreground user, apply pointer params immediately");
+        return false;
+    }
+    int32_t cursorUserId = GetCurrentUser();
+    if (cursorUserId != userId) {
+        MMI_HILOGI("Cursor on user:%{public}d display, defer apply pointer params for caller:%{public}d",
+            cursorUserId, userId);
+        return true;
+    }
+    return false;
 }
 
 int32_t PointerDrawingManager::GetCursorSurfaceId(uint64_t &surfaceId)

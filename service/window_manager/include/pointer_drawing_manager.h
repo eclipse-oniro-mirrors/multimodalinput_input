@@ -224,6 +224,7 @@ private:
     int32_t InitLayer(const MOUSE_ICON mouseStyle) override;
     void UpdateMouseStyle();
     int32_t GetCurrentUser();
+    bool IsCursorOnOtherForegroundUser(int32_t userId);
     int32_t UpdateCursorProperty(CursorPixelMap curPixelMap, const int32_t &focusX, const int32_t &focusY);
     int32_t UpdateCursorProperty(CustomCursor cursor);
     void RotateDegree(Direction direction);
