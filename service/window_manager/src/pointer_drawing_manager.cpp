@@ -1212,7 +1212,8 @@ int32_t PointerDrawingManager::DrawDynamicHardwareCursor(std::shared_ptr<ScreenP
         auto addr = static_cast<uint8_t*>(buffer->GetVirAddr());
         CHKPR(addr, RET_ERR);
         if (pointerRenderer_.DynamicRender(addr, buffer->GetWidth(), buffer->GetHeight(), renderCfg) != RET_OK) {
-            MMI_HILOGE("DynamicRender failed");
+            MMI_HILOGE("DynamicRender failed, skipping PublishFrame to avoid hotspot/pixel mismatch");
+            return RET_ERR;
         }
     }
 
@@ -3726,6 +3727,7 @@ int32_t PointerDrawingManager::DrawHardCursor(std::shared_ptr<ScreenPointer> sp,
             sp->GetScreenId(), cfg.style_);
         if (pointerRenderer_.Render(addr, buffer->GetWidth(), buffer->GetHeight(), cfg) != RET_OK) {
             MMI_HILOGE("Render failed, skipping PublishFrame to avoid hotspot/pixel mismatch");
+            BytraceAdapter::StopHardPointerRender();
             return RET_ERR;
         }
         BytraceAdapter::StopHardPointerRender();
