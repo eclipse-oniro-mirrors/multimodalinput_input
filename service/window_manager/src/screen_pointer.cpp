@@ -147,6 +147,11 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, const O
         std::swap(width_, height_);
     }
     dpi_ = float(di.dpi) / BASELINE_DENSITY;
+    // Populate off-screen state from DisplayInfo so that the first ResolveBufferSide()
+    // call during Init() uses the correct value rather than the false default.
+    // Note: DisplayInfo does not carry a screen source mode field, so mode_ remains at
+    // the default (SCREEN_MAIN); it is corrected later when ScreenInfo arrives.
+    isCurrentOffScreenRendering_ = di.isCurrentOffScreenRendering;
     bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with DisplayInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
