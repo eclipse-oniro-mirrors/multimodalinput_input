@@ -338,8 +338,11 @@ image_ptr_t PointerRenderer::UserIconScale(uint32_t width, uint32_t height, cons
     cfg.userIconPixelMap->Marshalling(data);
     std::shared_ptr<Media::PixelMap> scaled(Media::PixelMap::Unmarshalling(data));
     if (scaled == nullptr) {
-        MMI_HILOGE("Copy user icon failed, draw it unscaled");
-        return ExtractDrawingImage(cfg.userIconPixelMap);
+        // Copy failed: return nullptr so the caller's CHKPR aborts this frame rather than
+        // drawing the original unscaled image with a hotspot already computed for the
+        // scaled-down size.  The previous frame's pixels and hotspot stay in place.
+        MMI_HILOGE("Copy user icon failed, skipping frame to avoid hotspot/pixel mismatch");
+        return nullptr;
     }
     scaled->scale(ratio, ratio, Media::AntiAliasingOption::SLR);
     return ExtractDrawingImage(scaled);
