@@ -204,7 +204,10 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
     }
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
-        bufferSize_ = prevBufferSize;
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            bufferSize_ = prevBufferSize;
+        }
         return false;
     }
 
@@ -755,6 +758,7 @@ uint32_t ScreenPointer::ResolveBufferSide()
 
 uint32_t ScreenPointer::GetBufferSize() const
 {
+    std::shared_lock<std::shared_mutex> lock(bufferMutex_);
     return bufferSize_;
 }
 
