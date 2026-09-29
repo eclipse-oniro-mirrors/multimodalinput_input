@@ -1182,11 +1182,38 @@ int32_t PointerDrawingManager::DrawDynamicHardwareCursor(std::shared_ptr<ScreenP
     auto buffer = sp->RequestBuffer(cfg, isCommonBuffer);
     CHKPR(buffer, RET_ERR);
     if (isCommonBuffer) {
+        // Recompute the spinner pivot from the actual buffer's width.  The caller computed a
+        // tentative pivot from GetBufferSize() before calling RequestBuffer(); if a tier-change
+        // rebuild completed between those two points the tentative value is wrong.  Using the
+        // buffer's own width here guarantees the pivot, the drawn pixels, and the hotspot all
+        // come from the same tier.
+        RenderConfig renderCfg = cfg;
+        uint32_t bufferSide = static_cast<uint32_t>(buffer->GetWidth());
+        float drawnSize = static_cast<float>(renderCfg.GetClampedImageSize(bufferSide));
+        int32_t iSize = static_cast<int32_t>(drawnSize);
+        int32_t iOriginBase;
+        if (bufferSide == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+            iOriginBase = static_cast<int32_t>(bufferSide) / 2 -
+                static_cast<int32_t>(renderCfg.GetFocusX(bufferSide));
+        } else {
+            iOriginBase = static_cast<int32_t>(bufferSide) / 2 - iSize / 2;
+        }
+        if (renderCfg.style_ == MOUSE_ICON::LOADING) {
+            renderCfg.rotationFocusX = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(renderCfg.GetFocusX(bufferSide)));
+            renderCfg.rotationFocusY = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(renderCfg.GetFocusY(bufferSide)));
+        } else {
+            renderCfg.rotationFocusX = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_X_RATIO));
+            renderCfg.rotationFocusY = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_Y_RATIO));
+        }
         auto addr = static_cast<uint8_t*>(buffer->GetVirAddr());
         CHKPR(addr, RET_ERR);
-        if (pointerRenderer_.DynamicRender(addr, buffer->GetWidth(), buffer->GetHeight(), cfg) != RET_OK) {
+        if (pointerRenderer_.DynamicRender(addr, buffer->GetWidth(), buffer->GetHeight(), renderCfg) != RET_OK) {
             MMI_HILOGE("DynamicRender failed");
-        };
+        }
     }
 
     MMI_HILOGI("DrawDynamicHardwareCursor on ScreenPointer success, screenId = %{public}" PRIu64 ", style = %{public}d",
@@ -1222,40 +1249,6 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         MMI_HILOGD("HardwareCursorRender, screen = %{public}" PRIu64 ", dpi = %{public}f",
             it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
-            // Hard cursor: derive the pivot from this ScreenPointer's buffer size so it stays
-            // inside the buffer when the hard cursor buffer shrinks. The placeholder soft path
-            // derives the same way -- it shares bufferSize_ with the hard cursor, so
-            // neither can keep a size of its own.
-            //
-            // The spinner pivot is the glyph's own centre, which the draw origin places at
-            // origin + size*ratio. It must NOT be measured from the buffer centre: with the image
-            // centred, origin is already size/2 away from the centre, so adding the buffer focus
-            // double-counts and puts the pivot outside the buffer entirely (128 + 254*0.675 = 299.5
-            // for a 256 buffer). Sweeping about that point threw the ink up to 300 px off-screen;
-            // about the glyph centre it stays fully inside at every gear.
-            uint32_t bufferSide = it.second->GetBufferSize();
-            float drawnSize = static_cast<float>(cfg.GetClampedImageSize(bufferSide));
-            int32_t iSize = static_cast<int32_t>(drawnSize);
-            // iOrigin replicates TierOriginX: 512-tier uses BufferFocus - GetFocusX;
-            // 256-tier uses CalcDrawOriginX = BufferFocus(side) - int(imageSize/2).
-            int32_t iOriginBase;
-            if (bufferSide == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-                iOriginBase = static_cast<int32_t>(bufferSide) / 2 -
-                    static_cast<int32_t>(cfg.GetFocusX(bufferSide));
-            } else {
-                iOriginBase = static_cast<int32_t>(bufferSide) / 2 - iSize / 2;
-            }
-            if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = static_cast<float>(
-                    iOriginBase + static_cast<int32_t>(cfg.GetFocusX(bufferSide)));
-                cfg.rotationFocusY = static_cast<float>(
-                    iOriginBase + static_cast<int32_t>(cfg.GetFocusY(bufferSide)));
-            } else {
-                cfg.rotationFocusX = static_cast<float>(
-                    iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_X_RATIO));
-                cfg.rotationFocusY = static_cast<float>(
-                    iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_Y_RATIO));
-            }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);
         } else {
@@ -2561,6 +2554,14 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
                 if (displayInfo.rsId == displayInfo_.rsId) {
                     SetSurfaceNode(sp->GetSurfaceNode());
                 }
+                // Force a full redraw of the current style so currentBuffer_ is populated
+                // before the next Move().  Without this, a subsequent move-only event would
+                // call Move() with a null currentBuffer_ and the cursor would not appear until
+                // the next style or visibility change triggers a draw independently.
+                MMI_HILOGI("Re-init succeeded, forcing first-frame redraw for screenId=%{public}" PRIu64,
+                    displayInfo.rsId);
+                HardwareCursorRender(MOUSE_ICON(lastMouseStyle_.id), lastPhysicalX_, lastPhysicalY_,
+                    displayInfo.rsId);
             } else {
                 MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
             }
