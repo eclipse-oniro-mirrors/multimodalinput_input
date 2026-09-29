@@ -2554,14 +2554,22 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
                 if (displayInfo.rsId == displayInfo_.rsId) {
                     SetSurfaceNode(sp->GetSurfaceNode());
                 }
-                // Force a full redraw of the current style so currentBuffer_ is populated
-                // before the next Move().  Without this, a subsequent move-only event would
-                // call Move() with a null currentBuffer_ and the cursor would not appear until
-                // the next style or visibility change triggers a draw independently.
+                // Force a first frame so currentBuffer_ is populated before the next Move().
+                // Respect the effective visibility: if the cursor is hidden, publish a transparent
+                // frame rather than drawing the current style — otherwise we would make a hidden
+                // cursor visible again after a successful rebuild.
                 MMI_HILOGI("Re-init succeeded, forcing first-frame redraw for screenId=%{public}" PRIu64,
                     displayInfo.rsId);
-                HardwareCursorRender(MOUSE_ICON(lastMouseStyle_.id), lastPhysicalX_, lastPhysicalY_,
-                    displayInfo.rsId);
+                if (CursorDrawingInformation::GetInstance().IsPointerVisible() && mouseDisplayState_) {
+                    HardwareCursorRender(MOUSE_ICON(lastMouseStyle_.id), lastPhysicalX_, lastPhysicalY_,
+                        displayInfo.rsId);
+                } else {
+                    // Cursor is currently hidden — publish a transparent frame so Move() has a
+                    // valid currentBuffer_ to submit without making the cursor visible.
+                    if (sp != nullptr) {
+                        sp->SetInvisible();
+                    }
+                }
             } else {
                 MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
             }
