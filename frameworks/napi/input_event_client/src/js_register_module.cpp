@@ -114,48 +114,6 @@ static int32_t GetInjectionEventDisplayId(napi_env env, napi_value keyHandle,
     return displayId;
 }
 
-#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
-static void GetInjectionEventDataNative(napi_env env, struct Input_KeyEvent* keyEventNative, napi_value keyHandle,
-    std::function<void(int32_t)> histogramError)
-{
-    bool isPressed = false;
-    if (GetNamedPropertyBool(env, keyHandle, "isPressed", isPressed) != RET_OK) {
-        MMI_HILOGE("Get isPressed failed");
-    }
-    int32_t keyDownDuration = 0;
-    if (GetNamedPropertyInt32(env, keyHandle, "keyDownDuration", keyDownDuration) != RET_OK) {
-        MMI_HILOGE("Get keyDownDuration failed");
-    }
-    if (keyDownDuration < 0) {
-        MMI_HILOGE("keyDownDuration:%{public}d is less 0, can not process", keyDownDuration);
-        THROWERR_CUSTOM(env, COMMON_PARAMETER_ERROR, "keyDownDuration must be greater than or equal to 0");
-        histogramError(COMMON_PARAMETER_ERROR);
-    }
-    int32_t keyCode = 0;
-    if (GetNamedPropertyInt32(env, keyHandle, "keyCode", keyCode) != RET_OK) {
-        MMI_HILOGE("Get keyCode failed");
-    }
-    if (keyCode < 0) {
-        MMI_HILOGE("keyCode is less 0, can not process");
-        THROWERR_CUSTOM(env, COMMON_PARAMETER_ERROR, "keyCode must be greater than or equal to 0");
-        histogramError(COMMON_PARAMETER_ERROR);
-    }
-    int32_t displayId = GetInjectionEventDisplayId(env, keyHandle, histogramError);
-    CHKPV(keyEventNative);
-    auto keyAction = isPressed ? Input_KeyEventAction::KEY_ACTION_DOWN : Input_KeyEventAction::KEY_ACTION_UP;
-    OH_Input_SetKeyEventAction(keyEventNative, keyAction);
-    OH_Input_SetKeyEventKeyCode(keyEventNative, keyCode);
-    OH_Input_SetKeyEventActionTime(keyEventNative, static_cast<int64_t>(keyDownDuration));
-    if (displayId >= 0) {
-        OH_Input_SetKeyEventDisplayId(keyEventNative, displayId);
-    }
-    Input_Result result = static_cast<Input_Result>(OH_Input_InjectKeyEvent(keyEventNative));
-    if (result != INPUT_SUCCESS) {
-        THROWERR_CUSTOM(env, result, "Error while injecting KeyEvent with native api");
-        histogramError(result);
-    }
-}
-#endif // OHOS_BUILD_ENABLE_VKEYBOARD
 static std::shared_ptr<KeyEvent> g_injectKeyState = KeyEvent::Create();
 
 static void GetInjectionEventData(napi_env env, std::shared_ptr<KeyEvent> keyEvent, napi_value keyHandle,
@@ -259,16 +217,9 @@ static napi_value InjectEvent(napi_env env, napi_callback_info info)
     auto histogramError = [](int32_t errorCode) {
         MMI_HISTOGRAM_ERROR("InputKit.inputEventClient.injectEvent.Error", errorCode);
     };
-#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
-    Input_KeyEvent* keyEventNative = OH_Input_CreateKeyEvent();
-    CHKPP(keyEventNative);
-    GetInjectionEventDataNative(env, keyEventNative, keyHandle, histogramError);
-    OH_Input_DestroyKeyEvent(&keyEventNative);
-#else
     auto keyEvent = KeyEvent::Create();
     CHKPP(keyEvent);
     GetInjectionEventData(env, keyEvent, keyHandle, histogramError);
-#endif // OHOS_BUILD_ENABLE_VKEYBOARD
     CHKRP(napi_create_int32(env, 0, &result), CREATE_INT32);
     return result;
 }
