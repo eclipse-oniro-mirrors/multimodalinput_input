@@ -147,10 +147,11 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, const O
         std::swap(width_, height_);
     }
     dpi_ = float(di.dpi) / BASELINE_DENSITY;
-    // Populate off-screen state from DisplayInfo so that the first ResolveBufferSide()
-    // call during Init() uses the correct value rather than the false default.
-    // Note: DisplayInfo does not carry a screen source mode field, so mode_ remains at
-    // the default (SCREEN_MAIN); it is corrected later when ScreenInfo arrives.
+    // Populate mode and off-screen state from DisplayInfo so that the first ResolveBufferSide()
+    // call during Init() uses the correct values rather than the zero-initialised defaults.
+    // di.displaySourceMode is OHOS::MMI::DisplaySourceMode; cast to mode_t (OHOS::Rosen::ScreenSourceMode)
+    // — both enums share the same integer representation (SCREEN_MAIN=0, SCREEN_MIRROR=1, SCREEN_EXTEND=2).
+    mode_ = static_cast<mode_t>(di.displaySourceMode);
     isCurrentOffScreenRendering_ = di.isCurrentOffScreenRendering;
     bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with DisplayInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
