@@ -1319,30 +1319,7 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             // requested at and the same the node bounds use.
             int32_t softSide = static_cast<int32_t>(it.second->GetBufferSize());
             it.second->UpdateHotspotInBuffer(cfg, false, softSide);
-            // Same pivot rule as the hard path: the spinner turns about its own centre, which the
-            // draw origin places at origin + size*ratio. Deriving it from the buffer centre
-            // instead double-counts the centring offset and swings the ink out of the buffer.
-            float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
-            int32_t iSoftSize = static_cast<int32_t>(softSize);
-            int32_t iSoftOriginBase;
-            if (static_cast<uint32_t>(softSide) == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-                iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
-                    static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide)));
-            } else {
-                iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
-                    static_cast<int32_t>(softSize / CALCULATE_IMAGE_MIDDLE);
-            }
-            if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = static_cast<float>(
-                    iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide))));
-                cfg.rotationFocusY = static_cast<float>(
-                    iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(softSide))));
-            } else {
-                cfg.rotationFocusX = static_cast<float>(
-                    iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_X_RATIO));
-                cfg.rotationFocusY = static_cast<float>(
-                    iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_Y_RATIO));
-            }
+            ComputeSoftPivot(cfg, softSide, mouseStyle);
             DrawDynamicSoftCursor(sn, cfg, static_cast<int32_t>(it.second->GetBufferSize()));
         } else {
             cfg.style_ = MOUSE_ICON::TRANSPARENT_ICON;
@@ -1351,6 +1328,34 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             DrawDynamicSoftCursor(it.second->GetSurfaceNode(), cfg,
                 static_cast<int32_t>(it.second->GetBufferSize()));
         }
+    }
+}
+
+void PointerDrawingManager::ComputeSoftPivot(RenderConfig &cfg, int32_t softSide, MOUSE_ICON mouseStyle)
+{
+    // Same pivot rule as the hard path: the spinner turns about its own centre, which the
+    // draw origin places at origin + size*ratio. Deriving it from the buffer centre
+    // instead double-counts the centring offset and swings the ink out of the buffer.
+    float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
+    int32_t iSoftSize = static_cast<int32_t>(softSize);
+    int32_t iSoftOriginBase;
+    if (static_cast<uint32_t>(softSide) == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+        iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
+            static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide)));
+    } else {
+        iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
+            static_cast<int32_t>(softSize / CALCULATE_IMAGE_MIDDLE);
+    }
+    if (mouseStyle == MOUSE_ICON::LOADING) {
+        cfg.rotationFocusX = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide))));
+        cfg.rotationFocusY = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(softSide))));
+    } else {
+        cfg.rotationFocusX = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_X_RATIO));
+        cfg.rotationFocusY = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_Y_RATIO));
     }
 }
 
@@ -1548,7 +1553,11 @@ void PointerDrawingManager::DrawRunningPointerAnimate(const MOUSE_ICON mouseStyl
         DecodeImageToPixelMap(MOUSE_ICON::RUNNING_RIGHT);
     CHKPV(pixelmap);
     MMI_HILOGD("Set mouseicon to OHOS system");
+    RecordRunningAnimationCanvas(pixelmap);
+}
 
+void PointerDrawingManager::RecordRunningAnimationCanvas(std::shared_ptr<OHOS::Media::PixelMap> pixelmap)
+{
 #ifndef USE_ROSEN_DRAWING
     auto canvas = static_cast<Rosen::RSRecordingCanvas *>(canvasNode_->BeginRecording(imageWidth_, imageHeight_));
     canvas->DrawPixelMap(pixelmap, 0, 0, SkSamplingOptions(), nullptr);
@@ -1804,11 +1813,16 @@ void PointerDrawingManager::FixCursorPosition(int32_t &physicalX, int32_t &physi
     if (physicalY < 0) {
         physicalY = 0;
     }
-    const int32_t cursorUnit = 16;
     Direction direction = GetDisplayDirection(&displayInfo_);
     if (!Rosen::SceneBoardJudgement::IsSceneBoardEnabled()) {
         direction = displayInfo_.direction;
     }
+    ClampCursorByDirection(physicalX, physicalY, direction);
+}
+
+void PointerDrawingManager::ClampCursorByDirection(int32_t &physicalX, int32_t &physicalY, Direction direction)
+{
+    const int32_t cursorUnit = 16;
     if (GetHardCursorEnabled()) {
         if (direction == DIRECTION0) {
             if (physicalX > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
@@ -2546,40 +2560,7 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
     CALL_DEBUG_ENTER;
     auto sp = GetScreenPointer(displayInfo.rsId);
     if (GetHardCursorEnabled() && sp != nullptr) {
-        sp->OnDisplayInfo(displayInfo);
-        // OnDisplayInfo() carries the off-screen-rendering flag, which arrives after the
-        // ScreenPointer was constructed and can move an extended screen onto the 512 side.
-        // Re-drive Init() (the only place with a renderer) when the pool no longer matches.
-        if (sp->GetBufferSize() != sp->ResolveBufferSide() || sp->IsPoolEmpty()) {
-            MMI_HILOGI("Buffer side changed or pool empty on display info, re-initialising screenId=%{public}" PRIu64,
-                displayInfo.rsId);
-            if (sp->Init(pointerRenderer_)) {
-                if (displayInfo.rsId == displayInfo_.rsId) {
-                    SetSurfaceNode(sp->GetSurfaceNode());
-                }
-                // Force a first frame so currentBuffer_ is populated before the next Move().
-                // Respect the effective visibility: if the cursor is hidden, publish a transparent
-                // frame rather than drawing the current style — otherwise we would make a hidden
-                // cursor visible again after a successful rebuild.
-                MMI_HILOGI("Re-init succeeded, forcing first-frame redraw for screenId=%{public}" PRIu64,
-                    displayInfo.rsId);
-                if (CursorDrawingInformation::GetInstance().IsPointerVisible() && mouseDisplayState_) {
-                    HardwareCursorRender(MOUSE_ICON(lastMouseStyle_.id), lastPhysicalX_, lastPhysicalY_,
-                        displayInfo.rsId);
-                } else {
-                    // Cursor is currently hidden — publish a transparent frame so Move() has a
-                    // valid currentBuffer_ to submit without making the cursor visible.
-                    if (sp != nullptr) {
-                        sp->SetInvisible();
-                    }
-                }
-            } else {
-                MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
-            }
-        }
-        if (sp->IsMain()) {
-            UpdateMirrorScreens(sp, displayInfo);
-        }
+        ReinitHardCursorIfNeeded(sp, displayInfo);
     }
 
     hasDisplay_ = true;
@@ -2605,6 +2586,43 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
     MAGIC_CURSOR->SetDisplayInfo(displayInfo);
 #endif // OHOS_BUILD_ENABLE_MAGICCURSOR
+}
+
+void PointerDrawingManager::ReinitHardCursorIfNeeded(std::shared_ptr<ScreenPointer> sp,
+    const OLD::DisplayInfo &displayInfo)
+{
+    sp->OnDisplayInfo(displayInfo);
+    // OnDisplayInfo() carries the off-screen-rendering flag, which arrives after the
+    // ScreenPointer was constructed and can move an extended screen onto the 512 side.
+    // Re-drive Init() (the only place with a renderer) when the pool no longer matches.
+    if (sp->GetBufferSize() != sp->ResolveBufferSide() || sp->IsPoolEmpty()) {
+        MMI_HILOGI("Buffer side changed or pool empty on display info, re-initialising screenId=%{public}" PRIu64,
+            displayInfo.rsId);
+        if (sp->Init(pointerRenderer_)) {
+            if (displayInfo.rsId == displayInfo_.rsId) {
+                SetSurfaceNode(sp->GetSurfaceNode());
+            }
+            // Force a first frame so currentBuffer_ is populated before the next Move().
+            // Respect the effective visibility: if the cursor is hidden, publish a transparent
+            // frame rather than drawing the current style — otherwise we would make a hidden
+            // cursor visible again after a successful rebuild.
+            MMI_HILOGI("Re-init succeeded, forcing first-frame redraw for screenId=%{public}" PRIu64,
+                displayInfo.rsId);
+            if (CursorDrawingInformation::GetInstance().IsPointerVisible() && mouseDisplayState_) {
+                HardwareCursorRender(MOUSE_ICON(lastMouseStyle_.id), lastPhysicalX_, lastPhysicalY_,
+                    displayInfo.rsId);
+            } else {
+                // Cursor is currently hidden — publish a transparent frame so Move() has a
+                // valid currentBuffer_ to submit without making the cursor visible.
+                sp->SetInvisible();
+            }
+        } else {
+            MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
+        }
+    }
+    if (sp->IsMain()) {
+        UpdateMirrorScreens(sp, displayInfo);
+    }
 }
 
 int32_t PointerDrawingManager::GetIndependentPixels()
@@ -3245,6 +3263,39 @@ void PointerDrawingManager::Dump(int32_t fd, const std::vector<std::string> &arg
     std::ostringstream oss;
     oss << std::endl;
 
+    DumpDisplayAndCursorInfo(oss);
+
+    std::vector<std::string> styleTitles = {"name", "Size", "Color", "ID"};
+    std::vector<std::vector<std::string>> styleData = {
+        {"lastMouseStyle", std::to_string(lastMouseStyle_.size), std::to_string(lastMouseStyle_.color),
+         std::to_string(lastMouseStyle_.id)},
+        {"currentMouseStyle", std::to_string(currentMouseStyle_.size), std::to_string(currentMouseStyle_.color),
+         std::to_string(currentMouseStyle_.id)}};
+
+    DumpFullTable(oss, "Cursor Style Info", styleTitles, styleData);
+    oss << std::endl;
+
+    std::vector<std::string> pidTitles = {"pid", "visible"};
+    std::vector<std::vector<std::string>> pidInfos;
+    auto dumpPidInfos = CursorDrawingInformation::GetInstance().GetPidInfos();
+    for (const auto &pidInfo : dumpPidInfos) {
+        pidInfos.push_back({std::to_string(pidInfo.pid), pidInfo.visible ? "true" : "false"});
+    }
+    DumpFullTable(oss, "Visible Info", pidTitles, pidInfos);
+    oss << std::endl;
+
+    std::vector<std::string> hardCursorTitles = {"isHardCursorEnabled"};
+    std::vector<std::vector<std::string>> hardCursorInfos;
+    hardCursorInfos.push_back({GetHardCursorEnabled() ? "true" : "false"});
+    DumpFullTable(oss, "Hard Cursor Info", hardCursorTitles, hardCursorInfos);
+    oss << std::endl;
+
+    std::string dumpInfo = oss.str();
+    dprintf(fd, dumpInfo.c_str());
+}
+
+void PointerDrawingManager::DumpDisplayAndCursorInfo(std::ostringstream &oss)
+{
     std::vector<std::string> displayTitles = {"ID", "X", "Y", "Width", "Height", "DPI", "Name", "Uniq",
                                               "Direction", "Display Direction", "Display Mode",
                                               "Is Current Off Screen Rendering", "Screen Real Width",
@@ -3276,34 +3327,6 @@ void PointerDrawingManager::Dump(int32_t fd, const std::vector<std::string> &arg
 
     DumpFullTable(oss, "Cursor Info", titles2, data2);
     oss << std::endl;
-
-    std::vector<std::string> styleTitles = {"name", "Size", "Color", "ID"};
-    std::vector<std::vector<std::string>> styleData = {
-        {"lastMouseStyle", std::to_string(lastMouseStyle_.size), std::to_string(lastMouseStyle_.color),
-         std::to_string(lastMouseStyle_.id)},
-        {"currentMouseStyle", std::to_string(currentMouseStyle_.size), std::to_string(currentMouseStyle_.color),
-         std::to_string(currentMouseStyle_.id)}};
-
-    DumpFullTable(oss, "Cursor Style Info", styleTitles, styleData);
-    oss << std::endl;
-
-    std::vector<std::string> pidTitles = {"pid", "visible"};
-    std::vector<std::vector<std::string>> pidInfos;
-    auto dumpPidInfos = CursorDrawingInformation::GetInstance().GetPidInfos();
-    for (const auto &pidInfo : dumpPidInfos) {
-        pidInfos.push_back({std::to_string(pidInfo.pid), pidInfo.visible ? "true" : "false"});
-    }
-    DumpFullTable(oss, "Visible Info", pidTitles, pidInfos);
-    oss << std::endl;
-
-    std::vector<std::string> hardCursorTitles = {"isHardCursorEnabled"};
-    std::vector<std::vector<std::string>> hardCursorInfos;
-    hardCursorInfos.push_back({GetHardCursorEnabled() ? "true" : "false"});
-    DumpFullTable(oss, "Hard Cursor Info", hardCursorTitles, hardCursorInfos);
-    oss << std::endl;
-
-    std::string dumpInfo = oss.str();
-    dprintf(fd, dumpInfo.c_str());
 }
 
 void PointerDrawingManager::UpdateBindDisplayId(uint64_t rsId, int32_t groupId, bool multiDefaultGroup)

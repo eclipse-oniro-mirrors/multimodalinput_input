@@ -259,6 +259,13 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
             | BUFFER_USAGE_MEM_MMZ_CACHE,
         .timeout = BUFFER_TIMEOUT,
     };
+    return InitBuffers(bufferCfg, render);
+}
+
+// Initialises default, transparent and common buffer pools; rolls back all buffers on
+// any failure so that IsPoolEmpty() correctly detects an incomplete rebuild.
+bool ScreenPointer::InitBuffers(const OHOS::BufferRequestConfig &bufferCfg, PointerRenderer &render)
+{
     if (!InitDefaultBuffer(bufferCfg, render)) {
         MMI_HILOGE("ScreenPointer InitDefaultBuffer failed");
         {
@@ -268,9 +275,6 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
             commonBuffers_.clear();
             currentBuffer_ = nullptr;
         }
-        // Do NOT restore prevBufferSize: leaving bufferSize_=desiredSide ensures the next
-        // GetBufferSize()==ResolveBufferSide() comparison is still equal, so IsPoolEmpty()
-        // is required alongside that check to detect and retry a failed rebuild.
         return false;
     }
     if (!InitTransparentBuffer(bufferCfg)) {
@@ -295,10 +299,6 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
         }
         return false;
     }
-    // Advance bufferId_ to seed the round-robin starting point for the first real draw call,
-    // but do NOT publish currentBuffer_ here: the common buffers are freshly allocated and have
-    // never been rendered into, so making one the current buffer would cause Move() to submit
-    // blank pixels until the first DrawHardCursor() completes and calls PublishFrame().
     {
         std::unique_lock<std::shared_mutex> lock(bufferMutex_);
         uint32_t poolSize = static_cast<uint32_t>(commonBuffers_.size());
@@ -822,6 +822,11 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
         }
     }
 
+    return CommitHwcPosition(x, y);
+}
+
+bool ScreenPointer::CommitHwcPosition(int32_t x, int32_t y)
+{
     buffer_ptr_t buffer;
     int32_t hotspotX = 0;
     int32_t hotspotY = 0;

@@ -349,6 +349,11 @@ private:
     void DestroyPointerWindowOfHardCursor();
     void DestroyPointerWindowOfSoftCursor();
     void ScalePixelMap(Media::PixelMap* pixelMap, float xScale, float yScale);
+    void ReinitHardCursorIfNeeded(std::shared_ptr<ScreenPointer> sp, const OLD::DisplayInfo &displayInfo);
+    void ComputeSoftPivot(RenderConfig &cfg, int32_t softSide, MOUSE_ICON mouseStyle);
+    void ClampCursorByDirection(int32_t &physicalX, int32_t &physicalY, Direction direction);
+    void RecordRunningAnimationCanvas(std::shared_ptr<OHOS::Media::PixelMap> pixelmap);
+    void DumpDisplayAndCursorInfo(std::ostringstream &oss);
 private:
     bool hasDisplay_ { false };
     bool hasPointerDevice_ { false };

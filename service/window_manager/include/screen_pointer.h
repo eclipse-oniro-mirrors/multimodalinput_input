@@ -256,9 +256,11 @@ private:
     bool InitDefaultBuffer(const OHOS::BufferRequestConfig &bufferCfg, PointerRenderer &render);
     bool InitTransparentBuffer(const OHOS::BufferRequestConfig &bufferCfg);
     bool InitCommonBuffer(const OHOS::BufferRequestConfig &bufferCfg);
+    bool InitBuffers(const OHOS::BufferRequestConfig &bufferCfg, PointerRenderer &render);
     buffer_ptr_t CreateSurfaceBuffer(const OHOS::BufferRequestConfig &bufferCfg);
     bool IsDefaultCfg(const RenderConfig &cfg);
     bool InitRSUIContext(uint64_t screenId);
+    bool CommitHwcPosition(int32_t x, int32_t y);
 
 private:
     std::mutex mtx_;
