@@ -66,6 +66,8 @@ namespace OHOS {
 namespace MMI {
 namespace {
 const std::string FOLD_SCREEN_FLAG = system::GetParameter("const.window.foldscreen.type", "");
+// Get rsId of the screen that disable cursor
+const int32_t DISABLE_CURSOR_SCREEN_RSID = system::GetIntParameter("const.multimodalinput.cursor.disablescreen", -1);
 const std::string IMAGE_POINTER_DEFAULT_PATH = "/data/service/el1/public/multimodalinput/mouse_icon/";
 const std::string CursorIconPath = IMAGE_POINTER_DEFAULT_PATH + "Cursor_Circle.png";
 const std::string CustomCursorIconPath = IMAGE_POINTER_DEFAULT_PATH + "Custom_Cursor_Circle.svg";
@@ -200,6 +202,7 @@ void PointerDrawingManager::RsRemoteDiedCallback()
     g_isHdiRemoteDied = true;
     g_isReStartVsync = true;
     isHardCursorSurfaceNodeInited_ = false;
+    isPointerCallbackInited_.store(false);
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
     MAGIC_CURSOR->RsRemoteDiedCallbackForMagicCursor();
 #endif // OHOS_BUILD_ENABLE_MAGICCURSOR
@@ -234,6 +237,10 @@ void PointerDrawingManager::InitPointerThread()
 
 void PointerDrawingManager::InitPointerCallback()
 {
+    if (isPointerCallbackInited_.exchange(true)) {
+        MMI_HILOGI("Pointer callback is already initialized, skip re-initialization");
+        return;
+    }
     InitRsCallback();
     if (GetSurfaceNode() != nullptr) {
         SetSurfaceNode(nullptr);
@@ -344,6 +351,9 @@ bool PointerDrawingManager::CreateGroupContext(int32_t groupId, uint64_t rsId)
     screenId_ = rsId;
     AttachToDisplay();
     CreateCanvasNode();
+    if (InitLayer(MOUSE_ICON(lastMouseStyle_.id)) != RET_OK) {
+        MMI_HILOGE("Init layer failed, groupId:%{public}d rsId:%{public}" PRIu64, groupId, rsId);
+    }
     RsFlushImplicitTransaction();
     std::unique_lock<std::mutex> lockGuard(surfaceNodeMutex_);
     activeGroupId_ = groupId;
@@ -1966,6 +1976,10 @@ int32_t PointerDrawingManager::CreatePointerWindowForScreenPointer(uint64_t rsId
         RsFlushImplicitTransaction();
         isHardCursorSurfaceNodeInited_ = true;
     } else if (sp == nullptr) {
+        if (IsDisableCursorScreen(displayInfo_.rsId)) {
+            MMI_HILOGI("Screen cursor disabled, rsId=%{public}" PRIu64, displayInfo_.rsId);
+            return RET_ERR;
+        }
         sp = std::make_shared<ScreenPointer>(hardwareCursorPointerManager_, handler_, displayInfo_);
         CHKPR(sp, RET_ERR);
         if (!sp->Init(pointerRenderer_)) {
@@ -1992,6 +2006,10 @@ int32_t PointerDrawingManager::CreatePointerWindowForNoScreenPointer(uint64_t rs
     int32_t physicalY)
 {
     CALL_DEBUG_ENTER;
+    if (IsDisableCursorScreen(rsId)) {
+        MMI_HILOGI("Screen cursor disabled, rsId=%{public}" PRIu64, rsId);
+        return RET_ERR;
+    }
     Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
     surfaceNodeConfig.SurfaceNodeName = "pointer window";
     Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
@@ -2523,11 +2541,11 @@ int32_t PointerDrawingManager::GetPointerColor(int32_t userId)
     std::string name = POINTER_COLOR;
     GetPreferenceKey(name);
     int32_t pointerColor = DEFAULT_VALUE;
-    
+
     bool configLoaded = INPUT_SETTING_MANAGER->IsUserConfigLoaded(userId);
-    
+
     INPUT_SETTING_MANAGER->GetIntValue(userId, MOUSE_KEY_SETTING, name, pointerColor);
-    
+
     if (configLoaded) {
         {
             std::lock_guard<std::mutex> guard(configCacheMutex_);
@@ -2547,7 +2565,7 @@ int32_t PointerDrawingManager::GetPointerColor(int32_t userId)
         }
         tempPointerColor_ = pointerColor;
     }
-    
+
     if (pointerColor == DEFAULT_VALUE) {
         pointerColor = MIN_POINTER_COLOR;
     }
@@ -2695,11 +2713,11 @@ int32_t PointerDrawingManager::GetPointerSize(int32_t userId)
     std::string name = POINTER_SIZE;
     GetPreferenceKey(name);
     int32_t pointerSize = DEFAULT_POINTER_SIZE;
-    
+
     bool configLoaded = INPUT_SETTING_MANAGER->IsUserConfigLoaded(userId);
-    
+
     INPUT_SETTING_MANAGER->GetIntValue(userId, MOUSE_KEY_SETTING, name, pointerSize);
-    
+
     if (configLoaded) {
         {
             std::lock_guard<std::mutex> guard(configCacheMutex_);
@@ -2719,7 +2737,7 @@ int32_t PointerDrawingManager::GetPointerSize(int32_t userId)
         }
         MMI_HILOGD("Get pointer size successfully, pointerSize:%{public}d", pointerSize);
     }
-    
+
     return pointerSize;
 }
 
@@ -2753,13 +2771,13 @@ int32_t PointerDrawingManager::GetCursorSurfaceId(uint64_t &surfaceId)
 void PointerDrawingManager::OnDisplayInfo(const OLD::DisplayGroupInfo &displayGroupInfo, bool isDisplayChanged)
 {
     CALL_DEBUG_ENTER;
-    if (displayGroupInfo.groupId != DEFAULT_GROUP_ID) {
+    if (displayGroupInfo.groupId != WIN_MGR->GetDefaultDisplayGroupInfo().groupId) {
         MMI_HILOGD("groupId:%{public}d", displayGroupInfo.groupId);
         return;
     }
     if (WIN_MGR->HasMultipleActiveUsers()) {
         int32_t cursorGroupId = WIN_MGR->FindGroupIdByRsId(displayInfo_.rsId);
-        if (cursorGroupId != DEFAULT_GROUP_ID && displayGroupInfo.groupId != cursorGroupId) {
+        if (displayGroupInfo.groupId != cursorGroupId) {
             MMI_HILOGI("Skip non-cursor group update, groupId:%{public}d cursorGroupId:%{public}d"
                 " cursorRsId:%{public}" PRIu64, displayGroupInfo.groupId, cursorGroupId, displayInfo_.rsId);
             return;
@@ -3555,7 +3573,8 @@ void PointerDrawingManager::OnScreenModeChange(const std::vector<sptr<OHOS::Rose
             MMI_HILOGE("skip ScreenModeChange callback");
             return RET_OK;
         }
-        this->SetMainScreenTargetDevice(screens);
+        auto filteredScreens = FilterOutScreensWithDisableCursor(screens);
+        this->SetMainScreenTargetDevice(filteredScreens);
 
         bool isHardCursorEnabled = this->GetHardCursorEnabled();
         if (!isHardCursorEnabled) {
@@ -3571,7 +3590,7 @@ void PointerDrawingManager::OnScreenModeChange(const std::vector<sptr<OHOS::Rose
             }
         }
 
-        auto mainScreen = this->UpdateScreenPointerAndFindMainScreenInfo(screens);
+        auto mainScreen = this->UpdateScreenPointerAndFindMainScreenInfo(filteredScreens);
         this->UpdateScreenScalesAndPadding(mainScreen);
         this->UpdatePointerVisible();
         return RET_OK;
@@ -4661,5 +4680,33 @@ void PointerDrawingManager::ScalePixelMap(Media::PixelMap* pixelMap, float xScal
     pixelMap->scale(1.0f, yScale, scaleOption);
 }
 
+std::vector<sptr<OHOS::Rosen::ScreenInfo>> PointerDrawingManager::FilterOutScreensWithDisableCursor(
+    const std::vector<sptr<OHOS::Rosen::ScreenInfo>> &screens)
+{
+    if (screens.empty()) {
+        return {};
+    }
+    std::vector<sptr<OHOS::Rosen::ScreenInfo>> filteredScreens;
+    for (const auto &screen : screens) {
+        if (screen == nullptr) {
+            MMI_HILOGW("the screen is null");
+            continue;
+        }
+        if (IsDisableCursorScreen(screen->GetRsId())) {
+            MMI_HILOGI("Screen cursor disabled, rsId=%{public}" PRIu64, screen->GetRsId());
+            continue;
+        }
+        filteredScreens.push_back(screen);
+    }
+    return filteredScreens;
+}
+
+bool PointerDrawingManager::IsDisableCursorScreen(uint64_t rsId)
+{
+    if (DISABLE_CURSOR_SCREEN_RSID < 0) {
+        return false;
+    }
+    return rsId == static_cast<uint64_t>(DISABLE_CURSOR_SCREEN_RSID);
+}
 } // namespace MMI
 } // namespace OHOS

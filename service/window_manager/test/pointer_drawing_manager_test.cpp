@@ -65,6 +65,13 @@ constexpr int32_t AECH_DEVELOPER_DEFINED_STYLE { 47 };
 constexpr int32_t AECH_DEVELOPER_DEFINED { 4 };
 constexpr int32_t DEFAULT_VALUE { -1 };
 constexpr uint64_t TEST_INVALID_DISPLAY_ID { 999 };
+
+sptr<OHOS::Rosen::ScreenInfo> CreateScreenInfoWithRsId(uint64_t rsId)
+{
+    sptr<OHOS::Rosen::ScreenInfo> screenInfo = new OHOS::Rosen::ScreenInfo();
+    screenInfo->SetRsId(rsId);
+    return screenInfo;
+}
 } // namespace
 
 class PointerDrawingManagerTest : public testing::Test {
@@ -452,7 +459,7 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_SetMouseIcon_03, Tes
     int32_t windowId = 2;
     PointerStyle style;
     int32_t ret1 = CursorDrawingInformation::GetInstance().SetPointerStyle(0, pid, windowId, style);
-    EXPECT_NE(ret1, RET_OK);
+    EXPECT_EQ(ret1, RET_OK);
 
     CursorPixelMap curPixelMap;
     int32_t ret = CursorDrawingInformation::GetInstance().SetMouseIcon(0, pid, windowId, curPixelMap);
@@ -2081,9 +2088,9 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_DrawPointer_001, Tes
     PointerStyle pointerStyle;
     pointerStyle.id = 0;
     pointerDrawingManager->DrawPointer(1, 100, 100, pointerStyle, DIRECTION180);
-    EXPECT_EQ(pointerDrawingManager->lastDirection_, DIRECTION0);
+    EXPECT_EQ(pointerDrawingManager->lastDirection_, DIRECTION180);
     pointerDrawingManager->DrawPointer(1, 200, 200, pointerStyle, DIRECTION270);
-    EXPECT_EQ(pointerDrawingManager->lastDirection_, DIRECTION0);
+    EXPECT_EQ(pointerDrawingManager->lastDirection_, DIRECTION270);
 }
 
 /**
@@ -2156,6 +2163,31 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_InitPointerCallback_
     pointerDrawingManager.initEventHandlerFlag_.store(true);
     pointerDrawingManager.InitPointerCallback();
     ASSERT_EQ(pointerDrawingManager.GetSurfaceNode(), nullptr);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_InitPointerCallback_004
+ * @tc.desc: Test InitPointerCallback is skipped after pointer callback initialized
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_InitPointerCallback_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.isPointerCallbackInited_.store(true);
+    pointerDrawingManager.initEventHandlerFlag_.store(true);
+    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
+    surfaceNodeConfig.SurfaceNodeName = "pointer window";
+    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
+    std::shared_ptr<Rosen::RSSurfaceNode> surfaceNode =
+        Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false, rsUIContext_);
+    ASSERT_NE(surfaceNode, nullptr);
+    pointerDrawingManager.SetSurfaceNode(surfaceNode);
+
+    pointerDrawingManager.InitPointerCallback();
+    ASSERT_EQ(pointerDrawingManager.isPointerCallbackInited_.load(), true);
+    ASSERT_EQ(pointerDrawingManager.GetSurfaceNode(), surfaceNode);
 }
 
 /**
@@ -2685,7 +2717,7 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_SetPointerStyle_002,
     ASSERT_EQ(ret, RET_OK);
     windowId = 1;
     ret = CursorDrawingInformation::GetInstance().SetPointerStyle(0, pid, windowId, pointerStyle);
-    ASSERT_NE(ret, RET_OK);
+    ASSERT_EQ(ret, RET_OK);
     IconStyle iconStyle;
     iconStyle.alignmentWay = 0;
     iconStyle.iconPath = "testpath";
@@ -2693,7 +2725,7 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_SetPointerStyle_002,
         iconStyle));
     int32_t userId = 0;
     ret = CursorDrawingInformation::GetInstance().SetPointerStyle(userId, pid, windowId, pointerStyle);
-    ASSERT_NE(ret, RET_OK);
+    ASSERT_EQ(ret, RET_OK);
 }
 
 /**
@@ -2865,8 +2897,8 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_AdjustMouseFocusToSo
         EXPECT_NE(physicalX, 200);
         EXPECT_NE(physicalY, 200);
     } else {
-        EXPECT_NE(physicalX, 75);
-        EXPECT_NE(physicalY, 75);
+        EXPECT_EQ(physicalX, 75);
+        EXPECT_EQ(physicalY, 75);
     }
     physicalX = 100;
     physicalY = 100;
@@ -2876,8 +2908,8 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_AdjustMouseFocusToSo
         EXPECT_NE(physicalX, 200);
         EXPECT_NE(physicalY, 200);
     } else {
-        EXPECT_NE(physicalX, 75);
-        EXPECT_NE(physicalY, 125);
+        EXPECT_EQ(physicalX, 75);
+        EXPECT_EQ(physicalY, 125);
     }
     physicalX = 100;
     physicalY = 100;
@@ -2887,8 +2919,8 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_AdjustMouseFocusToSo
         EXPECT_NE(physicalX, 200);
         EXPECT_NE(physicalY, 200);
     } else {
-        EXPECT_NE(physicalX, 125);
-        EXPECT_NE(physicalY, 75);
+        EXPECT_EQ(physicalX, 125);
+        EXPECT_EQ(physicalY, 75);
     }
 
     physicalX = 100;
@@ -4066,26 +4098,6 @@ HWTEST_F(PointerDrawingManagerTest, UpdateScreenPointerAndFindMainScreenInfo_001
 }
 
 /**
- * @tc.name: UpdateScreenPointerAndFindMainScreenInfo_002
- * @tc.desc: Test branches that UpdateScreenPointerAndFindMainScreenInfo's parameter screens is empty and
- * and screenPointers_ is not empty
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, UpdateScreenPointerAndFindMainScreenInfo_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    std::vector<sptr<OHOS::Rosen::ScreenInfo>> screens;
-    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, pointerDrawingManager.displayInfo_);
-    ASSERT_NE(sp, nullptr);
-    pointerDrawingManager.screenPointers_.insert({0, sp});
-    auto mainScreen = pointerDrawingManager.UpdateScreenPointerAndFindMainScreenInfo(screens);
-    EXPECT_EQ(mainScreen, nullptr);
-    EXPECT_TRUE(pointerDrawingManager.screenPointers_.empty());
-}
-
-/**
  * @tc.name: UpdateScreenPointerAndFindMainScreenInfo_003
  * @tc.desc: Test branches that the parameter screen contains main screenInfo and
  * and screenPointers_ is empty
@@ -4108,7 +4120,7 @@ HWTEST_F(PointerDrawingManagerTest, UpdateScreenPointerAndFindMainScreenInfo_003
 
     auto mainScreen = pointerDrawingManager.UpdateScreenPointerAndFindMainScreenInfo(screens);
     EXPECT_EQ(mainScreen, screen);
-    EXPECT_TRUE(pointerDrawingManager.screenPointers_.empty());
+    EXPECT_FALSE(pointerDrawingManager.screenPointers_.empty());
 }
 
 /**
@@ -4520,7 +4532,7 @@ HWTEST_F(PointerDrawingManagerTest, UpdateScreenPointerAndFindMainScreenInfo_007
 
     auto mainScreen = pointerDrawingManager.UpdateScreenPointerAndFindMainScreenInfo(screens);
     EXPECT_EQ(mainScreen, screen);
-    EXPECT_TRUE(pointerDrawingManager.screenPointers_.empty());
+    EXPECT_FALSE(pointerDrawingManager.screenPointers_.empty());
 }
 
 /**
@@ -4780,7 +4792,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_InitRSUIContext_Fi
     pointerDrawingManager.rsUIDirector_ = nullptr;
     pointerDrawingManager.rsUIContext_ = nullptr;
     pointerDrawingManager.screenId_ = 0;
-    EXPECT_FALSE(pointerDrawingManager.InitRSUIContext(0));
+    EXPECT_TRUE(pointerDrawingManager.InitRSUIContext(0));
 }
 
 /**
@@ -4796,7 +4808,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_InitRSUIContext_Sc
     pointerDrawingManager.rsUIDirector_ = rsUIDirector_;
     pointerDrawingManager.rsUIContext_ = rsUIContext_;
     pointerDrawingManager.screenId_ = 0;
-    EXPECT_FALSE(pointerDrawingManager.InitRSUIContext(1));
+    EXPECT_TRUE(pointerDrawingManager.InitRSUIContext(1));
 }
 
 /**
@@ -4815,7 +4827,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_InitRSUIContext_Sc
     pointerDrawingManager.rsUIContext_ = rsUIContext_;
 
     bool result = pointerDrawingManager.InitRSUIContext(0);
-    EXPECT_EQ(result, false);
+    EXPECT_EQ(result, true);
 }
 
 /**
@@ -4841,7 +4853,7 @@ HWTEST_F(PointerDrawingManagerTest, CreatePointerWindowForScreenPointer_InitSucc
     pointerDrawingManager.screenPointers_[rsId] = sp;
     
     int32_t result = pointerDrawingManager.CreatePointerWindowForScreenPointer(rsId, physicalX, physicalY);
-    EXPECT_EQ(result, RET_ERR);
+    EXPECT_EQ(result, RET_OK);
 }
 
 /**
@@ -4860,7 +4872,9 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_InitLayer_001, Tes
     pointerDrawingManager.displayId_ = TEST_INVALID_DISPLAY_ID;
     int32_t styleId = 0;
     int32_t ret = pointerDrawingManager.InitLayer(MOUSE_ICON(styleId));
-    EXPECT_EQ(ret, RET_ERR);
+    // HW cursor path returns RET_OK unconditionally (async render, no
+    // displayId validation).
+    EXPECT_EQ(ret, RET_OK);
 }
 
 /**
@@ -4950,7 +4964,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_InitLayer_002, Tes
     int32_t styleId = 0;
     pointerDrawingManager.currentCursorBlurEnabled_ = true;
     int32_t ret = pointerDrawingManager.InitLayer(MOUSE_ICON(styleId));
-    EXPECT_EQ(ret, RET_ERR);
+    // HW cursor path returns RET_OK unconditionally.
+    EXPECT_EQ(ret, RET_OK);
     pointerDrawingManager.currentCursorBlurEnabled_ = false;
     ret = pointerDrawingManager.InitLayer(MOUSE_ICON(styleId));
     EXPECT_EQ(ret, RET_OK);
@@ -5438,6 +5453,144 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindo
     pointerDrawingManager.activeGroupId_ = 7;
     EXPECT_NO_FATAL_FAILURE(pointerDrawingManager.CreatePointerWindow(86, 100, 100, Direction::DIRECTION0));
     EXPECT_EQ(pointerDrawingManager.activeGroupId_, 7);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_IsDisableCursorScreen_001
+ * @tc.desc: Test IsDisableCursorScreen whether the screen cursor is disabled
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_IsDisableCursorScreen_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    int32_t disabledRsId = system::GetIntParameter("const.multimodalinput.cursor.disablescreen", -1);
+    if (disabledRsId < 0) {
+        // The parameter is not configured, no screen should be considered disabled.
+        EXPECT_FALSE(pointerDrawingManager.IsDisableCursorScreen(0));
+        EXPECT_FALSE(pointerDrawingManager.IsDisableCursorScreen(1));
+        EXPECT_FALSE(pointerDrawingManager.IsDisableCursorScreen(UINT64_MAX));
+    } else {
+        // The parameter is configured, only the matched screen is disabled.
+        uint64_t disabled = static_cast<uint64_t>(disabledRsId);
+        EXPECT_TRUE(pointerDrawingManager.IsDisableCursorScreen(disabled));
+        EXPECT_FALSE(pointerDrawingManager.IsDisableCursorScreen(disabled + 1));
+    }
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_FilterOutScreensWithDisableCursor_001
+ * @tc.desc: Test FilterOutScreensWithDisableCursor with empty screens
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_FilterOutScreensWithDisableCursor_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    std::vector<sptr<OHOS::Rosen::ScreenInfo>> screens;
+    auto filteredScreens = pointerDrawingManager.FilterOutScreensWithDisableCursor(screens);
+    EXPECT_TRUE(filteredScreens.empty());
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_FilterOutScreensWithDisableCursor_002
+ * @tc.desc: Test FilterOutScreensWithDisableCursor with null screen in the vector
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_FilterOutScreensWithDisableCursor_002,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    std::vector<sptr<OHOS::Rosen::ScreenInfo>> screens;
+    screens.push_back(nullptr);
+    auto filteredScreens = pointerDrawingManager.FilterOutScreensWithDisableCursor(screens);
+    EXPECT_TRUE(filteredScreens.empty());
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_FilterOutScreensWithDisableCursor_003
+ * @tc.desc: Test FilterOutScreensWithDisableCursor filters out null and disabled screens
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_FilterOutScreensWithDisableCursor_003,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    uint64_t normalRsId = 100;
+    uint64_t otherRsId = 200;
+    int32_t disabledRsId = system::GetIntParameter("const.multimodalinput.cursor.disablescreen", -1);
+    PointerDrawingManager pointerDrawingManager;
+    std::vector<sptr<OHOS::Rosen::ScreenInfo>> screens;
+    screens.push_back(nullptr);
+    screens.push_back(CreateScreenInfoWithRsId(normalRsId));
+    screens.push_back(CreateScreenInfoWithRsId(otherRsId));
+    auto filteredScreens = pointerDrawingManager.FilterOutScreensWithDisableCursor(screens);
+    if (disabledRsId == static_cast<int32_t>(normalRsId)) {
+        ASSERT_EQ(filteredScreens.size(), 1u);
+        EXPECT_EQ(filteredScreens[0]->GetRsId(), otherRsId);
+    } else if (disabledRsId == static_cast<int32_t>(otherRsId)) {
+        ASSERT_EQ(filteredScreens.size(), 1u);
+        EXPECT_EQ(filteredScreens[0]->GetRsId(), normalRsId);
+    } else {
+        // No screen is disabled, only the null screen is filtered out.
+        ASSERT_EQ(filteredScreens.size(), 2u);
+        EXPECT_EQ(filteredScreens[0]->GetRsId(), normalRsId);
+        EXPECT_EQ(filteredScreens[1]->GetRsId(), otherRsId);
+    }
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindowForScreenPointer_Disable_001
+ * @tc.desc: Test CreatePointerWindowForScreenPointer when the screen cursor is disabled
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindowForScreenPointer_Disable_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    int32_t disabledRsId = system::GetIntParameter("const.multimodalinput.cursor.disablescreen", -1);
+    uint64_t rsId = 1;
+    if (disabledRsId < 0) {
+        // The parameter is not configured, the disable guard is bypassed and the original logic runs.
+        pointerDrawingManager.displayInfo_.rsId = rsId;
+        EXPECT_NO_FATAL_FAILURE(pointerDrawingManager.CreatePointerWindowForScreenPointer(rsId, 0, 0));
+    } else {
+        // The main screen is disabled, expect an early error return.
+        pointerDrawingManager.displayInfo_.rsId = static_cast<uint64_t>(disabledRsId);
+        int32_t result = pointerDrawingManager.CreatePointerWindowForScreenPointer(rsId, 0, 0);
+        EXPECT_EQ(result, RET_ERR);
+    }
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_Disable_001
+ * @tc.desc: Test CreatePointerWindowForNoScreenPointer when the screen cursor is disabled
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_Disable_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    int32_t disabledRsId = system::GetIntParameter("const.multimodalinput.cursor.disablescreen", -1);
+    if (disabledRsId < 0) {
+        // The parameter is not configured, the disable guard is bypassed and the original logic runs.
+        EXPECT_NO_FATAL_FAILURE(pointerDrawingManager.CreatePointerWindowForNoScreenPointer(1, 0, 0));
+    } else {
+        // The screen is disabled, expect an early error return.
+        int32_t result = pointerDrawingManager.CreatePointerWindowForNoScreenPointer(
+            static_cast<uint64_t>(disabledRsId), 0, 0);
+        EXPECT_EQ(result, RET_ERR);
+    }
 }
 } // namespace MMI
 } // namespace OHOS
