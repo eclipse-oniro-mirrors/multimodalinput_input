@@ -157,6 +157,21 @@ HWTEST_F(InputTouchCommandTest, TouchSwipe_ZeroDuration_InjectsDownThenUpWithout
         { "TouchUp", { 0, 2, 30, 40 } } });
 }
 
+HWTEST_F(InputTouchCommandTest, TouchSwipe_StationaryPathWaitsDurationWithoutMove, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const auto start = std::chrono::steady_clock::now();
+    const auto result = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "10", "--srcY", "20", "--dstX", "10",
+        "--dstY", "20", "--duration", "64" });
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    ExpectTouchSuccess(result, "touch-swipe");
+    EXPECT_GE(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), 60);
+    ExpectCalls(calls, { { "CreateTouchController", {} }, { "TouchDown", { 0, 0, 10, 20 } },
+        { "TouchUp", { 0, 0, 10, 20 } } });
+}
+
 HWTEST_F(InputTouchCommandTest, TouchSwipe_ShortDuration_InjectsOrderedMovesAndEndpointUp, TestSize.Level1)
 {
     MockControllerFixture fixture;
@@ -171,10 +186,12 @@ HWTEST_F(InputTouchCommandTest, TouchSwipe_ShortDuration_InjectsOrderedMovesAndE
     EXPECT_EQ(calls[1].values, (std::vector<int32_t> { 0, 1, 0, 20 }));
     EXPECT_EQ(calls.back().name, "TouchUp");
     EXPECT_EQ(calls.back().values, (std::vector<int32_t> { 0, 1, 100, 40 }));
+    ASSERT_EQ(calls[calls.size() - 2].name, "TouchMove");
+    EXPECT_EQ(calls[calls.size() - 2].values, (std::vector<int32_t> { 0, 1, 100, 40 }));
     EXPECT_GE(std::count_if(calls.begin(), calls.end(), [](const RecordedCall &call) {
         return call.name == "TouchMove";
     }), 1);
-    for (size_t index = 2; index + 1 < calls.size(); ++index) {
+    for (size_t index = 2; index + 2 < calls.size(); ++index) {
         ASSERT_EQ(calls[index].name, "TouchMove");
         ASSERT_EQ(calls[index].values.size(), 4U);
         EXPECT_EQ(calls[index].values[0], 0);
@@ -210,12 +227,14 @@ HWTEST_F(InputTouchCommandTest, TouchSwipe_SpecExample_InjectsLinearMoveSequence
     EXPECT_EQ(calls[1].values, (std::vector<int32_t> { 0, 0, 100, 500 }));
     EXPECT_EQ(calls.back().name, "TouchUp");
     EXPECT_EQ(calls.back().values, (std::vector<int32_t> { 0, 0, 900, 500 }));
+    ASSERT_EQ(calls[calls.size() - 2].name, "TouchMove");
+    EXPECT_EQ(calls[calls.size() - 2].values, (std::vector<int32_t> { 0, 0, 900, 500 }));
     const auto moveCount = std::count_if(calls.begin(), calls.end(), [](const RecordedCall &call) {
         return call.name == "TouchMove";
     });
     EXPECT_GE(moveCount, 2);
     int32_t previousX = 100;
-    for (size_t index = 2; index + 1 < calls.size(); ++index) {
+    for (size_t index = 2; index + 2 < calls.size(); ++index) {
         ASSERT_EQ(calls[index].name, "TouchMove");
         ASSERT_EQ(calls[index].values.size(), 4U);
         EXPECT_EQ(calls[index].values[0], 0);

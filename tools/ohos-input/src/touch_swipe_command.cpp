@@ -45,7 +45,6 @@ struct SwipeStep {
     int32_t x;
     int32_t y;
     int32_t delayMs;
-    bool move;
 };
 
 bool ParseSwipeOptions(const std::vector<std::string> &args, SwipeOptions &options, std::string &error)
@@ -72,22 +71,55 @@ bool ParseSwipeOptions(const std::vector<std::string> &args, SwipeOptions &optio
 std::vector<SwipeStep> BuildSwipeSteps(const SwipeOptions &options)
 {
     std::vector<SwipeStep> steps;
-    if (options.duration <= 0) {
+    if (options.duration == 0) {
         return steps;
     }
-    const int32_t count = (options.duration + MOVE_INTERVAL_MS - 1) / MOVE_INTERVAL_MS;
     const int64_t deltaX = static_cast<int64_t>(options.dstX) - options.srcX;
     const int64_t deltaY = static_cast<int64_t>(options.dstY) - options.srcY;
-    const bool shouldMove = deltaX != 0 || deltaY != 0;
+    const int32_t count = (options.duration + MOVE_INTERVAL_MS - 1) / MOVE_INTERVAL_MS;
     steps.reserve(static_cast<std::size_t>(count));
     for (int32_t index = 1; index <= count; ++index) {
         const int32_t delay = index == count ? options.duration - MOVE_INTERVAL_MS * (count - 1)
                                              : MOVE_INTERVAL_MS;
         const int32_t x = static_cast<int32_t>(options.srcX + deltaX * index / count);
         const int32_t y = static_cast<int32_t>(options.srcY + deltaY * index / count);
-        steps.push_back({ x, y, delay, shouldMove && index < count });
+        steps.push_back({ x, y, delay });
     }
     return steps;
+}
+
+int32_t InjectSwipe(TouchControllerImpl &controller, const SwipeOptions &options)
+{
+    int32_t ret = controller.TouchDown(TOUCH_ID, options.displayId, options.srcX, options.srcY);
+    if (ret != 0) {
+        return HandleControllerError(ret, "TouchDown");
+    }
+
+    int32_t lastX = options.srcX;
+    int32_t lastY = options.srcY;
+    const bool shouldMove = options.srcX != options.dstX || options.srcY != options.dstY;
+    if (!shouldMove) {
+        if (options.duration > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(options.duration));
+        }
+    } else {
+        for (const auto &step : BuildSwipeSteps(options)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(step.delayMs));
+            ret = controller.TouchMove(TOUCH_ID, options.displayId, step.x, step.y);
+            if (ret != 0) {
+                (void)controller.TouchUp(TOUCH_ID, options.displayId, lastX, lastY);
+                return HandleControllerError(ret, "TouchMove");
+            }
+            lastX = step.x;
+            lastY = step.y;
+        }
+    }
+
+    ret = controller.TouchUp(TOUCH_ID, options.displayId, options.dstX, options.dstY);
+    if (ret != 0) {
+        return HandleControllerError(ret, "TouchUp");
+    }
+    return 0;
 }
 }
 
@@ -136,29 +168,9 @@ int32_t TouchSwipeCommand::Execute(const std::vector<std::string> &args)
     if (createResult != 0 || controller == nullptr) {
         return HandleControllerError(createResult, "CreateTouchController");
     }
-    int32_t ret = controller->TouchDown(TOUCH_ID, options.displayId, options.srcX, options.srcY);
+    const int32_t ret = InjectSwipe(*controller, options);
     if (ret != 0) {
-        return HandleControllerError(ret, "TouchDown");
-    }
-
-    int32_t lastX = options.srcX;
-    int32_t lastY = options.srcY;
-    for (const auto &step : BuildSwipeSteps(options)) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(step.delayMs));
-        if (!step.move) {
-            continue;
-        }
-        ret = controller->TouchMove(TOUCH_ID, options.displayId, step.x, step.y);
-        if (ret != 0) {
-            (void)controller->TouchUp(TOUCH_ID, options.displayId, lastX, lastY);
-            return HandleControllerError(ret, "TouchMove");
-        }
-        lastX = step.x;
-        lastY = step.y;
-    }
-    ret = controller->TouchUp(TOUCH_ID, options.displayId, options.dstX, options.dstY);
-    if (ret != 0) {
-        return HandleControllerError(ret, "TouchUp");
+        return ret;
     }
     return OutputPrinter::PrintSuccess({ { "action", "touch-swipe" }, { "displayId", options.displayId },
         { "srcX", options.srcX }, { "srcY", options.srcY }, { "dstX", options.dstX }, { "dstY", options.dstY },

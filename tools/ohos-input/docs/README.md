@@ -2,7 +2,7 @@
 
 ## 概述
 
-面向 AI Agent 与自动化测试的输入模拟工具。基于 multimodalinput 部件内建 Controller 接口模拟鼠标、键盘和触屏输入。仅支持启用 Controller 注入能力的 PC（2in1）产品。
+面向 AI Agent 应用和自动化测试，提供鼠标点击、双击、滚动、移动与拖动，键盘按键输入，以及触屏点击与滑动等模拟能力。仅部署于 PC（2in1）设备形态。
 
 ## 功能列表
 
@@ -10,10 +10,10 @@
 - **模拟鼠标双击**：两次完整点击，按下间隔可配置
 - **模拟鼠标滚轮垂直滚动**：按齿数滚动，1 齿 = 15 度，正数向上、负数向下
 - **移动鼠标光标**：将光标移动到指定显示器的指定位置
-- **模拟鼠标拖动**：按住按键从起点拖至终点，支持跨显示器与按时长插值步进
+- **模拟鼠标拖动**：按住鼠标按键，将指针从起点拖动到终点；支持跨显示器拖动和设置拖动时长
 - **模拟键盘按键**：按 OHOS 键码注入按键，支持 ctrl/alt/shift/meta 修饰键组合
-- **模拟触屏点击**：指定显示器、坐标和按压时长
-- **模拟触屏滑动**：按约 16ms 间隔线性插值移动至目标坐标
+- **模拟触屏点击**：在指定坐标模拟一次触屏点击，支持指定按压时长
+- **模拟触屏滑动**：在指定显示器上模拟从起始坐标到目标坐标的手指滑动操作，支持设置滑动时长
 
 ## 依赖
 
@@ -22,15 +22,13 @@
 - `InputManager` - Controller 创建入口（libmmi-client 内建接口）
 - `MouseController` - 鼠标事件注入（移动、按键、滚轮轴会话）
 - `KeyboardController` - 键盘事件注入（按键按下与抬起）
-- `TouchControllerImpl` - 触屏事件注入（DOWN、MOVE、UP）
+- `TouchControllerImpl` - 触屏事件注入（按下、移动、抬起）
 
 ### 权限
 
 | 权限 | 命令 | 说明 |
 |-----------|----------|-------------|
-| `ohos.permission.CONTROL_DEVICE` | 全部命令 | Controller 创建与逐事件注入的权限校验 |
-
-权限校验在 Controller 创建时由输入服务完成，之后对每个注入的 Controller 事件再次校验；权限不足时命令以退出码 3 失败。
+| `ohos.permission.CONTROL_DEVICE` | 全部注入命令 | 注入输入事件时需要该权限 |
 
 ## 基本用法
 
@@ -45,18 +43,18 @@ ohos-input <subcommand> --help
 
 | 命令 | 说明 | 参数 | 权限 | 前置依赖 |
 |---------|-------------|------------|-------------|--------------|
-| mouse-click | 模拟鼠标单击 | `--x --y`（必填）；`--displayId --button --holdDuration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
-| mouse-double-click | 模拟鼠标双击 | 同 mouse-click，另加 `--clickInterval`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
-| mouse-scroll | 模拟鼠标滚轮垂直滚动 | `--clicks`（必填）；`--modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
-| mouse-move | 移动鼠标光标到指定位置 | `--x --y`（必填）；`--displayId --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
-| mouse-drag | 模拟鼠标拖动（支持跨显示器） | `--srcX --srcY --dstX --dstY`（必填）；`--srcDisplayId --dstDisplayId --button --duration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
-| key-press | 模拟键盘按键 | `--key`（必填）；`--holdDuration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | 无 |
-| touch-tap | 模拟触屏点击 | `--x --y`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC 产品，启用 Controller 注入能力 |
-| touch-swipe | 模拟触屏滑动 | `--srcX --srcY --dstX --dstY`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC 产品，启用 Controller 注入能力 |
+| mouse-click | 模拟鼠标单击 | `--x --y`（必填）；`--displayId --button --holdDuration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| mouse-double-click | 模拟鼠标双击 | `--x --y`（必填）；`--displayId --button --holdDuration --modifier --clickInterval`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| mouse-scroll | 模拟鼠标滚轮垂直滚动 | `--clicks`（必填）；`--modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| mouse-move | 移动鼠标光标到指定位置 | `--x --y`（必填）；`--displayId --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| mouse-drag | 模拟鼠标拖动（支持跨显示器） | `--srcX --srcY --dstX --dstY`（必填）；`--srcDisplayId --dstDisplayId --button --duration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| key-press | 模拟键盘按键 | `--key`（必填）；`--holdDuration --modifier`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| touch-tap | 模拟触屏点击 | `--x --y`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
+| touch-swipe | 模拟触屏滑动 | `--srcX --srcY --dstX --dstY`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
 
 **前置依赖说明**：
-- 鼠标和键盘命令无需额外前置条件。CLI 会自动创建所需 Controller；提供 `--modifier` 时还会创建 KeyboardController。
-- 触屏命令仅支持启用 Controller 注入能力的 PC 产品。构建时需启用 `input_controller_inject_enable`，并由 `OHOS_BUILD_ENABLE_CONTROLLER_INJECT` 编译开关启用相关实现。
+- 所有命令均适用于 PC（2in1）产品，且需启用 Controller 注入能力。构建时设置 `input_controller_inject_enable=true`，以启用 `OHOS_BUILD_ENABLE_CONTROLLER_INJECT` 实现。
+- CLI 会根据命令自动创建所需 Controller；使用 `--modifier` 时还会创建 `KeyboardController`。
 
 ## 参数说明
 
@@ -74,9 +72,14 @@ ohos-input mouse-click [options]
 
 ### mouse-double-click
 
-同 mouse-click，另增加：
-
 ```
+ohos-input mouse-double-click [options]
+  --displayId <number>    显示器 ID（可选，>=0，默认 0）
+  --x <integer>           目标 X 坐标（必填整数，>=0）
+  --y <integer>           目标 Y 坐标（必填整数，>=0）
+  --button <key>          鼠标按键（可选，left/right/middle，默认 left）
+  --holdDuration <number> 按下持续时间 ms（可选，[50,200]，默认 100）
+  --modifier <keys>       修饰键（可选，ctrl/alt/shift/meta，多个用 | 分隔，不可重复）
   --clickInterval <number> 第一次按下到第二次按下的间隔 ms（可选，[100,400]，须大于 holdDuration，默认 250）
 ```
 
@@ -111,8 +114,6 @@ ohos-input mouse-drag [options]
   --modifier <keys>       修饰键（可选，ctrl/alt/shift/meta，多个用 | 分隔，不可重复）
 ```
 
-源显示器与目标显示器不同时，两端点换算为全局坐标后插值注入，由输入服务选择实际显示器；同显示器拖动走显示器坐标路径。
-
 ### key-press
 
 ```
@@ -131,10 +132,8 @@ ohos-input touch-tap [options]
   --displayId <number>  显示器 ID（可选，>=0，默认 0）
   --x <integer>         目标 X 坐标（必填，>=0）
   --y <integer>         目标 Y 坐标（必填，>=0）
-  --duration <number>   按下持续时间 ms（可选，[0,5000]，默认 100）
+  --duration <number>   按下持续时间 ms（可选，[0,5000]，默认 100；duration为0时立即抬起）
 ```
-
-坐标和 `displayId` 必须为非负 int32。命令依次注入 DOWN、等待和 UP。`duration=0` 时，命令立即注入 DOWN 和 UP。
 
 ### touch-swipe
 
@@ -145,14 +144,12 @@ ohos-input touch-swipe [options]
   --srcY <integer>      起点 Y 坐标（必填，>=0）
   --dstX <integer>      终点 X 坐标（必填，>=0）
   --dstY <integer>      终点 Y 坐标（必填，>=0）
-  --duration <number>   滑动总时长 ms（可选，[0,5000]，默认 500）
+  --duration <number>   总时长 ms（可选，[0,5000]，0 表示瞬间完成，默认 500；>0 时按约 16ms 步进插值移动）
 ```
-
-坐标和 `displayId` 必须为非负 int32。命令按约 16ms 间隔线性插值注入 MOVE，并在终点注入 UP。`duration=0` 时不注入 MOVE。
 
 ## 输出格式
 
-鼠标、键盘及触屏命令复用 `OutputPrinter` 输出 JSON 到 stdout。成功结构为 `{"type":"result","status":"success","data":{...}}`；失败结构为 `{"type":"result","status":"failed","errCode":"ERR_*","errMsg":"...","suggestion":"..."}`。
+所有命令以 JSON 格式输出到 stdout，结构如下：
 
 ### 成功响应
 
@@ -161,7 +158,7 @@ ohos-input touch-swipe [options]
   "type": "result",
   "status": "success",
   "data": {
-    // 命令特定数据（action 及对应坐标/键码等）
+    // 命令特定数据
   }
 }
 ```
@@ -294,30 +291,33 @@ ohos-input touch-swipe --displayId 0 --srcX 100 --srcY 500 --dstX 900 --dstY 500
 
 ## 典型工作流
 
+### 鼠标与键盘操作
+
 ```bash
 # 1. 移动光标到目标位置
 ohos-input mouse-move --x 100 --y 200
 
-# 2. 单击选中对象
-ohos-input mouse-click --x 100 --y 200
-
-# 3. 双击打开
+# 2. 双击打开目标
 ohos-input mouse-double-click --x 100 --y 200
 
-# 4. Ctrl+A 全选
-ohos-input key-press --key 2017 --modifier ctrl
+# 3. 单击选中目标区域
+ohos-input mouse-click --x 300 --y 400
 
-# 5. 滚动浏览内容
+# 4. 滚动浏览内容
 ohos-input mouse-scroll --clicks -3
 
-# 6. 拖动对象到新位置
-ohos-input mouse-drag --srcX 100 --srcY 100 --dstX 300 --dstY 300 --duration 500
+# 5. 输入按键（示例：按下回车键）
+ohos-input key-press --key 2054
+```
 
-# 7. 在指定坐标模拟触屏单击
-ohos-input touch-tap --displayId 0 --x 500 --y 800 --duration 100
+### 触屏操作
 
-# 8. 从起点滑动到终点
+```bash
+# 1. 手指滑动到指定位置
 ohos-input touch-swipe --displayId 0 --srcX 100 --srcY 500 --dstX 900 --dstY 500 --duration 500
+
+# 2. 点击目标位置
+ohos-input touch-tap --displayId 0 --x 900 --y 500 --duration 100
 ```
 
 ## 安装

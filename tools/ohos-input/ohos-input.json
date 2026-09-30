@@ -396,15 +396,36 @@
       }
     },
     "touch-tap": {
-      "description": "Simulate a touch-screen tap on a PC product. Used by authorized automation callers. Requires the input-controller injection feature.",
-      "requirePermissions": ["ohos.permission.CONTROL_DEVICE"],
+      "description": "Simulate a touch-screen tap at the specified coordinates for the requested duration.",
+      "requirePermissions": [
+        "ohos.permission.CONTROL_DEVICE"
+      ],
       "inputSchema": {
         "type": "object",
         "properties": {
-          "displayId": { "type": "integer", "description": "Target display ID", "minimum": 0, "default": 0 },
-          "x": { "type": "integer", "description": "Target X coordinate", "minimum": 0 },
-          "y": { "type": "integer", "description": "Target Y coordinate", "minimum": 0 },
-          "duration": { "type": "integer", "description": "Press duration in milliseconds", "minimum": 0, "maximum": 5000, "default": 100 }
+          "displayId": {
+            "type": "integer",
+            "description": "Target display ID",
+            "minimum": 0,
+            "default": 0
+          },
+          "x": {
+            "type": "integer",
+            "description": "Target X coordinate",
+            "minimum": 0
+          },
+          "y": {
+            "type": "integer",
+            "description": "Target Y coordinate",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Press duration in milliseconds",
+            "minimum": 0,
+            "maximum": 5000,
+            "default": 100
+          }
         },
         "required": ["x", "y"]
       },
@@ -416,11 +437,26 @@
           "data": {
             "type": "object",
             "properties": {
-              "action": { "type": "string", "description": "Executed action" },
-              "displayId": { "type": "integer", "description": "Target display ID" },
-              "x": { "type": "integer", "description": "Target X coordinate" },
-              "y": { "type": "integer", "description": "Target Y coordinate" },
-              "duration": { "type": "integer", "description": "Press duration in milliseconds" }
+              "action": {
+                "type": "string",
+                "description": "Executed action"
+              },
+              "displayId": {
+                "type": "integer",
+                "description": "Target display ID"
+              },
+              "x": {
+                "type": "integer",
+                "description": "Target X coordinate"
+              },
+              "y": {
+                "type": "integer",
+                "description": "Target Y coordinate"
+              },
+              "duration": {
+                "type": "integer",
+                "description": "Press duration in milliseconds"
+              }
             },
             "required": ["action", "displayId", "x", "y", "duration"]
           }
@@ -429,35 +465,93 @@
       }
     },
     "touch-swipe": {
-      "description": "Simulate a linear touch-screen swipe on a PC product. Used by authorized automation callers. Requires the input-controller injection feature.",
-      "requirePermissions": ["ohos.permission.CONTROL_DEVICE"],
+      "description": "Simulate a touch-screen swipe from the specified start coordinates to the target coordinates on the specified display for the requested duration.",
+      "requirePermissions": [
+        "ohos.permission.CONTROL_DEVICE"
+      ],
       "inputSchema": {
         "type": "object",
         "properties": {
-          "displayId": { "type": "integer", "description": "Target display ID", "minimum": 0, "default": 0 },
-          "srcX": { "type": "integer", "description": "Starting X coordinate", "minimum": 0 },
-          "srcY": { "type": "integer", "description": "Starting Y coordinate", "minimum": 0 },
-          "dstX": { "type": "integer", "description": "Ending X coordinate", "minimum": 0 },
-          "dstY": { "type": "integer", "description": "Ending Y coordinate", "minimum": 0 },
-          "duration": { "type": "integer", "description": "Swipe duration in milliseconds", "minimum": 0, "maximum": 5000, "default": 500 }
+          "displayId": {
+            "type": "integer",
+            "description": "Target display ID",
+            "minimum": 0,
+            "default": 0
+          },
+          "srcX": {
+            "type": "integer",
+            "description": "Starting X coordinate",
+            "minimum": 0
+          },
+          "srcY": {
+            "type": "integer",
+            "description": "Starting Y coordinate",
+            "minimum": 0
+          },
+          "dstX": {
+            "type": "integer",
+            "description": "Ending X coordinate",
+            "minimum": 0
+          },
+          "dstY": {
+            "type": "integer",
+            "description": "Ending Y coordinate",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Swipe duration in milliseconds",
+            "minimum": 0,
+            "maximum": 5000,
+            "default": 500
+          }
         },
         "required": ["srcX", "srcY", "dstX", "dstY"]
       },
       "outputSchema": {
         "type": "object",
         "properties": {
-          "type": { "type": "string", "description": "Response type", "enum": ["result"] },
-          "status": { "type": "string", "description": "Command result status", "enum": ["success"] },
+          "type": {
+            "type": "string",
+            "description": "Response type",
+            "enum": ["result"]
+          },
+          "status": {
+            "type": "string",
+            "description": "Command result status",
+            "enum": ["success"]
+          },
           "data": {
             "type": "object",
             "properties": {
-              "action": { "type": "string", "description": "Executed action" },
-              "displayId": { "type": "integer", "description": "Target display ID" },
-              "srcX": { "type": "integer", "description": "Starting X coordinate" },
-              "srcY": { "type": "integer", "description": "Starting Y coordinate" },
-              "dstX": { "type": "integer", "description": "Ending X coordinate" },
-              "dstY": { "type": "integer", "description": "Ending Y coordinate" },
-              "duration": { "type": "integer", "description": "Swipe duration in milliseconds" }
+              "action": {
+                "type": "string",
+                "description": "Executed action"
+              },
+              "displayId": {
+                "type": "integer",
+                "description": "Target display ID"
+              },
+              "srcX": {
+                "type": "integer",
+                "description": "Starting X coordinate"
+              },
+              "srcY": {
+                "type": "integer",
+                "description": "Starting Y coordinate"
+              },
+              "dstX": {
+                "type": "integer",
+                "description": "Ending X coordinate"
+              },
+              "dstY": {
+                "type": "integer",
+                "description": "Ending Y coordinate"
+              },
+              "duration": {
+                "type": "integer",
+                "description": "Swipe duration in milliseconds"
+              }
             },
             "required": ["action", "displayId", "srcX", "srcY", "dstX", "dstY", "duration"]
           }
