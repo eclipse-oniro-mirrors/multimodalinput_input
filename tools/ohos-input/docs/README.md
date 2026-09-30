@@ -53,8 +53,7 @@ ohos-input <subcommand> --help
 | touch-swipe | 模拟触屏滑动 | `--srcX --srcY --dstX --dstY`（必填）；`--displayId --duration`（可选） | `ohos.permission.CONTROL_DEVICE` | PC（2in1），启用 Controller 注入能力 |
 
 **前置依赖说明**：
-- 所有命令均适用于 PC（2in1）产品，且需启用 Controller 注入能力。构建时设置 `input_controller_inject_enable=true`，以启用 `OHOS_BUILD_ENABLE_CONTROLLER_INJECT` 实现。
-- CLI 会根据命令自动创建所需 Controller；使用 `--modifier` 时还会创建 `KeyboardController`。
+- 所有命令均适用于 PC（2in1）产品，需要启用 Controller 注入能力。
 
 ## 参数说明
 
