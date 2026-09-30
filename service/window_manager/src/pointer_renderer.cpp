@@ -402,6 +402,19 @@ int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, 
     return RET_OK;
 }
 
+// (Re)builds the blur canvas bitmap at the given dimensions and loads the current pointer image
+// into it. Used both for the first blur frame and whenever the buffer tier changes underneath us.
+void PointerRenderer::SetupBlurBitmap(uint32_t width, uint32_t height, const RenderConfig &cfg)
+{
+    if (!defaultBitmap_.Build(width, height, defaultFormat_)) {
+        MMI_HILOGE("Default Bitmap build failed");
+    }
+    defaultCanvas_.Bind(defaultBitmap_);
+    LoadDefaultPointerImage(width, cfg);
+    SetPointerCfg(cfg);
+    defaultCanvas_.Save();
+}
+
 int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t width, uint32_t height,
     const RenderConfig &cfg)
 {
@@ -410,13 +423,7 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         return RET_ERR;
     }
     if (!defaultInit_) {
-        if (!defaultBitmap_.Build(width, height, defaultFormat_)) {
-            MMI_HILOGE("Default Bitmap build failed");
-        }
-        defaultCanvas_.Bind(defaultBitmap_);
-        LoadDefaultPointerImage(width, cfg);
-        SetPointerCfg(cfg);
-        defaultCanvas_.Save();
+        SetupBlurBitmap(width, height, cfg);
         defaultInit_ = true;
         MMI_HILOGI("Blur Render init success");
     } else if (defaultBitmap_.GetWidth() != static_cast<int32_t>(width) ||
@@ -426,13 +433,7 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         // the memcpy_s below never reads past the bitmap's allocation.
         MMI_HILOGI("Blur bitmap tier mismatch (%{public}dx%{public}d vs %{public}ux%{public}u), rebuilding",
             defaultBitmap_.GetWidth(), defaultBitmap_.GetHeight(), width, height);
-        if (!defaultBitmap_.Build(width, height, defaultFormat_)) {
-            MMI_HILOGE("Default Bitmap rebuild failed");
-        }
-        defaultCanvas_.Bind(defaultBitmap_);
-        LoadDefaultPointerImage(width, cfg);
-        SetPointerCfg(cfg);
-        defaultCanvas_.Save();
+        SetupBlurBitmap(width, height, cfg);
     }
     if (!HasPointerCfg(cfg)) {
         MMI_HILOGI("cfg change, render cfg:%{private}s", cfg.ToString().c_str());

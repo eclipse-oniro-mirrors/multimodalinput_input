@@ -386,7 +386,8 @@ buffer_ptr_t ScreenPointer::GetCommonBuffer()
 void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide)
 {
     int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
-    int32_t x, y;
+    int32_t x;
+    int32_t y;
     if (side == BLUR_CURSOR_SIZE) {
         // 512-tier: draw origin is BufferFocus - GetFocusX/Y; hotspot = origin + focus = side/2.
         x = side / NUM_TWO;
@@ -462,7 +463,6 @@ void ScreenPointer::PublishFrame(const RenderConfig &cfg, buffer_ptr_t buffer)
 // exactly once from defaultCursorCfg_ (DIRECTION0, no blur) and is never redrawn afterwards --
 // DrawHardCursor skips Render() for it. Anything this rejects falls through to commonBuffers_ and is
 // re-rendered every frame.
-//
 // RenderConfig::operator== only compares style_, GetImageSize() and color, so each term below has to
 // be spelled out; every one of them changes the pixels while leaving operator== equal:
 //   - direction: a rotated screen turns the glyph about the buffer focus, so DIRECTION0's cached

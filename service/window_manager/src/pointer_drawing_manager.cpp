@@ -1344,7 +1344,7 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
 void PointerDrawingManager::ComputeSoftPivot(RenderConfig &cfg, int32_t softSide, MOUSE_ICON mouseStyle)
 {
     // Same pivot rule as the hard path: the spinner turns about its own centre, which the
-    // draw origin places at origin + size*ratio. Deriving it from the buffer centre
+    // draw origin puts at origin + size*ratio. Deriving it from the buffer centre
     // instead double-counts the centring offset and swings the ink out of the buffer.
     float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
     int32_t iSoftSize = static_cast<int32_t>(softSize);
@@ -1830,55 +1830,64 @@ void PointerDrawingManager::FixCursorPosition(int32_t &physicalX, int32_t &physi
     ClampCursorByDirection(physicalX, physicalY, direction);
 }
 
+// Clamps value into [0, limit]; a limit at or below zero pins the value to 0 rather than
+// producing a negative bound. Kept separate so ClampCursorByDirection stays a flat set of
+// per-direction bound computations instead of a deeply nested comparison tree.
+static int32_t ClampToLimit(int32_t value, int32_t limit)
+{
+    if (value > limit) {
+        return limit;
+    }
+    return value;
+}
+
+// Raises value up to at least floor.
+static int32_t ClampToFloor(int32_t value, int32_t floor)
+{
+    if (value < floor) {
+        return floor;
+    }
+    return value;
+}
+
 void PointerDrawingManager::ClampCursorByDirection(int32_t &physicalX, int32_t &physicalY, Direction direction)
 {
     const int32_t cursorUnit = 16;
-    if (GetHardCursorEnabled()) {
-        if (direction == DIRECTION0) {
-            if (physicalX > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalX = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalY = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
-        } else if (direction == DIRECTION90) {
-            if (physicalX > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalX = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
-            if (physicalY < imageWidth_ / cursorUnit) {
-                physicalY = imageWidth_ / cursorUnit;
-            }
-        } else if (direction == DIRECTION180) {
-            if (physicalX < imageHeight_ / cursorUnit) {
-                physicalX = imageHeight_ / cursorUnit;
-            }
-            if (physicalY < imageWidth_ / cursorUnit) {
-                physicalY = imageWidth_ / cursorUnit;
-            }
-        } else if (direction == DIRECTION270) {
-            if (physicalX < imageHeight_ / cursorUnit) {
-                physicalX = imageHeight_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalY = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
-        }
-    } else {
+    int32_t widthLimit = displayInfo_.validWidth - imageWidth_ / cursorUnit;
+    int32_t heightLimit = displayInfo_.validHeight - imageHeight_ / cursorUnit;
+    int32_t widthFloor = imageWidth_ / cursorUnit;
+    int32_t heightFloor = imageHeight_ / cursorUnit;
+    int32_t rotatedWidthLimit = displayInfo_.validHeight - imageHeight_ / cursorUnit;
+    int32_t rotatedHeightLimit = displayInfo_.validWidth - imageWidth_ / cursorUnit;
+    if (!GetHardCursorEnabled()) {
         if (direction == DIRECTION0 || direction == DIRECTION180) {
-            if (physicalX > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalX = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalY = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
+            physicalX = ClampToLimit(physicalX, widthLimit);
+            physicalY = ClampToLimit(physicalY, heightLimit);
         } else {
-            if (physicalX > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalX = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalY = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
+            physicalX = ClampToLimit(physicalX, rotatedWidthLimit);
+            physicalY = ClampToLimit(physicalY, rotatedHeightLimit);
         }
+        return;
+    }
+    switch (direction) {
+        case DIRECTION0:
+            physicalX = ClampToLimit(physicalX, widthLimit);
+            physicalY = ClampToLimit(physicalY, heightLimit);
+            break;
+        case DIRECTION90:
+            physicalX = ClampToLimit(physicalX, rotatedWidthLimit);
+            physicalY = ClampToFloor(physicalY, widthFloor);
+            break;
+        case DIRECTION180:
+            physicalX = ClampToFloor(physicalX, heightFloor);
+            physicalY = ClampToFloor(physicalY, widthFloor);
+            break;
+        case DIRECTION270:
+            physicalX = ClampToFloor(physicalX, heightFloor);
+            physicalY = ClampToLimit(physicalY, rotatedHeightLimit);
+            break;
+        default:
+            break;
     }
 }
 

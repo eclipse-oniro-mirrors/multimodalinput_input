@@ -1332,9 +1332,9 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_ImageSizeUpperBound_001, TestS
             }
         }
     }
-    EXPECT_LT(worstSize, hardCursorBufferSize)
-        << "imageSize exceeds the buffer: size=" << worstSize << ", gear=" << worstGear
-        << ", dpi=" << worstDpi;
+    EXPECT_LT(worstSize, hardCursorBufferSize) <<
+        "imageSize exceeds the buffer: size=" << worstSize << ", gear=" << worstGear <<
+        ", dpi=" << worstDpi;
 }
 
 /**

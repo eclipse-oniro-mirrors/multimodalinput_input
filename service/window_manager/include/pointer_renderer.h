@@ -104,6 +104,7 @@ public:
 private:
     int32_t BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t width, uint32_t height,
         const RenderConfig &cfg);
+    void SetupBlurBitmap(uint32_t width, uint32_t height, const RenderConfig &cfg);
     void DrawDefaultPointer(uint32_t width, uint32_t height, const RenderConfig &cfg);
     void DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg, const RenderConfig &cfg);
     void AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t direction, uint32_t displayDirection);
