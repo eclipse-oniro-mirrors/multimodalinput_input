@@ -20,6 +20,7 @@
 #include <set>
 #include <thread>
 
+#include "error_multimodal.h"
 #include "input_manager.h"
 #include "option_parser.h"
 #include "printer.h"
@@ -96,7 +97,11 @@ int32_t TouchTapCommand::Execute(const std::vector<std::string> &args)
         return ParameterError(error, "Please use documented touch tap arguments");
     }
     std::shared_ptr<TouchControllerImpl> controller;
-    const int32_t createResult = InputManager::GetInstance()->CreateTouchController(controller);
+    auto *inputManager = InputManager::GetInstance();
+    if (inputManager == nullptr) {
+        return HandleControllerError(ERROR_NULL_POINTER, "InputManager::GetInstance");
+    }
+    const int32_t createResult = inputManager->CreateTouchController(controller);
     if (createResult != 0 || controller == nullptr) {
         return HandleControllerError(createResult, "CreateTouchController");
     }
