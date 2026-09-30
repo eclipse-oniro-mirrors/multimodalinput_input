@@ -3458,6 +3458,26 @@ bool PointerDrawingManager::ShouldSkipScreen(const sptr<OHOS::Rosen::ScreenInfo>
     return false;
 }
 
+void PointerDrawingManager::ReinitScreenPointerIfTierChanged(std::shared_ptr<ScreenPointer> sp, uint64_t sid,
+    bool needDrawPointer)
+{
+    // The buffer side depends on the mode and the off-screen flag, both of which can change here
+    // (extend -> mirror, or the off-screen flag arriving late). Init() is the only place with a
+    // renderer to rebuild the pool, so re-drive it whenever the resolved side no longer matches
+    // the one the existing pool was built at.
+    if (sp->GetBufferSize() == sp->ResolveBufferSide() && !sp->IsPoolEmpty()) {
+        return;
+    }
+    MMI_HILOGI("Buffer side changed or pool empty for screenId=%{public}" PRIu64 ", re-initialising", sid);
+    if (!sp->Init(pointerRenderer_, needDrawPointer)) {
+        MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, sid);
+        return;
+    }
+    if (sid == displayInfo_.rsId) {
+        SetSurfaceNode(sp->GetSurfaceNode());
+    }
+}
+
 sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindMainScreenInfo(
     const std::vector<sptr<OHOS::Rosen::ScreenInfo>> &screens)
 {
@@ -3480,20 +3500,7 @@ sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindM
             // Update ScreenPointer when it already exist
             auto sp = GetScreenPointer(sid);
             sp->UpdateScreenInfo(screen, needDrawPointer);
-            // The buffer side depends on the mode and the off-screen flag, both of which can
-            // change here (extend -> mirror, or the off-screen flag arriving late). Init() is
-            // the only place with a renderer to rebuild the pool, so re-drive it whenever the
-            // resolved side no longer matches the one the existing pool was built at.
-            if (sp->GetBufferSize() != sp->ResolveBufferSide() || sp->IsPoolEmpty()) {
-                MMI_HILOGI("Buffer side changed or pool empty for screenId=%{public}" PRIu64 ", re-initialising", sid);
-                if (sp->Init(pointerRenderer_, needDrawPointer)) {
-                    if (sid == displayInfo_.rsId) {
-                        SetSurfaceNode(sp->GetSurfaceNode());
-                    }
-                } else {
-                    MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, sid);
-                }
-            }
+            ReinitScreenPointerIfTierChanged(sp, sid, needDrawPointer);
             MMI_HILOGI("Update ScreenPointer, screenId=%{public}" PRIu64, sid);
         } else {
             // Create and init ScreenPointer when it does not exist

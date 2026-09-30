@@ -350,6 +350,10 @@ private:
     void DestroyPointerWindowOfSoftCursor();
     void ScalePixelMap(Media::PixelMap* pixelMap, float xScale, float yScale);
     void ReinitHardCursorIfNeeded(std::shared_ptr<ScreenPointer> sp, const OLD::DisplayInfo &displayInfo);
+    // Re-drives Init() when a ScreenPointer's resolved buffer tier no longer matches the pool it
+    // was built at (or the pool is empty after a failed rebuild), and republishes the node when
+    // the affected screen is the current display.
+    void ReinitScreenPointerIfTierChanged(std::shared_ptr<ScreenPointer> sp, uint64_t sid, bool needDrawPointer);
     void ComputeSoftPivot(RenderConfig &cfg, int32_t softSide, MOUSE_ICON mouseStyle);
     void ClampCursorByDirection(int32_t &physicalX, int32_t &physicalY, Direction direction);
     void RecordRunningAnimationCanvas(std::shared_ptr<OHOS::Media::PixelMap> pixelmap);

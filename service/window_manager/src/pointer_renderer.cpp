@@ -173,15 +173,15 @@ int32_t RenderConfig::GetClampedImageSize(uint32_t bufferSide) const
 
 float RenderConfig::AdjustIncreaseRatio(float originDpi) const
 {
-    if (std::fabs(originDpi) < EPSILON) {
+    if (std::fabs(originDpi) < EPSILON || originDpi == 0.0f) {
         MMI_HILOGE("The originDpi cannot be 0, return default increase ratio");
         return INCREASE_RATIO;
     }
     if (originDpi <= MAX_DPI) {
         return INCREASE_RATIO;
-    } else {
-        return INCREASE_RATIO * pow(MAX_DPI / originDpi, float(1.0f / float(MAX_POINTER_SIZE - 1)));
     }
+    float divisor = originDpi;
+    return INCREASE_RATIO * pow(MAX_DPI / divisor, float(1.0f / float(MAX_POINTER_SIZE - 1)));
 }
 
 std::string RenderConfig::ToString() const

@@ -127,14 +127,19 @@ private:
     // buffer limit two sides can share that value while producing differently sized images.
     // Omitting it would let a 320px soft-cursor decode be reused for a 256px hard-cursor buffer,
     // bypassing the clamp.
-    std::vector<std::tuple<RenderConfig, uint32_t, image_ptr_t>> imgMaps_;
+    struct ImgCacheEntry {
+        RenderConfig cfg;
+        uint32_t bufferSide;
+        image_ptr_t img;
+    };
+    std::vector<ImgCacheEntry> imgMaps_;
     std::shared_mutex imgMapsMtx_;
     image_ptr_t FindImg(uint32_t bufferSide, const RenderConfig &cfg)
     {
         std::shared_lock lock(imgMapsMtx_);
         for (auto& data : imgMaps_) {
-            if ((std::get<1>(data) == bufferSide) && (std::get<0>(data) == cfg)) {
-                return std::get<2>(data);
+            if ((data.bufferSide == bufferSide) && (data.cfg == cfg)) {
+                return data.img;
             }
         }
         return nullptr;
