@@ -243,6 +243,9 @@ void InputEventHandler::RefreshDwtActingState()
     isDwtEdgeAreaForTouchpadMotionActing_ = true;
     isDwtEdgeAreaForTouchpadButtonActing_ = true;
     isDwtEdgeAreaForTouchpadTapActing_ = true;
+    int64_t now = GetSysClockTime();
+    lastBeginDwtEdgeAreaForTouchpadMotionTime_ = now;
+    lastBeginDwtEdgeAreaForTouchpadTapTime_ = now;
 }
 
 bool InputEventHandler::IsTouchpadMistouch(libinput_event *event)
@@ -326,12 +329,14 @@ bool InputEventHandler::IsTouchpadTapMistouch(libinput_event* event)
         if (libinput_device_get_size(touchpadDevice, &touchpadSizeX, &touchpadSizeY) != 0) {
             return false;
         }
-        if (touchpadSizeX < TOUCHPAD_MIN_X_SIZE_FOR_DWT) {
+        if (touchpadSizeX < TOUCHPAD_MIN_X_SIZE_FOR_DWT && lastBeginDwtEdgeAreaForTouchpadTapTime_ > 0 &&
+            GetSysClockTime() - lastBeginDwtEdgeAreaForTouchpadTapTime_ > TOUCHPAD_DWT_FOR_TAP_DURATION) {
             return false;
         }
         double coordX = touchpadEventDownAbsX_;
+        double edgeWidth = std::min(TOUCHPAD_EDGE_WIDTH_FOR_TAP, touchpadSizeX/3);
         if (isDwtEdgeAreaForTouchpadTapActing_ &&
-            (coordX <= TOUCHPAD_EDGE_WIDTH_FOR_TAP || coordX >= touchpadSizeX - TOUCHPAD_EDGE_WIDTH_FOR_TAP)) {
+            (coordX <= edgeWidth || coordX >= touchpadSizeX - edgeWidth)) {
             isTapMistouch_ = true;
             MMI_HILOGI("Touchpad tap presse event is mistouch");
             return true;
@@ -363,8 +368,13 @@ bool InputEventHandler::IsTouchpadMotionMistouch(libinput_event *event)
     if (libinput_device_get_size(touchpadDevice, &touchpadSizeX, &touchpadSizeY) != 0) {
         return false;
     }
+    if (touchpadSizeX < TOUCHPAD_MIN_X_SIZE_FOR_DWT && lastBeginDwtEdgeAreaForTouchpadMotionTime_ > 0 &&
+        GetSysClockTime() - lastBeginDwtEdgeAreaForTouchpadMotionTime_ > TOUCHPAD_DWT_FOR_MOTION_DURATION) {
+        return false;
+    }
     auto coordX = touchpadEventDownAbsX_;
-    if (coordX <= TOUCHPAD_EDGE_WIDTH || coordX >= touchpadSizeX - TOUCHPAD_EDGE_WIDTH) {
+    double edgeWidth = std::min(TOUCHPAD_EDGE_WIDTH, touchpadSizeX/3);
+    if (coordX <= edgeWidth || coordX >= touchpadSizeX - edgeWidth) {
         MMI_HILOGD("Touchpad event is edge mistouch");
         return true;
     }
@@ -387,8 +397,13 @@ bool InputEventHandler::IsTouchpadPointerMotionMistouch(libinput_event *event)
     if (libinput_device_get_size(touchpadDevice, &touchpadSizeX, &touchpadSizeY) != 0) {
         return false;
     }
+    if (touchpadSizeX < TOUCHPAD_MIN_X_SIZE_FOR_DWT && lastBeginDwtEdgeAreaForTouchpadMotionTime_ > 0 &&
+        GetSysClockTime() - lastBeginDwtEdgeAreaForTouchpadMotionTime_ > TOUCHPAD_DWT_FOR_MOTION_DURATION) {
+        return false;
+    }
     double coordX = touchpadEventDownAbsX_;
-    if (coordX <= TOUCHPAD_EDGE_WIDTH || coordX >= touchpadSizeX - TOUCHPAD_EDGE_WIDTH) {
+    double edgeWidth = std::min(TOUCHPAD_EDGE_WIDTH, touchpadSizeX/3);
+    if (coordX <= edgeWidth || coordX >= touchpadSizeX - edgeWidth) {
         MMI_HILOGD("Touchpad pointer motion event is edge mistouch");
         return true;
     }
