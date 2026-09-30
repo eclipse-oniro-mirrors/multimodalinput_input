@@ -149,9 +149,26 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, const O
     dpi_ = float(di.dpi) / BASELINE_DENSITY;
     // Populate mode and off-screen state from DisplayInfo so that the first ResolveBufferSide()
     // call during Init() uses the correct values rather than the zero-initialised defaults.
-    // di.displaySourceMode is OHOS::MMI::DisplaySourceMode; cast to mode_t (OHOS::Rosen::ScreenSourceMode)
-    // — both enums share the same integer representation (SCREEN_MAIN=0, SCREEN_MIRROR=1, SCREEN_EXTEND=2).
-    mode_ = static_cast<mode_t>(di.displaySourceMode);
+    // MMI::DisplaySourceMode and Rosen::ScreenSourceMode share the same names but different
+    // integer values, so an explicit name-to-name mapping is required instead of a numeric cast.
+    switch (di.displaySourceMode) {
+        case OHOS::MMI::DisplaySourceMode::SCREEN_MIRROR:
+            mode_ = mode_t::SCREEN_MIRROR;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_EXTEND:
+            mode_ = mode_t::SCREEN_EXTEND;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_ALONE:
+            mode_ = mode_t::SCREEN_ALONE;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_UNIQUE:
+            mode_ = mode_t::SCREEN_UNIQUE;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_MAIN:
+        default:
+            mode_ = mode_t::SCREEN_MAIN;
+            break;
+    }
     isCurrentOffScreenRendering_ = di.isCurrentOffScreenRendering;
     bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with DisplayInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
