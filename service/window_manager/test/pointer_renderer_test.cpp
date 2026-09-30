@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2024 Huawei Device Co., Ltd.
+/**
+ * Copyright (c) 2024-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -62,6 +62,11 @@ constexpr uint32_t BUFFER_SIDE{256};
 constexpr uint32_t FOCUS_POINT_OLD{256};
 constexpr float CALCULATE_IMAGE_MIDDLE_OLD{2.0f};
 constexpr float CALCULATE_MOUSE_ICON_BIAS_OLD{5.0f / 33.0f};
+// The canvas is RGBA, so each pixel is four bytes and the alpha byte sits at offset three.
+constexpr size_t PIXEL_STRIDE{4};
+constexpr size_t ALPHA_OFFSET{3};
+// Half of a value: the offset from a buffer's centre to its edge.
+constexpr int32_t HALF_DIVISOR{2};
 
 // Replicates the pre-change RenderConfig::GetOffsetX() so the focus identity can be asserted
 // against a reference value that does not depend on the production code under change.
@@ -116,6 +121,135 @@ int32_t LegacyOffsetY(const RenderConfig &cfg, int32_t height)
         default:
             return FOCUS_POINT_OLD;
     }
+}
+
+// Bounding box of the non-transparent ink inside a side x side RGBA canvas. Adapted from the ones
+// that used to be written out inline in the render tests; the callers keep their own diagnostics.
+struct InkBounds {
+    int32_t minX { INT32_MAX };
+    int32_t minY { INT32_MAX };
+    int32_t maxX { -1 };
+    int32_t maxY { -1 };
+};
+
+InkBounds ScanInkBounds(const std::vector<uint8_t> &pixels, uint32_t side)
+{
+    InkBounds bounds;
+    for (uint32_t y = 0; y < side; ++y) {
+        for (uint32_t x = 0; x < side; ++x) {
+            if (pixels[(static_cast<size_t>(y) * side + x) * PIXEL_STRIDE + ALPHA_OFFSET] != 0) {
+                bounds.minX = std::min(bounds.minX, static_cast<int32_t>(x));
+                bounds.maxX = std::max(bounds.maxX, static_cast<int32_t>(x));
+                bounds.minY = std::min(bounds.minY, static_cast<int32_t>(y));
+                bounds.maxY = std::max(bounds.maxY, static_cast<int32_t>(y));
+            }
+        }
+    }
+    return bounds;
+}
+
+// Builds the RUNNING config for one frame of the rotation cycle. The caller renders into an
+// enlarged canvas of `canvasSide`; the glyph itself is clamped to HARD_CURSOR_SIZE, matching the
+// production limits, and the pivot is placed in the canvas coordinate space.
+RenderConfig MakeRunningConfig(float dpi, uint32_t gear, int32_t frame, int32_t canvasSide)
+{
+    constexpr int32_t rotationStep = 12;    // DYNAMIC_ROTATION_ANGLE
+    RenderConfig config;
+    config.style_ = MOUSE_ICON::RUNNING_RIGHT;
+    config.path_ = "/data/service/el1/public/multimodalinput/mouse_icon/Loading_Right.svg";
+    config.align_ = ICON_TYPE::ANGLE_NW;
+    config.size = gear;
+    config.dpi = dpi;
+    config.color = 0;
+    config.rotationAngle = frame * rotationStep;
+    // Pivot uses the canvasSide-based origin to match TierOriginX(canvasSide):
+    //   iOrigin = canvasSide/2 - imageSize/2 = side/2 + margin - imageSize/2
+    // Image size is clamped to 'side' (not canvasSide) to match production limits.
+    float drawnSize = static_cast<float>(config.GetClampedImageSize(HARD_CURSOR_SIZE));
+    int32_t iSize = static_cast<int32_t>(drawnSize);
+    int32_t iOrigin = static_cast<int32_t>(canvasSide) / HALF_DIVISOR - iSize / HALF_DIVISOR;
+    config.rotationFocusX = static_cast<float>(
+        iOrigin + static_cast<int32_t>(drawnSize * 0.3f));
+    config.rotationFocusY = static_cast<float>(
+        iOrigin + static_cast<int32_t>(drawnSize * 0.675f));
+    return config;
+}
+
+// Expected HotspotInBufferX/Y for a quarter-turned canvas. Computed here independently (the same
+// quarter-turn the canvas applies) rather than by calling the production helper, so a regression to
+// an unrotated value is caught. Rotates the unrotated focus pixel about the buffer centre.
+void CheckHotspotIsRotatedFocus(const RenderConfig &config, uint32_t side, ICON_TYPE align,
+    uint32_t gear, uint32_t direction)
+{
+    int32_t size = config.GetClampedImageSize(side);
+    int32_t half = static_cast<int32_t>(side) / HALF_DIVISOR;
+    int32_t origin = half - size / HALF_DIVISOR;
+    int32_t expectedX = origin + static_cast<int32_t>(config.GetFocusX(side));
+    int32_t expectedY = origin + static_cast<int32_t>(config.GetFocusY(side));
+    for (uint32_t i = 0; i < direction; ++i) {
+        int32_t dx = expectedX - half;
+        int32_t dy = expectedY - half;
+        expectedX = half + dy;
+        expectedY = half - dx;
+    }
+    EXPECT_EQ(config.HotspotInBufferX(side), expectedX)
+        << "hotspot not at the rotated focus corner, align=" << static_cast<int32_t>(align)
+        << " gear=" << gear << " direction=" << direction;
+    EXPECT_EQ(config.HotspotInBufferY(side), expectedY)
+        << "hotspot not at the rotated focus corner, align=" << static_cast<int32_t>(align)
+        << " gear=" << gear << " direction=" << direction;
+}
+
+// The on-screen position of a given ink pixel must not depend on the buffer side: the draw origin
+// and the Move() offset are both expressed relative to the buffer centre, so the centre cancels.
+// Reconstructs where the style's focus pixel really ends up, independently of HotspotInBuffer.
+void CheckFocusPixelLandsOnCursor(ICON_TYPE align, uint32_t gear, uint32_t direction, uint32_t side)
+{
+    RenderConfig config;
+    config.align_ = align;
+    config.size = gear;
+    config.dpi = MAX_DPI;
+    config.direction = direction;
+    int32_t size = config.GetClampedImageSize(side);
+    int32_t focusX = static_cast<int32_t>(config.GetFocusX(side));
+    int32_t focusY = static_cast<int32_t>(config.GetFocusY(side));
+    int32_t hotspotX = config.HotspotInBufferX(side);
+    int32_t hotspotY = config.HotspotInBufferY(side);
+
+    // The renderer draws the image at `origin`, then rotates the canvas by -direction*90 about the
+    // buffer centre (see Render::Render), so the focus pixel starts at origin+focus relative to the
+    // buffer and is carried by that same rotation. Move() then offsets the window by the hotspot.
+    // The old test computed (cursorX - hotspotX) + hotspotX == cursorX, an identity true for any
+    // hotspot, so it could not catch a wrong formula -- and an earlier attempt to fix it compared
+    // against the *unrotated* origin+focus, which only holds at direction 0.
+    int32_t half = static_cast<int32_t>(side) / HALF_DIVISOR;
+    int32_t origin = half - size / HALF_DIVISOR;
+    int32_t dx = origin + focusX - half;
+    int32_t dy = origin + focusY - half;
+    for (uint32_t turn = 0; turn < direction; ++turn) {
+        // Same quarter-turn convention RotateOffsetAboutCentre uses for a 90-degree step.
+        int32_t t = dx;
+        dx = dy;
+        dy = -t;
+    }
+    EXPECT_EQ(hotspotX, half + dx) << "HotspotInBufferX wrong, align="
+        << static_cast<int32_t>(align) << " gear=" << gear
+        << " direction=" << direction;
+    EXPECT_EQ(hotspotY, half + dy) << "HotspotInBufferY wrong, align="
+        << static_cast<int32_t>(align) << " gear=" << gear
+        << " direction=" << direction;
+
+    // At direction 0 no rotation applies, so the hotspot is exactly the focus pixel.
+    if (direction == 0) {
+        EXPECT_EQ(hotspotX, origin + focusX) << "unrotated hotspot is not the focus pixel";
+        EXPECT_EQ(hotspotY, origin + focusY) << "unrotated hotspot is not the focus pixel";
+    }
+
+    // Sanity: the image must be fully inside the buffer for the placement to be valid.
+    EXPECT_GE(origin, 0);
+    EXPECT_LE(origin + size, static_cast<int32_t>(side));
+    EXPECT_GE(focusX, 0);
+    EXPECT_LE(focusX, size);
 }
 } // namespace
 
@@ -1255,56 +1389,28 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RunningPivotBound_001, TestSiz
     // visible in the outer strip rather than silently clipped, covering all four edges.
     const int32_t margin = static_cast<int32_t>(side) / 4;   // 64px — canvasSide = 384
     const uint32_t canvasSide = side + static_cast<uint32_t>(margin) * 2;
-    constexpr int32_t rotationStep = 12;    // DYNAMIC_ROTATION_ANGLE
     constexpr int32_t frameCount = 30;      // full 360 cycles
 
     for (float dpi : {1.93f, 3.0f}) {
         for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
             for (int32_t frame = 0; frame < frameCount; ++frame) {
-                RenderConfig config;
-                config.style_ = MOUSE_ICON::RUNNING_RIGHT;
-                config.path_ = "/data/service/el1/public/multimodalinput/mouse_icon/Loading_Right.svg";
-                config.align_ = ICON_TYPE::ANGLE_NW;
-                config.size = gear;
-                config.dpi = dpi;
-                config.color = 0;
-                config.rotationAngle = frame * rotationStep;
-                // Pivot uses the canvasSide-based origin to match TierOriginX(canvasSide):
-                //   iOrigin = canvasSide/2 - imageSize/2 = side/2 + margin - imageSize/2
-                // Image size is clamped to 'side' (not canvasSide) to match production limits.
-                float drawnSize = static_cast<float>(config.GetClampedImageSize(side));
-                int32_t iSize = static_cast<int32_t>(drawnSize);
-                int32_t iOrigin = static_cast<int32_t>(canvasSide) / 2 - iSize / 2;
-                config.rotationFocusX = static_cast<float>(
-                    iOrigin + static_cast<int32_t>(drawnSize * 0.3f));
-                config.rotationFocusY = static_cast<float>(
-                    iOrigin + static_cast<int32_t>(drawnSize * 0.675f));
+                RenderConfig config = MakeRunningConfig(dpi, gear, frame, canvasSide);
 
                 std::vector<uint8_t> pixels(static_cast<size_t>(canvasSide) * canvasSide * 4, 0);
                 PointerRenderer renderer;
                 ASSERT_EQ(renderer.DynamicRender(pixels.data(), canvasSide, canvasSide, config), RET_OK);
 
-                int32_t minX = INT32_MAX, minY = INT32_MAX, maxX = -1, maxY = -1;
-                for (uint32_t y = 0; y < canvasSide; ++y) {
-                    for (uint32_t x = 0; x < canvasSide; ++x) {
-                        if (pixels[(static_cast<size_t>(y) * canvasSide + x) * 4 + 3] != 0) {
-                            minX = std::min(minX, static_cast<int32_t>(x));
-                            maxX = std::max(maxX, static_cast<int32_t>(x));
-                            minY = std::min(minY, static_cast<int32_t>(y));
-                            maxY = std::max(maxY, static_cast<int32_t>(y));
-                        }
-                    }
-                }
-                ASSERT_GE(maxX, 0) << "RUNNING produced no ink, dpi=" << dpi << " gear=" << gear;
+                InkBounds ink = ScanInkBounds(pixels, canvasSide);
+                ASSERT_GE(ink.maxX, 0) << "RUNNING produced no ink, dpi=" << dpi << " gear=" << gear;
                 // Ink must stay within the logical window [margin, margin+side-1].
-                EXPECT_GE(minX, margin) << "ink left of logical buffer, frame=" << frame
+                EXPECT_GE(ink.minX, margin) << "ink left of logical buffer, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_GE(minY, margin) << "ink above logical buffer, frame=" << frame
+                EXPECT_GE(ink.minY, margin) << "ink above logical buffer, frame=" << frame
                     << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_LE(maxX, margin + static_cast<int32_t>(side) - 1) << "ink right of logical buffer, frame=" << frame
-                    << " dpi=" << dpi << " gear=" << gear;
-                EXPECT_LE(maxY, margin + static_cast<int32_t>(side) - 1) << "ink below logical buffer, frame=" << frame
-                    << " dpi=" << dpi << " gear=" << gear;
+                EXPECT_LE(ink.maxX, margin + static_cast<int32_t>(side) - 1)
+                    << "ink right of logical buffer, frame=" << frame << " dpi=" << dpi << " gear=" << gear;
+                EXPECT_LE(ink.maxY, margin + static_cast<int32_t>(side) - 1)
+                    << "ink below logical buffer, frame=" << frame << " dpi=" << dpi << " gear=" << gear;
             }
         }
     }
@@ -1337,38 +1443,11 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_001, TestSize.L
         PointerRenderer renderer;
         ASSERT_EQ(renderer.Render(pixels.data(), side, side, config), RET_OK);
 
-        int32_t minX = INT32_MAX, minY = INT32_MAX, maxX = -1, maxY = -1;
-        for (uint32_t y = 0; y < side; ++y) {
-            for (uint32_t x = 0; x < side; ++x) {
-                if (pixels[(static_cast<size_t>(y) * side + x) * 4 + 3] != 0) {
-                    minX = std::min(minX, static_cast<int32_t>(x));
-                    maxX = std::max(maxX, static_cast<int32_t>(x));
-                    minY = std::min(minY, static_cast<int32_t>(y));
-                    maxY = std::max(maxY, static_cast<int32_t>(y));
-                }
-            }
-        }
-        ASSERT_GE(maxX, 0) << "no ink, direction=" << direction;
-        int32_t size = config.GetClampedImageSize(side);
+        InkBounds ink = ScanInkBounds(pixels, side);
+        ASSERT_GE(ink.maxX, 0) << "no ink, direction=" << direction;
 
-        // The hotspot must equal the rotated position of the image's focus corner. Computed here
-        // independently (the same quarter-turn the canvas applies) rather than by calling the
-        // production helper, so a regression to an unrotated value is caught.
-        int32_t origin = static_cast<int32_t>(side) / 2 - size / 2;
-        int32_t cornerX = origin + static_cast<int32_t>(config.GetFocusX(side));
-        int32_t cornerY = origin + static_cast<int32_t>(config.GetFocusY(side));
-        int32_t expectedX = cornerX;
-        int32_t expectedY = cornerY;
-        for (uint32_t i = 0; i < direction; ++i) {
-            int32_t dx = expectedX - static_cast<int32_t>(side) / 2;
-            int32_t dy = expectedY - static_cast<int32_t>(side) / 2;
-            expectedX = static_cast<int32_t>(side) / 2 + dy;
-            expectedY = static_cast<int32_t>(side) / 2 - dx;
-        }
-        EXPECT_EQ(config.HotspotInBufferX(side), expectedX)
-            << "hotspot not at the rotated focus corner, direction=" << direction;
-        EXPECT_EQ(config.HotspotInBufferY(side), expectedY)
-            << "hotspot not at the rotated focus corner, direction=" << direction;
+        // The hotspot must equal the rotated position of the image's focus corner.
+        CheckHotspotIsRotatedFocus(config, side, config.align_, MAX_POINTER_SIZE, direction);
 
         // The focused corner is drawn at the hotspot, so the hotspot must touch the ink and the
         // ink must not spill the buffer.
@@ -1378,15 +1457,15 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_RotatedHotspot_001, TestSize.L
         EXPECT_LE(config.HotspotInBufferY(side), static_cast<int32_t>(side));
         // Ink extent must be rotation-invariant: a quarter turn swaps width and height.
         if (direction == 0) {
-            refInkWidth = maxX - minX + 1;
-            refInkHeight = maxY - minY + 1;
+            refInkWidth = ink.maxX - ink.minX + 1;
+            refInkHeight = ink.maxY - ink.minY + 1;
             EXPECT_GT(refInkWidth, 0);
         } else if (direction % 2 == 1) {
-            EXPECT_EQ(maxX - minX + 1, refInkHeight) << "rotated ink width, direction=" << direction;
-            EXPECT_EQ(maxY - minY + 1, refInkWidth) << "rotated ink height, direction=" << direction;
+            EXPECT_EQ(ink.maxX - ink.minX + 1, refInkHeight) << "rotated ink width, direction=" << direction;
+            EXPECT_EQ(ink.maxY - ink.minY + 1, refInkWidth) << "rotated ink height, direction=" << direction;
         } else {
-            EXPECT_EQ(maxX - minX + 1, refInkWidth) << "rotated ink width, direction=" << direction;
-            EXPECT_EQ(maxY - minY + 1, refInkHeight) << "rotated ink height, direction=" << direction;
+            EXPECT_EQ(ink.maxX - ink.minX + 1, refInkWidth) << "rotated ink width, direction=" << direction;
+            EXPECT_EQ(ink.maxY - ink.minY + 1, refInkHeight) << "rotated ink height, direction=" << direction;
         }
     }
 }
@@ -1491,54 +1570,7 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_HotspotInvariance_001, TestSiz
     for (auto align : aligns) {
         for (uint32_t gear = 1; gear <= MAX_POINTER_SIZE; ++gear) {
             for (uint32_t direction = 0; direction < 4; ++direction) {
-                uint32_t side = HARD_CURSOR_SIZE;
-                RenderConfig config;
-                config.align_ = align;
-                config.size = gear;
-                config.dpi = MAX_DPI;
-                config.direction = direction;
-                int32_t size = config.GetClampedImageSize(side);
-                int32_t focusX = static_cast<int32_t>(config.GetFocusX(side));
-                int32_t focusY = static_cast<int32_t>(config.GetFocusY(side));
-                int32_t hotspotX = config.HotspotInBufferX(side);
-                int32_t hotspotY = config.HotspotInBufferY(side);
-
-                // Reconstruct where the style's focus pixel really ends up, independently of
-                // HotspotInBuffer: the renderer draws the image at `origin`, then rotates the canvas
-                // by -direction*90 about the buffer centre (see Render::Render), so the focus pixel
-                // starts at origin+focus relative to the buffer and is carried by that same rotation.
-                // Move() then offsets the window by the hotspot. The old test computed
-                // (cursorX - hotspotX) + hotspotX == cursorX, an identity true for any hotspot, so it
-                // could not catch a wrong formula -- and an earlier attempt to fix it compared against
-                // the *unrotated* origin+focus, which only holds at direction 0.
-                int32_t origin = static_cast<int32_t>(side) / 2 - size / 2;
-                int32_t half = static_cast<int32_t>(side) / 2;
-                int32_t dx = origin + focusX - half;
-                int32_t dy = origin + focusY - half;
-                for (uint32_t turn = 0; turn < direction; ++turn) {
-                    // Same quarter-turn convention RotateOffsetAboutCentre uses for a 90-degree step.
-                    int32_t t = dx;
-                    dx = dy;
-                    dy = -t;
-                }
-                EXPECT_EQ(hotspotX, half + dx) << "HotspotInBufferX wrong, align="
-                    << static_cast<int32_t>(align) << " gear=" << gear
-                    << " direction=" << direction;
-                EXPECT_EQ(hotspotY, half + dy) << "HotspotInBufferY wrong, align="
-                    << static_cast<int32_t>(align) << " gear=" << gear
-                    << " direction=" << direction;
-
-                // At direction 0 no rotation applies, so the hotspot is exactly the focus pixel.
-                if (direction == 0) {
-                    EXPECT_EQ(hotspotX, origin + focusX) << "unrotated hotspot is not the focus pixel";
-                    EXPECT_EQ(hotspotY, origin + focusY) << "unrotated hotspot is not the focus pixel";
-                }
-
-                // Sanity: the image must be fully inside the buffer for the placement to be valid.
-                EXPECT_GE(origin, 0);
-                EXPECT_LE(origin + size, static_cast<int32_t>(side));
-                EXPECT_GE(focusX, 0);
-                EXPECT_LE(focusX, size);
+                CheckFocusPixelLandsOnCursor(align, gear, direction, HARD_CURSOR_SIZE);
             }
         }
     }
