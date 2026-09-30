@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2025-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -389,8 +389,8 @@ void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, 
     int32_t x, y;
     if (side == BLUR_CURSOR_SIZE) {
         // 512-tier: draw origin is BufferFocus - GetFocusX/Y; hotspot = origin + focus = side/2.
-        x = side / 2;
-        y = side / 2;
+        x = side / NUM_TWO;
+        y = side / NUM_TWO;
     } else {
         x = cfg.HotspotInBufferX(side);
         y = cfg.HotspotInBufferY(side);
@@ -453,8 +453,8 @@ void ScreenPointer::PublishFrame(const RenderConfig &cfg, buffer_ptr_t buffer)
         side = DEFAULT_CURSOR_SIZE;
     }
     std::unique_lock<std::shared_mutex> lock(bufferMutex_);
-    hotspotHardX_ = (side == BLUR_CURSOR_SIZE) ? (side / 2) : cfg.HotspotInBufferX(side);
-    hotspotHardY_ = (side == BLUR_CURSOR_SIZE) ? (side / 2) : cfg.HotspotInBufferY(side);
+    hotspotHardX_ = (side == BLUR_CURSOR_SIZE) ? (side / NUM_TWO) : cfg.HotspotInBufferX(side);
+    hotspotHardY_ = (side == BLUR_CURSOR_SIZE) ? (side / NUM_TWO) : cfg.HotspotInBufferY(side);
     currentBuffer_ = buffer;
 }
 

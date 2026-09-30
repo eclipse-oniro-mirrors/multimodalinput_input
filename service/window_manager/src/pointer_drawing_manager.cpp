@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2021-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1193,10 +1193,11 @@ int32_t PointerDrawingManager::DrawDynamicHardwareCursor(std::shared_ptr<ScreenP
         int32_t iSize = static_cast<int32_t>(drawnSize);
         int32_t iOriginBase;
         if (bufferSide == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-            iOriginBase = static_cast<int32_t>(bufferSide) / 2 -
+            iOriginBase = static_cast<int32_t>(bufferSide / CALCULATE_IMAGE_MIDDLE) -
                 static_cast<int32_t>(renderCfg.GetFocusX(bufferSide));
         } else {
-            iOriginBase = static_cast<int32_t>(bufferSide) / 2 - iSize / 2;
+            iOriginBase = static_cast<int32_t>(bufferSide / CALCULATE_IMAGE_MIDDLE) -
+                static_cast<int32_t>(drawnSize / CALCULATE_IMAGE_MIDDLE);
         }
         if (renderCfg.style_ == MOUSE_ICON::LOADING) {
             renderCfg.rotationFocusX = static_cast<float>(
@@ -1325,10 +1326,11 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
             int32_t iSoftSize = static_cast<int32_t>(softSize);
             int32_t iSoftOriginBase;
             if (static_cast<uint32_t>(softSide) == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
-                iSoftOriginBase = softSide / 2 -
+                iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
                     static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide)));
             } else {
-                iSoftOriginBase = softSide / 2 - iSoftSize / 2;
+                iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
+                    static_cast<int32_t>(softSize / CALCULATE_IMAGE_MIDDLE);
             }
             if (mouseStyle == MOUSE_ICON::LOADING) {
                 cfg.rotationFocusX = static_cast<float>(
