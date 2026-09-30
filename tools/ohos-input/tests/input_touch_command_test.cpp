@@ -71,7 +71,8 @@ HWTEST_F(InputTouchCommandTest, TouchTap_InvalidDurationAndNegativeCoordinate_Re
     MockControllerFixture fixture;
     std::vector<RecordedCall> calls;
     fixture.Configure(calls);
-    const auto durationResult = OHOS::MMI::InputCli::Run({ "touch-tap", "--x", "500", "--y", "800", "--duration", "6000" });
+    const auto durationResult = OHOS::MMI::InputCli::Run(
+        { "touch-tap", "--x", "500", "--y", "800", "--duration", "6000" });
     EXPECT_EQ(durationResult.code, PARAMETER_EXIT);
     ExpectTouchError(durationResult, "ERR_PARAMETER_ERROR");
     const auto coordinateResult = OHOS::MMI::InputCli::Run({ "touch-tap", "--x", "-1", "--y", "800" });
@@ -86,11 +87,12 @@ HWTEST_F(InputTouchCommandTest, TouchSwipe_MissingDstYAndNegativeDuration_Return
     MockControllerFixture fixture;
     std::vector<RecordedCall> calls;
     fixture.Configure(calls);
-    const auto missingResult = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "100", "--srcY", "500", "--dstX", "900" });
+    const auto missingResult = OHOS::MMI::InputCli::Run(
+        { "touch-swipe", "--srcX", "100", "--srcY", "500", "--dstX", "900" });
     EXPECT_EQ(missingResult.code, PARAMETER_EXIT);
     ExpectTouchError(missingResult, "ERR_PARAMETER_ERROR");
-    const auto durationResult = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "100", "--srcY", "500", "--dstX", "900",
-        "--dstY", "500", "--duration", "-1" });
+    const auto durationResult = OHOS::MMI::InputCli::Run(
+        { "touch-swipe", "--srcX", "100", "--srcY", "500", "--dstX", "900", "--dstY", "500", "--duration", "-1" });
     EXPECT_EQ(durationResult.code, PARAMETER_EXIT);
     ExpectTouchError(durationResult, "ERR_PARAMETER_ERROR");
     EXPECT_EQ(fixture.TouchCreateCount(), 0);
@@ -132,7 +134,8 @@ HWTEST_F(InputTouchCommandTest, TouchTap_SpecExample_HoldsForRequestedDuration, 
     std::vector<RecordedCall> calls;
     fixture.Configure(calls);
     const auto start = std::chrono::steady_clock::now();
-    const auto result = OHOS::MMI::InputCli::Run({ "touch-tap", "--displayId", "0", "--x", "500", "--y", "800", "--duration", "200" });
+    const auto result = OHOS::MMI::InputCli::Run(
+        { "touch-tap", "--displayId", "0", "--x", "500", "--y", "800", "--duration", "200" });
     const auto elapsed = std::chrono::steady_clock::now() - start;
     ExpectTouchSuccess(result, "touch-tap");
     EXPECT_GE(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(), 180);
@@ -262,7 +265,8 @@ HWTEST_F(InputTouchCommandTest, TouchCommands_MapPermissionFailureToExitThree, T
     calls.clear();
     ResetMockControllerState();
     fixture.Configure(calls, options);
-    const auto swipe = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "1", "--srcY", "2", "--dstX", "3", "--dstY", "4" });
+    const auto swipe = OHOS::MMI::InputCli::Run(
+        { "touch-swipe", "--srcX", "1", "--srcY", "2", "--dstX", "3", "--dstY", "4" });
     EXPECT_EQ(swipe.code, PERMISSION_EXIT);
     ExpectTouchError(swipe, "ERR_PERMISSION_DENIED");
     ExpectCalls(calls, { { "CreateTouchController", {} } });
@@ -276,8 +280,8 @@ HWTEST_F(InputTouchCommandTest, TouchSwipe_MoveFailureAttemptsUpAtLastSuccessful
     options.touchFailureCall = "TouchMove";
     options.touchFailureResult = -1;
     fixture.Configure(calls, options);
-    const auto result = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "10", "--srcY", "20", "--dstX", "100", "--dstY", "200",
-        "--duration", "1000" });
+    const auto result = OHOS::MMI::InputCli::Run(
+        { "touch-swipe", "--srcX", "10", "--srcY", "20", "--dstX", "100", "--dstY", "200", "--duration", "1000" });
     EXPECT_EQ(result.code, SERVICE_EXIT);
     ExpectTouchError(result, "ERR_INPUT_SERVICE_EXCEPTION");
     ASSERT_EQ(calls.size(), 4U);
