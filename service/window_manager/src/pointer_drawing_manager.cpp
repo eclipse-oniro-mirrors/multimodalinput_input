@@ -2016,9 +2016,13 @@ void PointerDrawingManager::CreatePointerWindow(uint64_t rsId, int32_t physicalX
     RotateDegree(direction);
     lastDirection_ = direction;
     CreateCanvasNode();
+    bool hasGroupCtx = false;
+    {
+        std::unique_lock<std::mutex> lockGuard(surfaceNodeMutex_);
+        hasGroupCtx = groupCursorCtxMap_.count(activeGroupId_) > 0;
+    }
     if (!GetHardCursorEnabled() && activeGroupId_ >= 0 &&
-        WIN_MGR->FindGroupIdByRsId(rsId) == activeGroupId_ &&
-        groupCursorCtxMap_.count(activeGroupId_) > 0) {
+        WIN_MGR->FindGroupIdByRsId(rsId) == activeGroupId_ && hasGroupCtx) {
         SaveActiveGroupToMap();
     }
     RsFlushImplicitTransaction();
@@ -2677,9 +2681,8 @@ int32_t PointerDrawingManager::GetCurrentUser()
 
 bool PointerDrawingManager::IsCursorOnOtherForegroundUser(int32_t userId)
 {
-    std::vector<int32_t> foregroundUserIds = ACCOUNT_MGR->QueryForegroundOsAccountIds();
-    if (foregroundUserIds.size() <= 1) {
-        MMI_HILOGD("Not multi foreground user, apply pointer params immediately");
+    if (!WIN_MGR->HasMultipleActiveUsers()) {
+        MMI_HILOGD("Not multi active user, apply pointer params immediately");
         return false;
     }
     int32_t cursorUserId = GetCurrentUser();
@@ -3328,6 +3331,7 @@ void PointerDrawingManager::UpdateBindDisplayIdForMultiGroup(uint64_t rsId, int3
     SaveActiveGroupToMap();
     if (leavingGroup >= 0) {
         const bool kept = WIN_MGR->HasPointerDeviceBoundToRsId(leavingRsId);
+        std::unique_lock<std::mutex> lockGuard(surfaceNodeMutex_);
         auto &leavingCtx = groupCursorCtxMap_[leavingGroup];
         if (leavingCtx.surfaceNode != nullptr) {
             leavingCtx.surfaceNode->SetVisible(kept);
@@ -3337,7 +3341,12 @@ void PointerDrawingManager::UpdateBindDisplayIdForMultiGroup(uint64_t rsId, int3
             leavingCtx.rsUIDirector->SendMessages();
         }
     }
-    if (groupCursorCtxMap_.count(groupId) > 0) {
+    bool hasTargetCtx = false;
+    {
+        std::unique_lock<std::mutex> lockGuard(surfaceNodeMutex_);
+        hasTargetCtx = groupCursorCtxMap_.count(groupId) > 0;
+    }
+    if (hasTargetCtx) {
         RestoreGroupFromMap(groupId);
         screenId_ = rsId;
         AttachToDisplay();

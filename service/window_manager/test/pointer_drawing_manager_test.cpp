@@ -5603,8 +5603,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_IsCursorOnOtherFor
 {
     CALL_TEST_DEBUG;
     PointerDrawingManager pointerDrawingManager;
-    // No foreground account can be queried in the test environment, which is the
-    // single foreground user form: the guard must not defer the apply.
+    // No display group info is seeded in the test environment, which is the
+    // single active user form: the guard must not defer the apply.
     EXPECT_FALSE(pointerDrawingManager.IsCursorOnOtherForegroundUser(100));
 }
 
