@@ -5456,6 +5456,159 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindo
 }
 
 /**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_ClearStaleGroupNode_001
+ * @tc.desc: When the active group context still references the current surface node, recreating
+ *           the window must clear the stale node from the context, otherwise the old cursor
+ *           stays on screen together with the new one (e.g. after a pointer size change).
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest,
+    PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_ClearStaleGroupNode_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.hardwareCursorPointerManager_ = nullptr;
+    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
+    surfaceNodeConfig.SurfaceNodeName = "pointer window";
+    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
+    auto staleNode = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false, rsUIContext_);
+    ASSERT_NE(staleNode, nullptr);
+    pointerDrawingManager.surfaceNode_ = staleNode;
+    pointerDrawingManager.activeGroupId_ = DEFAULT_GROUP_ID;
+    GroupCursorContext ctx;
+    ctx.surfaceNode = staleNode;
+    ctx.canvasNode = Rosen::RSCanvasNode::Create(false, false, rsUIContext_);
+    pointerDrawingManager.groupCursorCtxMap_[DEFAULT_GROUP_ID] = ctx;
+    pointerDrawingManager.CreatePointerWindowForNoScreenPointer(86, 100, 100);
+    EXPECT_EQ(pointerDrawingManager.groupCursorCtxMap_[DEFAULT_GROUP_ID].surfaceNode, nullptr);
+    EXPECT_EQ(pointerDrawingManager.groupCursorCtxMap_[DEFAULT_GROUP_ID].canvasNode, nullptr);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_GroupMismatch_001
+ * @tc.desc: When the rsId belongs to another group, the active group's context entry must be
+ *           kept untouched, so the leaving group can keep its own cursor visible.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest,
+    PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_GroupMismatch_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.hardwareCursorPointerManager_ = nullptr;
+    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
+    surfaceNodeConfig.SurfaceNodeName = "pointer window";
+    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
+    auto staleNode = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false, rsUIContext_);
+    ASSERT_NE(staleNode, nullptr);
+    pointerDrawingManager.surfaceNode_ = staleNode;
+    pointerDrawingManager.activeGroupId_ = 7;
+    GroupCursorContext ctx;
+    ctx.surfaceNode = staleNode;
+    pointerDrawingManager.groupCursorCtxMap_[7] = ctx;
+    pointerDrawingManager.CreatePointerWindowForNoScreenPointer(86, 100, 100);
+    EXPECT_EQ(pointerDrawingManager.groupCursorCtxMap_[7].surfaceNode, staleNode);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_NoCtxEntry_001
+ * @tc.desc: Without a context entry for the active group (single-group legacy path), recreating
+ *           the window must neither detach the old node nor create a context entry.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest,
+    PointerDrawingManagerTest_CreatePointerWindowForNoScreenPointer_NoCtxEntry_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.hardwareCursorPointerManager_ = nullptr;
+    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
+    surfaceNodeConfig.SurfaceNodeName = "pointer window";
+    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
+    auto staleNode = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false, rsUIContext_);
+    ASSERT_NE(staleNode, nullptr);
+    pointerDrawingManager.surfaceNode_ = staleNode;
+    pointerDrawingManager.activeGroupId_ = DEFAULT_GROUP_ID;
+    pointerDrawingManager.CreatePointerWindowForNoScreenPointer(86, 100, 100);
+    EXPECT_TRUE(pointerDrawingManager.groupCursorCtxMap_.empty());
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindow_RefreshGroupCtx_001
+ * @tc.desc: After recreating the active group's cursor window, the group context must reference
+ *           the new surface node, so a later RestoreGroupFromMap no longer brings back the
+ *           detached old node.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindow_RefreshGroupCtx_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.hardwareCursorPointerManager_ = nullptr;
+    pointerDrawingManager.activeGroupId_ = DEFAULT_GROUP_ID;
+    pointerDrawingManager.screenId_ = 86;
+    pointerDrawingManager.rsUIDirector_ = rsUIDirector_;
+    pointerDrawingManager.rsUIContext_ = rsUIContext_;
+    pointerDrawingManager.groupCursorCtxMap_[DEFAULT_GROUP_ID] = GroupCursorContext();
+    EXPECT_NO_FATAL_FAILURE(pointerDrawingManager.CreatePointerWindow(86, 100, 100, Direction::DIRECTION0));
+    EXPECT_EQ(pointerDrawingManager.groupCursorCtxMap_[DEFAULT_GROUP_ID].surfaceNode,
+        pointerDrawingManager.surfaceNode_);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreatePointerWindow_GroupMismatchNoPollution_001
+ * @tc.desc: When the rsId belongs to another group, CreatePointerWindow must not write the new
+ *           surface node into the stale active group's context, and must not create an entry
+ *           for the rsId's group either.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindow_GroupMismatchNoPollution_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.hardwareCursorPointerManager_ = nullptr;
+    pointerDrawingManager.activeGroupId_ = 7;
+    pointerDrawingManager.screenId_ = 86;
+    pointerDrawingManager.rsUIDirector_ = rsUIDirector_;
+    pointerDrawingManager.rsUIContext_ = rsUIContext_;
+    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
+    surfaceNodeConfig.SurfaceNodeName = "pointer window";
+    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::CURSOR_NODE;
+    auto sentinelNode = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false, rsUIContext_);
+    ASSERT_NE(sentinelNode, nullptr);
+    GroupCursorContext ctx;
+    ctx.surfaceNode = sentinelNode;
+    pointerDrawingManager.groupCursorCtxMap_[7] = ctx;
+    EXPECT_NO_FATAL_FAILURE(pointerDrawingManager.CreatePointerWindow(86, 100, 100, Direction::DIRECTION0));
+    EXPECT_EQ(pointerDrawingManager.groupCursorCtxMap_[7].surfaceNode, sentinelNode);
+    EXPECT_EQ(pointerDrawingManager.groupCursorCtxMap_.count(DEFAULT_GROUP_ID), 0u);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_IsCursorOnOtherForegroundUser_001
+ * @tc.desc: Single foreground user must keep the immediate-apply behavior, the guard
+ *           only defers applying when multiple foreground users exist and the cursor
+ *           stays on another user's display group.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_IsCursorOnOtherForegroundUser_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    // No display group info is seeded in the test environment, which is the
+    // single active user form: the guard must not defer the apply.
+    EXPECT_FALSE(pointerDrawingManager.IsCursorOnOtherForegroundUser(100));
+}
+
+/**
  * @tc.name: PointerDrawingManagerTest_IsDisableCursorScreen_001
  * @tc.desc: Test IsDisableCursorScreen whether the screen cursor is disabled
  * @tc.type: FUNC

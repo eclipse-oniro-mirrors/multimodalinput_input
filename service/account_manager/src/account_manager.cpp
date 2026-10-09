@@ -378,8 +378,26 @@ int32_t AccountManager::QueryCurrentAccountId()
         MMI_HILOGE("GetForegroundOsAccountLocalId failed");
         return DEFAULT_USER_ID;
     }
-    MMI_HILOGD("GetForegroundOsAccountLocalId localId: %{private}d", localId);
+    MMI_HILOGD("GetForegroundOsAccountLocalId localId: %{public}d", localId);
     return localId;
+}
+
+std::vector<int32_t> AccountManager::QueryForegroundOsAccountIds()
+{
+    std::vector<int32_t> userIds;
+    std::vector<AccountSA::ForegroundOsAccount> foregroundAccounts;
+    int32_t ret = AccountSA::OsAccountManager::GetForegroundOsAccounts(foregroundAccounts);
+    if (ret != ERR_OK) {
+        MMI_HILOGE("GetForegroundOsAccounts failed, ret:%{public}d", ret);
+        return userIds;
+    }
+    std::string userIdsStr;
+    for (const auto &foregroundAccount : foregroundAccounts) {
+        userIds.push_back(foregroundAccount.localId);
+        userIdsStr += std::to_string(foregroundAccount.localId) + ",";
+    }
+    MMI_HILOGI("Query foreground accounts, size:%{public}zu, ids:%{public}s", userIds.size(), userIdsStr.c_str());
+    return userIds;
 }
 
 void AccountManager::AccountManagerUnregister()
@@ -585,6 +603,7 @@ void AccountManager::OnSwitchUser(const EventFwk::CommonEventData &data)
 {
     int32_t accountId = data.GetCode();
     std::string displayId = data.GetWant().GetStringParam("displayId");
+    MMI_HILOGI("User switch event, displayId:%{public}s, userId:%{public}d", displayId.c_str(), accountId);
     uint64_t currentDisplayId = MAIN_DISPLAY_ID;
     if (displayId.size() <= MAX_DISPLAYID_SIZE && IsNumeric(displayId)) {
         uint64_t num = 0;
@@ -603,7 +622,10 @@ void AccountManager::OnSwitchUser(const EventFwk::CommonEventData &data)
         currentAccountId_ = accountId;
         MMI_HILOGD("Switched to account(%d)", currentAccountId_);
     }
-    INPUT_SETTING_MANAGER->OnSwitchUser(currentAccountId_);
+    // Route the switched-to user of the event regardless of display, so a non-main
+    // display user (e.g. the passenger in the cockpit multi-user scenario) also gets
+    // its setting data loaded and applied.
+    INPUT_SETTING_MANAGER->OnSwitchUser(accountId);
 #ifdef OHOS_BUILD_ENABLE_TRIPLE_FINGER_SNAPSHOT
     TripleFingerSnapshotManager::GetInstance().RegisterSwitchObserver(currentAccountId_);
 #endif // OHOS_BUILD_ENABLE_TRIPLE_FINGER_SNAPSHOT

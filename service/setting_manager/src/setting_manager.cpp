@@ -124,25 +124,44 @@ void SettingManager::OnDataShareReady()
     }
     ffrtHandler->submit([this] {
         flushFlag_.store(true);
-        int32_t userId = ACCOUNT_MGR->QueryCurrentAccountId();
-        MMI_HILOGI("Run task in data share ready, current id:%{private}d", userId);
-        MarkUserConfigLoading(userId);
-        ReadSettingData(userId);
-        if (GetVersion(userId) != VERSION_NUMBERS_LATEST) {
+        std::vector<int32_t> foregroundUserIds = ACCOUNT_MGR->QueryForegroundOsAccountIds();
+        if (foregroundUserIds.empty()) {
+            MMI_HILOGW("No foreground account, fallback to current account");
+            foregroundUserIds.push_back(ACCOUNT_MGR->QueryCurrentAccountId());
+        }
+        MMI_HILOGI("Run task in data share ready, foreground user size:%{public}zu", foregroundUserIds.size());
+        for (int32_t userId : foregroundUserIds) {
+            MarkUserConfigLoading(userId);
+            ReadSettingData(userId);
+        }
+        bool needMigrateSettings = false;
+        for (int32_t userId : foregroundUserIds) {
+            if (GetVersion(userId) != VERSION_NUMBERS_LATEST) {
+                needMigrateSettings = true;
+                break;
+            }
+        }
+        if (needMigrateSettings) {
             MMI_HILOGI("Migrate settings for all user");
             INPUT_SETTING_MIGRATOR.Initialize(defaultSettingData_);
             if (!INPUT_SETTING_MIGRATOR.Migrator()) {
                 MMI_HILOGE("MigrateSettings failed");
             }
-            ReadSettingData(userId);
+            for (int32_t userId : foregroundUserIds) {
+                ReadSettingData(userId);
+            }
         }
         CommitStagedChanges();
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-        TouchPadTransformProcessor::OnDataShareReady(userId);
+        // Double tap and drag is a global libinput knob applied to all touchpad
+        // devices, so it keeps following the primary foreground account here.
+        TouchPadTransformProcessor::OnDataShareReady(ACCOUNT_MGR->QueryCurrentAccountId());
 #endif  // OHOS_BUILD_ENABLE_TOUCHPAD
         flushFlag_.store(false);
         databaseReadyFlag_.store(true);
-        MarkUserConfigLoaded(userId);
+        for (int32_t userId : foregroundUserIds) {
+            MarkUserConfigLoaded(userId);
+        }
     });
 }
 
@@ -344,7 +363,7 @@ void SettingManager::ReadSettingData(int32_t userId)
                 data.AddSettingItem(item);
             }
             MMI_HILOGI(
-                "id:%{private}d, key:%{public}s, value:%{public}s", userId, settingKey.c_str(), settingVal.c_str());
+                "id:%{public}d, key:%{public}s, value:%{public}s", userId, settingKey.c_str(), settingVal.c_str());
         }
     }
 
@@ -538,12 +557,12 @@ bool SettingManager::IsParamsValid(int32_t userId, const std::string &settingKey
 void SettingManager::MarkUserConfigLoading(int32_t userId)
 {
     if (userId < 0) {
-        MMI_HILOGE("Invalid userId:%{private}d", userId);
+        MMI_HILOGE("Invalid userId:%{public}d", userId);
         return;
     }
     std::lock_guard<std::mutex> guard(userConfigLoadedMutex_);
     userConfigLoadedMap_[userId] = false;
-    MMI_HILOGI("Mark user config loading, userId:%{private}d", userId);
+    MMI_HILOGI("Mark user config loading, userId:%{public}d", userId);
 }
 
 void SettingManager::MarkUserConfigLoaded(int32_t userId)
@@ -554,7 +573,7 @@ void SettingManager::MarkUserConfigLoaded(int32_t userId)
     }
     std::lock_guard<std::mutex> guard(userConfigLoadedMutex_);
     userConfigLoadedMap_[userId] = true;
-    MMI_HILOGI("Mark user config loaded, userId:%{private}d", userId);
+    MMI_HILOGI("Mark user config loaded, userId:%{public}d", userId);
 }
 
 bool SettingManager::IsUserConfigLoaded(int32_t userId) const

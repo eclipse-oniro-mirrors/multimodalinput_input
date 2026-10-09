@@ -87,6 +87,7 @@ public:
     int32_t GetCurrentAccountId();
     int32_t GetAccountIdFromUid(int32_t uid);
     std::vector<int32_t> QueryAllCreatedOsAccounts();
+    std::vector<int32_t> QueryForegroundOsAccountIds();
     int32_t QueryCurrentAccountId();
     int32_t RegisterCommonEventCallback(const std::function<void(const EventFwk::CommonEventData &)> &callback);
     bool UnRegisterCommonEventCallback(int32_t callbackId);
