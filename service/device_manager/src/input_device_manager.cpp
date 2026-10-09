@@ -1482,10 +1482,11 @@ int32_t InputDeviceManager::RemoveVirtualInputDeviceInner(int32_t deviceId, stru
         return RET_ERR;
     }
     if (MakeVirtualDeviceInfo(iter->second, info) != RET_OK) {
-        virtualInputDevices_.erase(iter);
         MMI_HILOGE("MakeVirtualDeviceInfo failed");
+        virtualInputDevices_.erase(iter);
         return RET_ERR;
     }
+    virtualInputDevices_.erase(iter);
     return RET_OK;
 }
 
