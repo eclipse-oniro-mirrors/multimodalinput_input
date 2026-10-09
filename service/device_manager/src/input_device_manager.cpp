@@ -979,6 +979,7 @@ void InputDeviceManager::OnInputDeviceAdded(struct libinput_device *inputDevice)
     switchSubscriberHandler->SyncSwitchLidState(inputDevice);
     switchSubscriberHandler->SyncSwitchTabletState(inputDevice);
 #endif // OHOS_BUILD_ENABLE_SWITCH
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     // LCOV_EXCL_STOP
 }
 
@@ -1003,6 +1004,7 @@ void InputDeviceManager::SetIsDeviceReportEvent(int32_t deviceId, bool isDeviceR
         NotifyAddPointerDevice(item->second.isPointerDevice, existEnabledPointerDevice);
     }
     NotifyDeviceFirstReportEvent(deviceId);
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
 }
 
 bool InputDeviceManager::GetIsDeviceReportEvent(int32_t deviceId)
@@ -1076,6 +1078,7 @@ void InputDeviceManager::OnInputDeviceRemoved(struct libinput_device *inputDevic
         DfxHisyseventDevice::ReportDeviceFault(DfxHisyseventDevice::DeviceFaultType::DEVICE_FAULT_TYPE_INNER,
                                                "Device reomved failed becaused of not found");
 #endif
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     // LCOV_EXCL_STOP
     }
 }
@@ -1388,6 +1391,7 @@ int32_t InputDeviceManager::AddVirtualInputDevice(std::shared_ptr<InputDevice> d
 #ifdef OHOS_BUILD_ENABLE_DFX_RADAR
     DfxHisyseventDevice::ReportDeviceBehavior(deviceId, "AddVirtualInputDevice successfully");
 #endif
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     return RET_OK;
     // LCOV_EXCL_STOP
 }
@@ -1429,7 +1433,6 @@ bool InputDeviceManager::CheckDuplicateInputDevice(std::shared_ptr<InputDevice> 
 void InputDeviceManager::AddPhysicalInputDeviceInner(int32_t deviceId, const struct InputDeviceInfo& info)
 {
     inputDevice_[deviceId] = info;
-    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     UpdatePhysicalInputDevice(deviceId, info);
     UpdateInputDeviceCaps(deviceId);
 }
@@ -1439,7 +1442,6 @@ void InputDeviceManager::AddVirtualInputDeviceInner(int32_t deviceId, std::share
     // LCOV_EXCL_START
     SetSpecialVirtualDevice(inputDevice);
     virtualInputDevices_[deviceId] = inputDevice;
-    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     if (IsKeyboardDevice(inputDevice)) {
         // mark true if vkbd has ever connected before; (does not set to false during disconnection)
         virtualKeyboardEverConnected_ = true;
@@ -1466,7 +1468,6 @@ void InputDeviceManager::RemovePhysicalInputDeviceInner(
             MMI_HILOGI("Device removed successfully, deviceId:%{public}d, sys uid:%{public}s", deviceId,
                 it->second.sysUid.c_str());
             inputDevice_.erase(it);
-            CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
             break;
         }
     }
@@ -1480,10 +1481,8 @@ int32_t InputDeviceManager::RemoveVirtualInputDeviceInner(int32_t deviceId, stru
         MMI_HILOGE("No virtual deviceId:%{public}d existed", deviceId);
         return RET_ERR;
     }
-    int32_t ret = MakeVirtualDeviceInfo(iter->second, info);
-    virtualInputDevices_.erase(iter);
-    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
-    if (ret != RET_OK) {
+    if (MakeVirtualDeviceInfo(iter->second, info) != RET_OK) {
+        virtualInputDevices_.erase(iter);
         MMI_HILOGE("MakeVirtualDeviceInfo failed");
         return RET_ERR;
     }
@@ -1610,6 +1609,7 @@ int32_t InputDeviceManager::RemoveVirtualInputDevice(int32_t deviceId)
     CALL_DEBUG_ENTER;
     InputDeviceInfo deviceInfo;
     if (RemoveVirtualInputDeviceInner(deviceId, deviceInfo) == RET_ERR) {
+        CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
         return RET_ERR;
     }
     NotifyDevRemoveCallback(deviceId, deviceInfo);
@@ -1621,6 +1621,7 @@ int32_t InputDeviceManager::RemoveVirtualInputDevice(int32_t deviceId)
 #ifdef OHOS_BUILD_ENABLE_DFX_RADAR
     DfxHisyseventDevice::ReportDeviceBehavior(deviceId, "RemoveVirtualInputDevice successfully");
 #endif
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     return RET_OK;
 }
 
