@@ -49,7 +49,6 @@ ohos_source_set("intention_device_manager") {
   deps = [
     "${device_status_root_path}/utils/common:devicestatus_util",
     "${device_status_root_path}/utils/ipc:devicestatus_ipc",
-    "//third_party/openssl:libcrypto_shared",
   ]
 
   public_deps = [

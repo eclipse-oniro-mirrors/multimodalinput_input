@@ -27,12 +27,11 @@
 #include <dlfcn.h>
 
 #ifdef OHOS_BUILD_ENABLE_DRAG_SECURITY
-#include <openssl/bio.h>
-#include <openssl/buffer.h>
-#include <openssl/crypto.h>
-#include <openssl/hmac.h>
-#include <openssl/rand.h>
-#include <openssl/evp.h>
+#include "bsl_base64.h"
+#include "bsl_errno.h"
+#include "crypt_algid.h"
+#include "crypt_eal_mac.h"
+#include "crypt_errno.h"
 #include <securec.h>
 #endif // OHOS_BUILD_ENABLE_DRAG_SECURITY
 
