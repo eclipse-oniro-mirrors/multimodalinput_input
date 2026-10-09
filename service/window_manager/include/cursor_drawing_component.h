@@ -115,6 +115,15 @@ public:
     }
     void OnSwitchUser(int32_t userId);
     IPointerDrawingManager* GetPointerInstance();
+    void SetPointerDeviceFlag(bool hasPointerDevice)
+    {
+        pointerDeviceFlag_.store(hasPointerDevice, std::memory_order_release);
+    }
+    bool GetPointerDeviceFlag()
+    {
+        return pointerDeviceFlag_.load(std::memory_order_acquire);
+    }
+
 private:
     CursorDrawingComponent();
     ~CursorDrawingComponent();
@@ -134,6 +143,7 @@ private:
     int32_t timerId_ { -1 };
     std::chrono::time_point<std::chrono::steady_clock> lastCallTime_ { std::chrono::steady_clock::now() };
     std::atomic<uint64_t> workerThreadId_ { 0 };
+    std::atomic<bool> pointerDeviceFlag_ { 0 };
 };
 
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
