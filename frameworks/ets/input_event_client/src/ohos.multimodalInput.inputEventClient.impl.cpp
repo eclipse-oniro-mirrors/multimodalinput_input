@@ -202,39 +202,6 @@ bool CheckInjectionEventDisplayId(const taihe::optional<int32_t> &displayId,
     return true;
 }
 
-#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
-void GetInjectionEventDataNative(Input_KeyEvent* keyEventNative,
-    ::ohos::multimodalInput::inputEventClient::KeyEvent const& thKeyEvent,
-    std::function<void(int32_t)> histogramError)
-{
-    if (thKeyEvent.keyCode < 0) {
-        set_business_error(INPUT_PARAMETER_ERROR, "keyCode must be greater than or equal to 0");
-        histogramError(INPUT_PARAMETER_ERROR);
-        return;
-    }
-    if (thKeyEvent.keyDownDuration < 0) {
-        MMI_HILOGE("keyDownDuration:%{public}d is less 0, can not process", thKeyEvent.keyDownDuration);
-        set_business_error(INPUT_PARAMETER_ERROR, "keyDownDuration must be greater than or equal to 0");
-        histogramError(INPUT_PARAMETER_ERROR);
-        return;
-    }
-
-    auto keyAction = thKeyEvent.isPressed ? Input_KeyEventAction::KEY_ACTION_DOWN : Input_KeyEventAction::KEY_ACTION_UP;
-    OH_Input_SetKeyEventAction(keyEventNative, keyAction);
-    OH_Input_SetKeyEventKeyCode(keyEventNative, thKeyEvent.keyCode);
-    OH_Input_SetKeyEventActionTime(keyEventNative, static_cast<int64_t>(thKeyEvent.keyDownDuration));
-    if (!CheckInjectionEventDisplayId(thKeyEvent.displayId, histogramError)) {
-        return;
-    }
-    if (thKeyEvent.displayId.has_value()) {
-        OH_Input_SetKeyEventDisplayId(keyEventNative, thKeyEvent.displayId.value());
-    }
-    Input_Result result = static_cast<Input_Result>(OH_Input_InjectKeyEvent(keyEventNative));
-    if (result != INPUT_SUCCESS) {
-        MMI_HILOGE("OH_Input_InjectKeyEvent error");
-    }
-}
-#else
 void GetInjectionEventData(std::shared_ptr<OHOS::MMI::KeyEvent> keyEventNative,
     ::ohos::multimodalInput::inputEventClient::KeyEvent const& thKeyEvent,
     std::function<void(int32_t)> histogramError)
@@ -274,7 +241,6 @@ void GetInjectionEventData(std::shared_ptr<OHOS::MMI::KeyEvent> keyEventNative,
     InputManager::GetInstance()->SimulateInputEvent(keyEventNative);
     std::this_thread::sleep_for(std::chrono::milliseconds(thKeyEvent.keyDownDuration));
 }
-#endif // OHOS_BUILD_ENABLE_VKEYBOARD
 
 void InjectKeyEventSync(::ohos::multimodalInput::inputEventClient::KeyEventData const& keyEvent)
 {
@@ -285,14 +251,8 @@ void InjectKeyEventSync(::ohos::multimodalInput::inputEventClient::KeyEventData 
     if (!CheckInputEventClentPermission(histogramError)) {
         return;
     }
-#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
-    Input_KeyEvent* keyEventNative = OH_Input_CreateKeyEvent();
-    GetInjectionEventDataNative(keyEventNative, keyEvent.keyEvent, histogramError);
-    OH_Input_DestroyKeyEvent(&keyEventNative);
-#else
     auto newKeyEvent = OHOS::MMI::KeyEvent::Create();
     GetInjectionEventData(newKeyEvent, keyEvent.keyEvent, histogramError);
-#endif
 }
 
 void InjectEventSync(::ohos::multimodalInput::inputEventClient::KeyEventInfo const& keyEvent)
@@ -304,14 +264,8 @@ void InjectEventSync(::ohos::multimodalInput::inputEventClient::KeyEventInfo con
     if (!CheckInputEventClentPermission(histogramError)) {
         return;
     }
-#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
-    Input_KeyEvent* keyEventNative = OH_Input_CreateKeyEvent();
-    GetInjectionEventDataNative(keyEventNative, keyEvent.KeyEvent, histogramError);
-    OH_Input_DestroyKeyEvent(&keyEventNative);
-#else
     auto lkeyEvent = OHOS::MMI::KeyEvent::Create();
     GetInjectionEventData(lkeyEvent, keyEvent.KeyEvent, histogramError);
-#endif // OHOS_BUILD_ENABLE_VKEYBOARD
 }
 
 void HandleMouseButton(::ohos::multimodalInput::mouseEvent::MouseEvent mouseEvent,
