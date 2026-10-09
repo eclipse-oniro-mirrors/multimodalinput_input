@@ -885,7 +885,7 @@ bool CursorDrawingInformation::IsPointerVisible()
                 return item.visible;
             }
         }
-        if (!(CursorDrawingComponent::GetInstance().GetPointerDeviceFlag()|| WIN_MGR->IsMouseSimulate())
+        if (!(CursorDrawingComponent::GetInstance().GetPointerDeviceFlag() || WIN_MGR->IsMouseSimulate())
             || pid_ == 0) {
             auto info = hapPidInfos_.back();
             MMI_HILOGI("Only hap visible pid:%{public}d-visible:%{public}s", info.pid, info.visible ? "true" : "false");

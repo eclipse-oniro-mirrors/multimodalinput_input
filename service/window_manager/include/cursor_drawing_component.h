@@ -143,7 +143,7 @@ private:
     int32_t timerId_ { -1 };
     std::chrono::time_point<std::chrono::steady_clock> lastCallTime_ { std::chrono::steady_clock::now() };
     std::atomic<uint64_t> workerThreadId_ { 0 };
-    std::atomic<bool> pointerDeviceFlag_ { 0 };
+    std::atomic<bool> pointerDeviceFlag_ { false };
 };
 
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING

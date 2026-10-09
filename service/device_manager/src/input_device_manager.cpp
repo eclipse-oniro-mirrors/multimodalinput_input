@@ -1429,7 +1429,7 @@ bool InputDeviceManager::CheckDuplicateInputDevice(std::shared_ptr<InputDevice> 
 void InputDeviceManager::AddPhysicalInputDeviceInner(int32_t deviceId, const struct InputDeviceInfo& info)
 {
     inputDevice_[deviceId] = info;
-    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual())
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     UpdatePhysicalInputDevice(deviceId, info);
     UpdateInputDeviceCaps(deviceId);
 }
@@ -1439,7 +1439,7 @@ void InputDeviceManager::AddVirtualInputDeviceInner(int32_t deviceId, std::share
     // LCOV_EXCL_START
     SetSpecialVirtualDevice(inputDevice);
     virtualInputDevices_[deviceId] = inputDevice;
-    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual())
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
     if (IsKeyboardDevice(inputDevice)) {
         // mark true if vkbd has ever connected before; (does not set to false during disconnection)
         virtualKeyboardEverConnected_ = true;
@@ -1466,7 +1466,7 @@ void InputDeviceManager::RemovePhysicalInputDeviceInner(
             MMI_HILOGI("Device removed successfully, deviceId:%{public}d, sys uid:%{public}s", deviceId,
                 it->second.sysUid.c_str());
             inputDevice_.erase(it);
-            CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual())
+            CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
             break;
         }
     }
@@ -1480,9 +1480,10 @@ int32_t InputDeviceManager::RemoveVirtualInputDeviceInner(int32_t deviceId, stru
         MMI_HILOGE("No virtual deviceId:%{public}d existed", deviceId);
         return RET_ERR;
     }
+    int32_t ret = MakeVirtualDeviceInfo(iter->second, info);
     virtualInputDevices_.erase(iter);
-    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual())
-    if (MakeVirtualDeviceInfo(iter->second, info) != RET_OK) {
+    CursorDrawingComponent::GetInstance().SetPointerDeviceFlag(HasPointerDeviceIncludingVirtual());
+    if (ret != RET_OK) {
         MMI_HILOGE("MakeVirtualDeviceInfo failed");
         return RET_ERR;
     }
