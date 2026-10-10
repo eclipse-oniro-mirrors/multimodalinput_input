@@ -143,7 +143,7 @@ ohos-input touch-swipe [options]
   --srcY <integer>      起点 Y 坐标（必填，>=0）
   --dstX <integer>      终点 X 坐标（必填，>=0）
   --dstY <integer>      终点 Y 坐标（必填，>=0）
-  --duration <number>   总时长 ms（可选，[0,5000]，0 表示瞬间完成，默认 500；>0 时按约 16ms 步进插值移动）
+  --duration <number>   总时长 ms（可选，[0,5000]，0 表示立即移动到终点后抬起，默认 500；>0 时按约 16ms 步进插值）
 ```
 
 ## 输出格式

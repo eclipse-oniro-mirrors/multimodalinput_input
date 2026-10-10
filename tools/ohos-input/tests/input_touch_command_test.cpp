@@ -148,7 +148,7 @@ HWTEST_F(InputTouchCommandTest, TouchTap_SpecExample_HoldsForRequestedDuration, 
         { "TouchUp", { 0, 0, 500, 800 } } });
 }
 
-HWTEST_F(InputTouchCommandTest, TouchSwipe_ZeroDuration_InjectsDownThenUpWithoutMove, TestSize.Level1)
+HWTEST_F(InputTouchCommandTest, TouchSwipe_ZeroDuration_MovesToEndpointBeforeUp, TestSize.Level1)
 {
     MockControllerFixture fixture;
     std::vector<RecordedCall> calls;
@@ -157,7 +157,35 @@ HWTEST_F(InputTouchCommandTest, TouchSwipe_ZeroDuration_InjectsDownThenUpWithout
         "--dstX", "30", "--dstY", "40", "--duration", "0" });
     ExpectTouchSuccess(result, "touch-swipe");
     ExpectCalls(calls, { { "CreateTouchController", {} }, { "TouchDown", { 0, 2, 10, 20 } },
-        { "TouchUp", { 0, 2, 30, 40 } } });
+        { "TouchMove", { 0, 2, 30, 40 } }, { "TouchUp", { 0, 2, 30, 40 } } });
+}
+
+HWTEST_F(InputTouchCommandTest, TouchSwipe_ZeroDurationStationaryPathSkipsMove, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const auto result = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "10", "--srcY", "20", "--dstX", "10",
+        "--dstY", "20", "--duration", "0" });
+    ExpectTouchSuccess(result, "touch-swipe");
+    ExpectCalls(calls, { { "CreateTouchController", {} }, { "TouchDown", { 0, 0, 10, 20 } },
+        { "TouchUp", { 0, 0, 10, 20 } } });
+}
+
+HWTEST_F(InputTouchCommandTest, TouchSwipe_ZeroDurationMoveFailureAttemptsUpAtSource, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    MockControllerOptions options;
+    options.touchFailureCall = "TouchMove";
+    options.touchFailureResult = -1;
+    fixture.Configure(calls, options);
+    const auto result = OHOS::MMI::InputCli::Run({ "touch-swipe", "--srcX", "10", "--srcY", "20", "--dstX", "30",
+        "--dstY", "40", "--duration", "0" });
+    EXPECT_EQ(result.code, SERVICE_EXIT);
+    ExpectTouchError(result, "ERR_INPUT_SERVICE_EXCEPTION");
+    ExpectCalls(calls, { { "CreateTouchController", {} }, { "TouchDown", { 0, 0, 10, 20 } },
+        { "TouchMove", { 0, 0, 30, 40 } }, { "TouchUp", { 0, 0, 10, 20 } } });
 }
 
 HWTEST_F(InputTouchCommandTest, TouchSwipe_StationaryPathWaitsDurationWithoutMove, TestSize.Level1)

@@ -500,7 +500,7 @@
           },
           "duration": {
             "type": "integer",
-            "description": "Swipe duration in milliseconds",
+            "description": "Swipe duration in milliseconds. When 0, moves directly to the endpoint if it differs from the start, then lifts.",
             "minimum": 0,
             "maximum": 5000,
             "default": 500

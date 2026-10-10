@@ -99,11 +99,15 @@ int32_t InjectSwipe(TouchControllerImpl &controller, const SwipeOptions &options
     int32_t lastX = options.srcX;
     int32_t lastY = options.srcY;
     const bool shouldMove = options.srcX != options.dstX || options.srcY != options.dstY;
-    if (!shouldMove) {
-        if (options.duration > 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(options.duration));
+    if (shouldMove && options.duration == 0) {
+        ret = controller.TouchMove(TOUCH_ID, options.displayId, options.dstX, options.dstY);
+        if (ret != 0) {
+            (void)controller.TouchUp(TOUCH_ID, options.displayId, lastX, lastY);
+            return HandleControllerError(ret, "TouchMove");
         }
-    } else {
+    } else if (!shouldMove && options.duration > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(options.duration));
+    } else if (shouldMove) {
         for (const auto &step : BuildSwipeSteps(options)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(step.delayMs));
             ret = controller.TouchMove(TOUCH_ID, options.displayId, step.x, step.y);

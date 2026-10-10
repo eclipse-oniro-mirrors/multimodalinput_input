@@ -44,11 +44,12 @@ platform injection or destructor cleanup; those require platform/board tests.
 | `ohos-input touch-tap --x 1 --y 2 --duration 5000` | maximum accepted duration | CONTROL_DEVICE | PC + controller injection feature |
 | `ohos-input touch-swipe --srcX 100 --srcY 500 --dstX 900 --dstY 500` | required arguments, default display 0 and duration 500ms | CONTROL_DEVICE | PC + controller injection feature |
 | `ohos-input touch-swipe --displayId 0 --srcX 100 --srcY 500 --dstX 900 --dstY 500 --duration 500` | explicit display and duration; DOWN, linear MOVE, UP | CONTROL_DEVICE | PC + controller injection feature |
-| `ohos-input touch-swipe --srcX 0 --srcY 0 --dstX 10 --dstY 10 --duration 0` | zero duration; DOWN then UP without MOVE | CONTROL_DEVICE | PC + controller injection feature |
+| `ohos-input touch-swipe --srcX 0 --srcY 0 --dstX 10 --dstY 10 --duration 0` | zero duration; DOWN, one MOVE to endpoint, then UP | CONTROL_DEVICE | PC + controller injection feature |
 | `ohos-input touch-swipe --srcX 1 --srcY 2 --dstX 3 --dstY 4 --duration 5000` | maximum accepted duration | CONTROL_DEVICE | PC + controller injection feature |
 | mocked `touch-tap --x 15 --y 25 --duration 0` | `CreateTouchController`, DOWN(15,25), UP(15,25); success JSON | Mocked controller | Host unit test |
 | mocked `touch-tap --displayId 0 --x 500 --y 800 --duration 200` | spec AC-1.1 coordinates/display, DOWN then UP, JSON data and at least 180ms elapsed | Mocked controller | Host unit test |
-| mocked `touch-swipe --displayId 2 --srcX 10 --srcY 20 --dstX 30 --dstY 40 --duration 0` | DOWN then UP at destination, with no MOVE | Mocked controller | Host unit test |
+| mocked `touch-swipe --displayId 2 --srcX 10 --srcY 20 --dstX 30 --dstY 40 --duration 0` | DOWN, one MOVE to destination, then UP | Mocked controller | Host unit test |
+| mocked stationary `touch-swipe --srcX 10 --srcY 20 --dstX 10 --dstY 20 --duration 0` | DOWN then UP at the same point, with no MOVE | Mocked controller | Host unit test |
 | mocked `touch-swipe --srcX 0 --srcY 20 --dstX 100 --dstY 40 --duration 256` | ordered DOWN, one or more MOVE, UP at endpoint | Mocked controller | Host unit test (uses short real timer interval) |
 | mocked `touch-swipe --displayId 0 --srcX 100 --srcY 500 --dstX 900 --dstY 500 --duration 500` | spec AC-2.1 arguments, >=2 MOVE calls with strictly increasing X below 900, endpoint UP at 900, JSON data and at least 480ms elapsed | Mocked controller | Host unit test |
 | mocked permission denial from touch controller factory | `ERR_PERMISSION_DENIED`, exit 3, and no DOWN/MOVE/UP | Mocked controller | Host unit test; actual SA identity enforcement also needs board test |
