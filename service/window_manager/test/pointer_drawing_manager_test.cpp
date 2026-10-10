@@ -5902,5 +5902,139 @@ HWTEST_F(PointerDrawingManagerTest,
     EXPECT_EQ(pointerDrawingManager.canvasHeight_, (100 / 64 + 1) * 64);
 }
 
+
+/**
+ * @tc.name: PointerDrawingManagerTest_OnWindowInfo_WindowScaleFactor_001
+ * @tc.desc: Test OnWindowInfo records window scale factor and falls back to 1.0 on invalid values
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_OnWindowInfo_WindowScaleFactor_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+
+    WinInfo info = { .windowPid = 100, .windowId = 200, .windowScaleFactor = 2.0f };
+    pointerDrawingManager.OnWindowInfo(info);
+    EXPECT_EQ(pointerDrawingManager.pid_, 100);
+    EXPECT_EQ(pointerDrawingManager.windowId_, 200);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 2.0f);
+
+    WinInfo zeroInfo = { .windowPid = 100, .windowId = 200, .windowScaleFactor = 0.0f };
+    pointerDrawingManager.OnWindowInfo(zeroInfo);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+
+    WinInfo negativeInfo = { .windowPid = 100, .windowId = 200, .windowScaleFactor = -1.0f };
+    pointerDrawingManager.OnWindowInfo(negativeInfo);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+
+    WinInfo nanInfo = { .windowPid = 100, .windowId = 200,
+        .windowScaleFactor = std::numeric_limits<float>::quiet_NaN() };
+    pointerDrawingManager.OnWindowInfo(nanInfo);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_001
+ * @tc.desc: Test CreateRenderConfig scale custom cursor by window scale factor
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_001,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    CursorDrawingInformation::GetInstance().userIcon_ = PointerDrawingManagerTest::CreatePixelMap(100, 100);
+    ASSERT_NE(CursorDrawingInformation::GetInstance().userIcon_, nullptr);
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.focusX_ = 10;
+    pointerDrawingManager.focusY_ = 20;
+    WinInfo info = { .windowPid = 1, .windowId = 2, .windowScaleFactor = 2.0f };
+    pointerDrawingManager.OnWindowInfo(info);
+    ASSERT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 2.0f);
+
+    RenderConfig cfg;
+    OLD::DisplayInfo displayInfo;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(nullptr, nullptr, displayInfo);
+    pointerDrawingManager.CreateRenderConfig(cfg, screenpointer, MOUSE_ICON::DEVELOPER_DEFINED_ICON,
+        false, 0, 0, 0);
+    ASSERT_NE(cfg.userIconPixelMap, nullptr);
+    EXPECT_EQ(cfg.userIconHotSpotX, 20);
+    EXPECT_EQ(cfg.userIconHotSpotY, 40);
+    Media::ImageInfo imageInfo;
+    cfg.userIconPixelMap->GetImageInfo(imageInfo);
+    EXPECT_EQ(imageInfo.size.width, 200);
+    EXPECT_EQ(imageInfo.size.height, 200);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 2.0f);
+    CursorDrawingInformation::GetInstance().userIcon_ = nullptr;
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_002
+ * @tc.desc: Test CreateRenderConfig clamps overscaled custom cursor size, window scale factor unchanged
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_002,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    CursorDrawingInformation::GetInstance().userIcon_ = PointerDrawingManagerTest::CreatePixelMap(128, 128);
+    ASSERT_NE(CursorDrawingInformation::GetInstance().userIcon_, nullptr);
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.focusX_ = 50;
+    pointerDrawingManager.focusY_ = 50;
+    WinInfo info = { .windowPid = 1, .windowId = 2, .windowScaleFactor = 4.0f };
+    pointerDrawingManager.OnWindowInfo(info);
+    ASSERT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 4.0f);
+
+    RenderConfig cfg;
+    OLD::DisplayInfo displayInfo;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(nullptr, nullptr, displayInfo);
+    pointerDrawingManager.CreateRenderConfig(cfg, screenpointer, MOUSE_ICON::DEVELOPER_DEFINED_ICON,
+        false, 0, 0, 0);
+    ASSERT_NE(cfg.userIconPixelMap, nullptr);
+    Media::ImageInfo imageInfo;
+    cfg.userIconPixelMap->GetImageInfo(imageInfo);
+    EXPECT_EQ(imageInfo.size.width, 256);
+    EXPECT_EQ(imageInfo.size.height, 256);
+    EXPECT_EQ(cfg.userIconHotSpotX, 100);
+    EXPECT_EQ(cfg.userIconHotSpotY, 100);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 4.0f);
+    CursorDrawingInformation::GetInstance().userIcon_ = nullptr;
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_003
+ * @tc.desc: Test CreateRenderConfig keeps existing behavior when window scale factor is 1.0
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_003,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    CursorDrawingInformation::GetInstance().userIcon_ = PointerDrawingManagerTest::CreatePixelMap(128, 128);
+    ASSERT_NE(CursorDrawingInformation::GetInstance().userIcon_, nullptr);
+    PointerDrawingManager pointerDrawingManager;
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+    pointerDrawingManager.focusX_ = 50;
+    pointerDrawingManager.focusY_ = 50;
+
+    RenderConfig cfg;
+    OLD::DisplayInfo displayInfo;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(nullptr, nullptr, displayInfo);
+    pointerDrawingManager.CreateRenderConfig(cfg, screenpointer, MOUSE_ICON::DEVELOPER_DEFINED_ICON,
+        false, 0, 0, 0);
+    ASSERT_NE(cfg.userIconPixelMap, nullptr);
+    Media::ImageInfo imageInfo;
+    cfg.userIconPixelMap->GetImageInfo(imageInfo);
+    EXPECT_EQ(imageInfo.size.width, 128);
+    EXPECT_EQ(imageInfo.size.height, 128);
+    EXPECT_EQ(cfg.userIconHotSpotX, 50);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+    CursorDrawingInformation::GetInstance().userIcon_ = nullptr;
+}
 } // namespace MMI
 } // namespace OHOS

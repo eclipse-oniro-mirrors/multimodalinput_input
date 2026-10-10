@@ -381,6 +381,7 @@ private:
     PointerStyle lastDrawPointerStyle_ {};
     int32_t pid_ { 0 };
     int32_t windowId_ { 0 };
+    float windowScaleFactor_ { 1.0f };
     int32_t imageWidth_ { 0 };
     int32_t imageHeight_ { 0 };
     int32_t canvasWidth_ = 64;

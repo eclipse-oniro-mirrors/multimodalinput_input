@@ -2797,7 +2797,7 @@ void InputWindowsManager::PointerDrawingManagerOnDisplayInfo(const OLD::DisplayG
             return;
         }
         int32_t windowPid = GetWindowPid(windowInfo->id);
-        WinInfo info = { .windowPid = windowPid, .windowId = windowInfo->id };
+        WinInfo info = { .windowPid = windowPid, .windowId = windowInfo->id, .windowScaleFactor = 1.0f };
         CursorDrawingComponent::GetInstance().OnWindowInfo(info);
         PointerStyle pointerStyle;
         GetPointerStyle(info.windowPid, info.windowId, pointerStyle);
@@ -2935,7 +2935,7 @@ void InputWindowsManager::UpdatePointerDrawingManagerWindowInfo()
     }
     CHKFRV(windowInfo, "The windowInfo is nullptr");
     int32_t windowPid = GetWindowPid(windowInfo->id);
-    WinInfo info = { .windowPid = windowPid, .windowId = windowInfo->id };
+    WinInfo info = { .windowPid = windowPid, .windowId = windowInfo->id, .windowScaleFactor = 1.0f };
     CursorDrawingComponent::GetInstance().OnWindowInfo(info);
 }
 
@@ -5350,7 +5350,7 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
         }
     }
     CursorDrawingComponent::GetInstance().UpdateDisplayInfo(*physicalDisplayInfo);
-    WinInfo info = { .windowPid = touchWindow->pid, .windowId = touchWindow->id };
+    WinInfo info = { .windowPid = touchWindow->pid, .windowId = touchWindow->id, .windowScaleFactor = 1.0f };
     CursorDrawingComponent::GetInstance().OnWindowInfo(info);
 #endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
 #ifdef OHOS_BUILD_EMULATOR
@@ -6702,7 +6702,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         }
 
         CursorDrawingComponent::GetInstance().UpdateDisplayInfo(*physicDisplayInfo);
-        WinInfo info = { .windowPid = touchWindow->pid, .windowId = touchWindow->id };
+        WinInfo info = { .windowPid = touchWindow->pid, .windowId = touchWindow->id, .windowScaleFactor = 1.0f };
         CursorDrawingComponent::GetInstance().OnWindowInfo(info);
         auto displayInfo = GetPhysicalDisplay(displayId);
         CHKPR(displayInfo, RET_ERR);

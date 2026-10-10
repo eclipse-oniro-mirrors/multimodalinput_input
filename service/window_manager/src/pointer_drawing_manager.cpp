@@ -15,6 +15,7 @@
 
 #include "pointer_drawing_manager.h"
 
+#include <cmath>
 #include <parameters.h>
 #include <regex>
 #include <utility>
@@ -2912,9 +2913,14 @@ void PointerDrawingManager::OnDisplayInfo(const OLD::DisplayGroupInfo &displayGr
 void PointerDrawingManager::OnWindowInfo(const WinInfo &info)
 {
     CALL_DEBUG_ENTER;
-    if (pid_ != info.windowPid || windowId_ != info.windowId) {
+    float windowScaleFactor = std::isfinite(info.windowScaleFactor) && info.windowScaleFactor > 0.0f ?
+        info.windowScaleFactor : 1.0f;
+    if (pid_ != info.windowPid || windowId_ != info.windowId || windowScaleFactor_ != windowScaleFactor) {
         windowId_ = info.windowId;
         pid_ = info.windowPid;
+        windowScaleFactor_ = windowScaleFactor;
+        MMI_HILOGI("pid: %{public}d, windowId: %{public}d, windowScaleFactor: %{public}f",
+            pid_, windowId_, windowScaleFactor_);
         UpdatePointerVisible();
     }
 }
@@ -3739,10 +3745,19 @@ void PointerDrawingManager::CreateRenderConfig(RenderConfig& cfg, std::shared_pt
         MMI_HILOGD("Set mouseIcon by userIcon_");
         cfg.userIconPixelMap = GetUserIconCopy();
         CHKPV(cfg.userIconPixelMap);
-        cfg.userIconHotSpotX = userIconHotSpotX_ * scale;
-        cfg.userIconHotSpotY = userIconHotSpotY_ * scale;
+        float effectiveScale = scale * windowScaleFactor_;
+        if (effectiveScale > scale) {
+            Media::ImageInfo imageInfo;
+            cfg.userIconPixelMap->GetImageInfo(imageInfo);
+            float maxDimension = static_cast<float>(std::max(imageInfo.size.width, imageInfo.size.height));
+            if (maxDimension > 0.0f) {
+                effectiveScale = std::min(effectiveScale, MAX_CUSTOM_CURSOR_DIMENSION / maxDimension);
+            }
+        }
+        cfg.userIconHotSpotX = userIconHotSpotX_ * effectiveScale;
+        cfg.userIconHotSpotY = userIconHotSpotY_ * effectiveScale;
         cfg.userIconFollowSystem = userIconFollowSystem_;
-        ScalePixelMap(cfg.userIconPixelMap.get(), scale, scale);
+        ScalePixelMap(cfg.userIconPixelMap.get(), effectiveScale, effectiveScale);
     }
 }
 
