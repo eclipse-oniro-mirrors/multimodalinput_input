@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2025-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,8 +38,6 @@ constexpr int32_t POINTER_WINDOW_INIT_SIZE{64};
 constexpr int32_t BUFFER_RELEASE_WAIT_MS{1000};
 constexpr int32_t NUM_TWO{2};
 constexpr int32_t DEFAULT_BUFFER_SIZE{8};
-constexpr int32_t DEFAULT_CURSOR_SIZE{512};
-constexpr uint32_t FOCUS_POINT = DEFAULT_CURSOR_SIZE / NUM_TWO;
 constexpr int32_t BUFFER_TIMEOUT{150};
 constexpr int32_t STRIDE_ALIGNMENT{8};
 constexpr uint32_t RENDER_STRIDE{4};
@@ -149,6 +147,30 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, const O
         std::swap(width_, height_);
     }
     dpi_ = float(di.dpi) / BASELINE_DENSITY;
+    // Populate mode and off-screen state from DisplayInfo so that the first ResolveBufferSide()
+    // call during Init() uses the correct values rather than the zero-initialised defaults.
+    // MMI::DisplaySourceMode and Rosen::ScreenSourceMode share the same names but different
+    // integer values, so an explicit name-to-name mapping is required instead of a numeric cast.
+    switch (di.displaySourceMode) {
+        case OHOS::MMI::DisplaySourceMode::SCREEN_MIRROR:
+            mode_ = mode_t::SCREEN_MIRROR;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_EXTEND:
+            mode_ = mode_t::SCREEN_EXTEND;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_ALONE:
+            mode_ = mode_t::SCREEN_ALONE;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_UNIQUE:
+            mode_ = mode_t::SCREEN_UNIQUE;
+            break;
+        case OHOS::MMI::DisplaySourceMode::SCREEN_MAIN:
+        default:
+            mode_ = mode_t::SCREEN_MAIN;
+            break;
+    }
+    isCurrentOffScreenRendering_ = di.isCurrentOffScreenRendering;
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with DisplayInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
 }
@@ -167,6 +189,7 @@ ScreenPointer::ScreenPointer(hwcmgr_ptr_t hwcMgr, handler_ptr_t handler, screen_
     width_ = result.width;
     height_ = result.height;
     rotation_ = result.rotation;
+    bufferSize_ = static_cast<uint32_t>(GetCursorBufferSize());
     MMI_HILOGI("Construct with ScreenInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
         "rotation=%{public}u, dpi=%{public}f", screenId_, width_, height_, mode_, rotation_.load(), dpi_);
 }
@@ -179,8 +202,35 @@ ScreenPointer::~ScreenPointer()
 
 bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 {
+    // Mirror screens and off-screen-rendering extended screens scale the cursor up
+    // (GetScale() > 1), so the upscaled glyph no longer fits a 256 buffer. The tier can change
+    // after construction -- the off-screen flag and the screen mode both arrive later -- so
+    // rebuild the pool whenever the resolved side differs from the one it was built at.
+    // InitCommonBuffer only tops the pool up to DEFAULT_BUFFER_SIZE, so without this the eight
+    // common buffers would keep their old side while default/transparent were rebuilt, leaving
+    // the hotspot (computed from bufferSize_) out of step with the pixels actually drawn.
+    uint32_t desiredSide = ResolveBufferSide();
+    uint32_t prevBufferSize = bufferSize_;
+    if (desiredSide != bufferSize_) {
+        MMI_HILOGI("Buffer side change %{public}u -> %{public}u, rebuilding pool",
+            bufferSize_, desiredSide);
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            currentBuffer_ = nullptr;
+            defaultBuffer_ = nullptr;
+            transparentBuffer_ = nullptr;
+            commonBuffers_.clear();
+            // Write bufferSize_ inside the exclusive lock so soft-render thread reads via
+            // GetBufferSize() are always consistent with the pool state they observe.
+            bufferSize_ = desiredSide;
+        }
+    }
     if (!InitSurface(needDrawPointer)) {
         MMI_HILOGE("ScreenPointer InitSurface failed");
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            bufferSize_ = prevBufferSize;
+        }
         return false;
     }
 
@@ -201,27 +251,63 @@ bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 
     // Init buffers
     OHOS::BufferRequestConfig bufferCfg = {
-        .width = DEFAULT_CURSOR_SIZE,
-        .height = DEFAULT_CURSOR_SIZE,
+        .width = static_cast<int32_t>(bufferSize_),
+        .height = static_cast<int32_t>(bufferSize_),
         .strideAlignment = STRIDE_ALIGNMENT,
         .format = GRAPHIC_PIXEL_FMT_RGBA_8888,
         .usage = BUFFER_USAGE_CPU_READ | BUFFER_USAGE_CPU_WRITE | BUFFER_USAGE_MEM_DMA | BUFFER_USAGE_HW_COMPOSER
             | BUFFER_USAGE_MEM_MMZ_CACHE,
         .timeout = BUFFER_TIMEOUT,
     };
+    return InitBuffers(bufferCfg, render);
+}
+
+// Initialises default, transparent and common buffer pools; rolls back all buffers on
+// any failure so that IsPoolEmpty() correctly detects an incomplete rebuild.
+bool ScreenPointer::InitBuffers(const OHOS::BufferRequestConfig &bufferCfg, PointerRenderer &render)
+{
     if (!InitDefaultBuffer(bufferCfg, render)) {
         MMI_HILOGE("ScreenPointer InitDefaultBuffer failed");
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            defaultBuffer_ = nullptr;
+            transparentBuffer_ = nullptr;
+            commonBuffers_.clear();
+            currentBuffer_ = nullptr;
+        }
         return false;
     }
     if (!InitTransparentBuffer(bufferCfg)) {
         MMI_HILOGE("ScreenPointer InitTransparentBuffer failed");
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            defaultBuffer_ = nullptr;
+            transparentBuffer_ = nullptr;
+            commonBuffers_.clear();
+            currentBuffer_ = nullptr;
+        }
         return false;
     }
     if (!InitCommonBuffer(bufferCfg)) {
         MMI_HILOGE("ScreenPointer InitCommonBuffer failed");
+        {
+            std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+            defaultBuffer_ = nullptr;
+            transparentBuffer_ = nullptr;
+            commonBuffers_.clear();
+            currentBuffer_ = nullptr;
+        }
         return false;
     }
-    GetCommonBuffer();
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        uint32_t poolSize = static_cast<uint32_t>(commonBuffers_.size());
+        if (poolSize > 0) {
+            uint32_t newId = bufferId_.load(std::memory_order_relaxed) + 1;
+            newId %= poolSize;
+            bufferId_.store(newId, std::memory_order_relaxed);
+        }
+    }
     return true;
 }
 
@@ -234,9 +320,9 @@ bool ScreenPointer::InitDefaultBuffer(const OHOS::BufferRequestConfig &bufferCfg
     int32_t ret = render.Render(addr, buffer->GetWidth(), buffer->GetHeight(), defaultCursorCfg_);
     if (ret != RET_OK) {
         MMI_HILOGE("Render failed, ret:%{public}d.", ret);
-        defaultBuffer_ = nullptr;
         return false;
     }
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
     defaultBuffer_ = buffer;
     return true;
 }
@@ -250,71 +336,141 @@ bool ScreenPointer::InitTransparentBuffer(const OHOS::BufferRequestConfig &buffe
 
     uint32_t addrSize = static_cast<uint32_t>(buffer->GetWidth() * buffer->GetHeight()) * RENDER_STRIDE;
     (void)memset_s(addr, addrSize, 0, addrSize);
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
     transparentBuffer_ = buffer;
     return true;
 }
 
 bool ScreenPointer::InitCommonBuffer(const OHOS::BufferRequestConfig &bufferCfg)
 {
-    for (int32_t i = 0; (i < DEFAULT_BUFFER_SIZE) && (commonBuffers_.size() < DEFAULT_BUFFER_SIZE); i++) {
+    // Allocate all buffers outside the lock (slow allocation), then commit atomically.
+    std::vector<buffer_ptr_t> newBuffers;
+    newBuffers.reserve(DEFAULT_BUFFER_SIZE);
+    for (int32_t i = 0; i < DEFAULT_BUFFER_SIZE; i++) {
         buffer_ptr_t buffer = CreateSurfaceBuffer(bufferCfg);
         CHKPF(buffer);
-        commonBuffers_.push_back(buffer);
+        newBuffers.push_back(buffer);
     }
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+    commonBuffers_ = std::move(newBuffers);
     return true;
 }
 
 buffer_ptr_t ScreenPointer::GetDefaultBuffer()
 {
-    {
-        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
-        currentBuffer_ = defaultBuffer_;
-    }
+    std::shared_lock<std::shared_mutex> lock(bufferMutex_);
     return defaultBuffer_;
 }
 
 buffer_ptr_t ScreenPointer::GetTransparentBuffer()
 {
-    {
-        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
-        currentBuffer_ = transparentBuffer_;
-    }
+    std::shared_lock<std::shared_mutex> lock(bufferMutex_);
     return transparentBuffer_;
 }
 
 buffer_ptr_t ScreenPointer::GetCommonBuffer()
 {
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
     uint32_t bufferSize = static_cast<uint32_t>(commonBuffers_.size());
     if (bufferSize != DEFAULT_BUFFER_SIZE) {
         MMI_HILOGE("The buffer size is incorrect, size:%{public}u", bufferSize);
         return nullptr;
     }
-
     uint32_t newId = bufferId_.load(std::memory_order_relaxed) + 1;
     newId %= bufferSize;
     bufferId_.store(newId, std::memory_order_relaxed);
-    {
-        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
-        currentBuffer_ = commonBuffers_[newId];
-    }
+    currentBuffer_ = commonBuffers_[newId];
     return commonBuffers_[newId];
+}
+
+void ScreenPointer::UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide)
+{
+    int32_t side = (bufferSide > 0) ? bufferSide : DEFAULT_CURSOR_SIZE;
+    int32_t x;
+    int32_t y;
+    if (side == BLUR_CURSOR_SIZE) {
+        // 512-tier: draw origin is BufferFocus - GetFocusX/Y; hotspot = origin + focus = side/2.
+        x = side / NUM_TWO;
+        y = side / NUM_TWO;
+    } else {
+        x = cfg.HotspotInBufferX(side);
+        y = cfg.HotspotInBufferY(side);
+    }
+    // Written under bufferMutex_ so the hotspot and the buffer it belongs to are published as
+    // one frame. Move()/MoveSoft() take the same lock and read both together; without it the
+    // retry thread could pair a newly cached hotspot with the previous buffer (a 256-tier
+    // DEFAULT -> LOADING switch shifts the hotspot 128 -> 108 and moves the arrow by 20px).
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+    if (isHard) {
+        hotspotHardX_ = x;
+        hotspotHardY_ = y;
+    } else {
+        hotspotSoftX_ = x;
+        hotspotSoftY_ = y;
+    }
 }
 
 buffer_ptr_t ScreenPointer::RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer)
 {
+    // Each branch takes the lock once to read bufferSize_ alongside the pool access, ensuring
+    // the hotspot is computed from the same tier as the buffer.  The frame is NOT published here
+    // — currentBuffer_ and hotspot are committed only after FlushCache succeeds (see PublishFrame).
     if (cfg.style_ == MOUSE_ICON::TRANSPARENT_ICON) {
         MMI_HILOGD("The buffer transparent buffer.");
         isCommonBuffer = false;
-        return GetTransparentBuffer();
-    } else if (IsDefaultCfg(cfg)) {
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        return transparentBuffer_;
+    }
+    if (IsDefaultCfg(cfg)) {
         MMI_HILOGD("The buffer default buffer.");
         isCommonBuffer = false;
-        return GetDefaultBuffer();
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        return defaultBuffer_;
     }
+    // Common buffer: size check, id advance under one exclusive lock.
     isCommonBuffer = true;
-    return GetCommonBuffer();
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+    uint32_t poolSize = static_cast<uint32_t>(commonBuffers_.size());
+    if (poolSize != DEFAULT_BUFFER_SIZE) {
+        MMI_HILOGE("The buffer size is incorrect, size:%{public}u", poolSize);
+        return nullptr;
+    }
+    uint32_t newId = bufferId_.load(std::memory_order_relaxed) + 1;
+    newId %= poolSize;
+    bufferId_.store(newId, std::memory_order_relaxed);
+    return commonBuffers_[newId];
 }
 
+void ScreenPointer::PublishFrame(const RenderConfig &cfg, buffer_ptr_t buffer)
+{
+    // Derive the hotspot from the buffer's own side length, not bufferSize_, so a concurrent
+    // tier-change rebuild cannot cause a mismatch: if a 256-tier buffer is flushed while a 512
+    // rebuild completes, the hotspot is still computed from 256 (the buffer that was drawn into).
+    if (!buffer) {
+        return;
+    }
+    int32_t side = buffer->GetWidth();
+    if (side <= 0) {
+        side = DEFAULT_CURSOR_SIZE;
+    }
+    std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+    hotspotHardX_ = (side == BLUR_CURSOR_SIZE) ? (side / NUM_TWO) : cfg.HotspotInBufferX(side);
+    hotspotHardY_ = (side == BLUR_CURSOR_SIZE) ? (side / NUM_TWO) : cfg.HotspotInBufferY(side);
+    currentBuffer_ = buffer;
+}
+
+// Decides whether a frame can be served the one-shot defaultBuffer_, which InitDefaultBuffer renders
+// exactly once from defaultCursorCfg_ (DIRECTION0, no blur) and is never redrawn afterwards --
+// DrawHardCursor skips Render() for it. Anything this rejects falls through to commonBuffers_ and is
+// re-rendered every frame.
+// RenderConfig::operator== only compares style_, GetImageSize() and color, so each term below has to
+// be spelled out; every one of them changes the pixels while leaving operator== equal:
+//   - direction: a rotated screen turns the glyph about the buffer focus, so DIRECTION0's cached
+//     image is wrong. Rotating away drops to the per-frame path and rotating back re-enters this one.
+//   - isBlur: the trail is composed per frame from the pointer's own motion, so a blurred frame can
+//     never reuse a cached image. Omitting this term would hand moving cursors the static buffer and
+//     the trail would never appear at all.
+//   - align_/isHard: change the draw origin and the target buffer pool respectively.
 bool ScreenPointer::IsDefaultCfg(const RenderConfig &cfg)
 {
     return (cfg == defaultCursorCfg_) && (cfg.direction == defaultCursorCfg_.direction)
@@ -345,11 +501,14 @@ buffer_ptr_t ScreenPointer::CreateSurfaceBuffer(const OHOS::BufferRequestConfig 
 
 bool ScreenPointer::InitSurface(bool needDrawPointer)
 {
-    // Remove surfaceNode from render tree
-    if (surfaceNode_ != nullptr) {
+    // Null the old node under bufferMutex_ first, so a concurrent MoveSoft() that snapshots
+    // surfaceNode_ under the same lock sees nullptr and returns early rather than using a
+    // node that is about to be destroyed.
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
         surfaceNode_ = nullptr;
-        RsFlushImplicitTransaction();
     }
+    RsFlushImplicitTransaction();
 
     // create RSUIDirector and RSUIContext
     if (!InitRSUIContext(screenId_)) {
@@ -357,35 +516,35 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
         return false;
     }
 
-    // create SurfaceNode
+    // Build the SurfaceNode into a local variable; publish it under bufferMutex_ only after
+    // it is fully configured so MoveSoft() never snapshots a half-initialised node.
+    std::shared_ptr<Rosen::RSSurfaceNode> newNode;
     Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
     surfaceNodeConfig.SurfaceNodeName = RS_SURFACE_NODE_NAME;
-    surfaceNode_ = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, Rosen::RSSurfaceNodeType::CURSOR_NODE,
+    newNode = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, Rosen::RSSurfaceNodeType::CURSOR_NODE,
         true, false, rsUIContext_);
-    CHKPF(surfaceNode_);
-    surfaceNode_->SetSkipCheckInMultiInstance(true);
+    CHKPF(newNode);
+    newNode->SetSkipCheckInMultiInstance(true);
     MMI_HILOGI("SurfaceNode::Create success");
 
-    // set soft cursor buffer size
-    auto surface = surfaceNode_->GetSurface();
+    auto surface = newNode->GetSurface();
     CHKPF(surface);
     surface->SetQueueSize(DEFAULT_BUFFER_SIZE);
 
-    surfaceNode_->SetVisible(true);
-    surfaceNode_->SetSnapshotSkipLayer(true);
-    surfaceNode_->SetFrameGravity(Rosen::Gravity::TOP_LEFT);
-    surfaceNode_->SetPositionZ(Rosen::RSSurfaceNode::POINTER_WINDOW_POSITION_Z);
+    newNode->SetVisible(true);
+    newNode->SetSnapshotSkipLayer(true);
+    newNode->SetFrameGravity(Rosen::Gravity::TOP_LEFT);
+    newNode->SetPositionZ(Rosen::RSSurfaceNode::POINTER_WINDOW_POSITION_Z);
     if (needDrawPointer) {
-        surfaceNode_->AttachToDisplay(screenId_);
+        newNode->AttachToDisplay(screenId_);
     }
-    surfaceNode_->SetBounds(0, 0, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+    newNode->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
     MMI_HILOGI("AttachToDisplay %{public}" PRIu64 " completed, needDrawPointer=%{public}d", screenId_, needDrawPointer);
 
-    // create canvas node
     canvasNode_ = Rosen::RSCanvasNode::Create(false, false, rsUIContext_);
     CHKPF(canvasNode_);
-    canvasNode_->SetBounds(0, 0, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
-    canvasNode_->SetFrame(0, 0, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+    canvasNode_->SetBounds(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
+    canvasNode_->SetFrame(0, 0, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
 #ifndef USE_ROSEN_DRAWING
     canvasNode_->SetBackgroundColor(SK_ColorTRANSPARENT);
 #else
@@ -394,7 +553,13 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
     canvasNode_->SetCornerRadius(1);
     canvasNode_->SetPositionZ(Rosen::RSSurfaceNode::POINTER_WINDOW_POSITION_Z);
     canvasNode_->SetRotation(float(rotation_.load()));
-    surfaceNode_->AddChild(canvasNode_, RS_NODE_CANVAS_INDEX);
+    newNode->AddChild(canvasNode_, RS_NODE_CANVAS_INDEX);
+
+    // Publish the fully-configured node atomically so MoveSoft() snapshots a complete node.
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        surfaceNode_ = std::move(newNode);
+    }
 
     MMI_HILOGI("InitSurface completed");
     return true;
@@ -403,7 +568,11 @@ bool ScreenPointer::InitSurface(bool needDrawPointer)
 void ScreenPointer::UpdateScreenInfo(sptr<OHOS::Rosen::ScreenInfo> si, bool needDrawPointer)
 {
     CHKPV(si);
-    CHKPV(surfaceNode_);
+    // Update all screen metadata unconditionally — mode_, width_, height_, dpi_ etc. must
+    // reflect the current screen regardless of whether the surface node exists.  If a previous
+    // Init() failed and left the node null, the IsPoolEmpty() gate will trigger a retry; that
+    // retry must see the correct mode or it will rebuild a 512 pool for a mirror that has since
+    // reverted to extend mode.
     screenId_ = si->GetRsId();
     mode_ = si->GetSourceMode();
     dpi_ = si->GetVirtualPixelRatio();
@@ -415,9 +584,11 @@ void ScreenPointer::UpdateScreenInfo(sptr<OHOS::Rosen::ScreenInfo> si, bool need
     width_ = result.width;
     height_ = result.height;
     rotation_ = result.rotation;
-    if (needDrawPointer) {
-        surfaceNode_->RemoveFromTree();
-        surfaceNode_->AttachToDisplay(screenId_);
+    // Node operations only when the node is present.
+    auto node = GetSurfaceNode();
+    if (needDrawPointer && node != nullptr) {
+        node->RemoveFromTree();
+        node->AttachToDisplay(screenId_);
     }
     RsFlushImplicitTransaction();
     MMI_HILOGI("Update with ScreenInfo, id=%{public}" PRIu64 ", shape=(%{public}u, %{public}u), mode=%{public}u, "
@@ -584,6 +755,40 @@ void ScreenPointer::CalculateHwcPositionForMirror(int32_t& x, int32_t& y)
     y += paddingTop_;
 }
 
+int32_t GetCursorBufferSize()
+{
+    // const. properties are read-only and fixed at boot, so the tier cannot change while the
+    // process lives. A function-local static keeps the parameter lookup off the per-frame draw
+    // path without needing an ownership story for a global; thread-safe init is guaranteed.
+    static const int32_t side = OHOS::system::GetBoolParameter(
+        "const.multimodalinput.support_blur_cursor", false) ? BLUR_CURSOR_SIZE : DEFAULT_CURSOR_SIZE;
+    return side;
+}
+
+uint32_t ScreenPointer::ResolveBufferSide()
+{
+    // Mirror screens and off-screen-rendering extended screens scale the cursor up
+    // (GetScale() > 1) to match the target resolution, so the upscaled glyph no longer fits a
+    // 256 buffer: a 200x200 icon at scale 2.0 becomes 400x400. Those two therefore require 512.
+    // Every other screen follows the boot-fixed blur switch.
+    if (IsMirror() || (IsExtend() && GetIsCurrentOffScreenRendering())) {
+        return static_cast<uint32_t>(BLUR_CURSOR_SIZE);
+    }
+    return static_cast<uint32_t>(GetCursorBufferSize());
+}
+
+uint32_t ScreenPointer::GetBufferSize() const
+{
+    std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+    return bufferSize_;
+}
+
+bool ScreenPointer::IsPoolEmpty() const
+{
+    std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+    return commonBuffers_.empty();
+}
+
 bool ScreenPointer::Move(int32_t x, int32_t y)
 {
     if (isVirtualExtend_) {
@@ -615,15 +820,30 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
         }
     }
 
-    auto buffer = GetCurrentBuffer();
+    return CommitHwcPosition(x, y);
+}
+
+bool ScreenPointer::CommitHwcPosition(int32_t x, int32_t y)
+{
+    buffer_ptr_t buffer;
+    int32_t hotspotX = 0;
+    int32_t hotspotY = 0;
+    {
+        // One frame: the buffer and its matching hotspot are read under the same lock that
+        // UpdateHotspotInBuffer() writes them, so the pair can never be crossed.
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        buffer = currentBuffer_;
+        hotspotX = hotspotHardX_;
+        hotspotY = hotspotHardY_;
+    }
     CHKPF(buffer);
     auto bh = buffer->GetBufferHandle();
     CHKPF(bh);
     if (IsPositionOutScreen(x, y)) {
         MMI_HILOGE("Position out of screen");
     }
-    int32_t px = x - FOCUS_POINT;
-    int32_t py = y - FOCUS_POINT;
+    int32_t px = x - hotspotX;
+    int32_t py = y - hotspotY;
     uint32_t bid = bufferId_.load(std::memory_order_relaxed);
     BytraceAdapter::StartHardPointerMove(buffer->GetWidth(), buffer->GetHeight(), bid, screenId_);
     auto ret = hwcMgr_->SetPosition(screenId_, px, py, bh);
@@ -638,7 +858,15 @@ bool ScreenPointer::Move(int32_t x, int32_t y)
 
 bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
 {
-    if (surfaceNode_ == nullptr) {
+    // Snapshot surfaceNode_ under bufferMutex_ so we can't race with InitSurface(), which
+    // nulls and replaces it under the same lock.  After the snapshot, the local shared_ptr
+    // keeps the node alive even if InitSurface() runs concurrently and replaces the member.
+    std::shared_ptr<Rosen::RSSurfaceNode> node;
+    {
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        node = surfaceNode_;
+    }
+    if (node == nullptr) {
         MMI_HILOGW("SurfaceNode is null in MoveSoft");
         return false;
     }
@@ -654,19 +882,26 @@ bool ScreenPointer::MoveSoft(int32_t x, int32_t y)
     if (IsMirror()) {
         CalculateHwcPositionForMirror(x, y);
     }
-    int32_t px = x - FOCUS_POINT;
-    int32_t py = y - FOCUS_POINT;
+    int32_t hotspotX = 0;
+    int32_t hotspotY = 0;
+    {
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
+        hotspotX = hotspotSoftX_;
+        hotspotY = hotspotSoftY_;
+    }
+    int32_t px = x - hotspotX;
+    int32_t py = y - hotspotY;
 
     if (!IsMirror()) {
-        int64_t nodeId = surfaceNode_->GetId();
-        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, DEFAULT_CURSOR_SIZE,
-            DEFAULT_CURSOR_SIZE);
+        int64_t nodeId = node->GetId();
+        rsUIContext_->GetRSRenderInterface()->SetHwcNodeBounds(nodeId, px, py, static_cast<int32_t>(bufferSize_),
+            static_cast<int32_t>(bufferSize_));
     } else {
-        surfaceNode_->SetBounds(px, py, DEFAULT_CURSOR_SIZE, DEFAULT_CURSOR_SIZE);
+        node->SetBounds(px, py, static_cast<int32_t>(bufferSize_), static_cast<int32_t>(bufferSize_));
     }
     MMI_HILOGD("Pointer Window SetBounds ScreenId:%{public}" PRIu64
         ", surfaceNodeId=%{public}" PRId64 ", pos=(%{private}d, %{private}d)",
-        screenId_, surfaceNode_->GetId(), px, py);
+        screenId_, node->GetId(), px, py);
     return true;
 }
 
@@ -690,6 +925,11 @@ bool ScreenPointer::SetInvisible()
     if (sret != RET_OK) {
         MMI_HILOGE("FlushCache ret: %{public}d", sret);
         return sret;
+    }
+    // Publish the transparent buffer as the current frame so MoveRetry sees a consistent state.
+    {
+        std::unique_lock<std::shared_mutex> lock(bufferMutex_);
+        currentBuffer_ = buffer;
     }
 
     auto bh = buffer->GetBufferHandle();

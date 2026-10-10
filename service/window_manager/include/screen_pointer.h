@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2025-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,21 @@ using screen_info_ptr_t = sptr<OHOS::Rosen::ScreenInfo>;
 using mode_t = OHOS::Rosen::ScreenSourceMode;
 using rotation_t = OHOS::Rosen::Rotation;
 
+// Side length of the cursor buffers. DEFAULT_CURSOR_SIZE is used when
+// const.multimodalinput.support_blur_cursor is false (or absent); BLUR_CURSOR_SIZE is used when
+// that property is true. All paths -- the hard-cursor common/default/transparent buffers, the
+// soft-cursor placeholder surface buffer, the draw origin, HotspotInBuffer(), and
+// Move()/MoveSoft() -- must agree on the same value.
+constexpr int32_t DEFAULT_CURSOR_SIZE{256};
+constexpr int32_t BLUR_CURSOR_SIZE{512};
+
+// The single source of truth for the choice above. Both the ScreenPointer that allocates the
+// buffers and the drawing path that requests a soft placeholder buffer call this rather than
+// reading the property themselves, so the property name, its default and the tier mapping exist in
+// exactly one place. The property is const.-prefixed (read-only, fixed at boot), so the value is
+// resolved once and cached; callers may invoke this per screen or per frame.
+int32_t GetCursorBufferSize();
+
 uint32_t GetScreenInfoWidth(const screen_info_ptr_t);
 uint32_t GetScreenInfoHeight(const screen_info_ptr_t);
 
@@ -64,7 +79,17 @@ public:
     buffer_ptr_t GetTransparentBuffer();
     buffer_ptr_t GetCommonBuffer();
     buffer_ptr_t RequestBuffer(const RenderConfig &cfg, bool &isCommonBuffer);
+    // Publishes the completed frame: atomically commits the hotspot and currentBuffer_ under
+    // bufferMutex_ so that Move()/MoveSoft() always read a matched pair.  Must be called after
+    // Render() and FlushCache() succeed — never before — to prevent MoveRetry from reading a
+    // slot whose pixels haven't been written yet.
+    void PublishFrame(const RenderConfig &cfg, buffer_ptr_t buffer);
     buffer_ptr_t GetCurrentBuffer();
+    // Caches the hotspot for the given path. isHard selects which copy to update: the two paths
+    // run on different threads with their own RenderConfig and must not share one value.
+    // bufferSide is the side of the buffer the image was actually drawn into, which is not always
+    // DEFAULT_CURSOR_SIZE.
+    void UpdateHotspotInBuffer(const RenderConfig &cfg, bool isHard, int32_t bufferSide);
 
     bool Move(int32_t x, int32_t y);
     bool MoveSoft(int32_t x, int32_t y);
@@ -75,6 +100,25 @@ public:
     {
         return screenId_;
     }
+
+    // Side length of the cursor buffers owned by this ScreenPointer. Callers that compute a
+    // rotation pivot must derive it from this rather than a fixed constant, so the pivot stays
+    // inside the buffer when the hard cursor buffer shrinks.
+    uint32_t GetBufferSize() const;
+
+    // Returns true when the buffer pool was never successfully built, or was cleared by a failed
+    // rebuild. Callers that gate re-init on GetBufferSize()==ResolveBufferSide() must also check
+    // this: a failed rebuild leaves bufferSize_ at desiredSide (so the tier comparison is equal)
+    // while the pool is empty, and without this guard the re-init would never retry.
+    bool IsPoolEmpty() const;
+
+    // Resolves the buffer side this screen requires from its current mode and off-screen state.
+    // Mirror screens and off-screen-rendering extended screens scale the cursor up (GetScale() > 1),
+    // so the upscaled glyph no longer fits a 256 buffer and 512 is required; every other screen
+    // follows const.multimodalinput.support_blur_cursor. Evaluated on every mode/display-info change
+    // rather than once in Init(), because the off-screen flag and the mode both arrive after
+    // construction.
+    uint32_t ResolveBufferSide();
 
     uint32_t GetScreenWidth() const
     {
@@ -88,6 +132,9 @@ public:
 
     std::shared_ptr<OHOS::Rosen::RSSurfaceNode> GetSurfaceNode()
     {
+        // Snapshot under bufferMutex_ so concurrent InitSurface() null+replace writes
+        // can't race with callers on the soft-cursor render thread.
+        std::shared_lock<std::shared_mutex> lock(bufferMutex_);
         return surfaceNode_;
     }
 
@@ -209,9 +256,11 @@ private:
     bool InitDefaultBuffer(const OHOS::BufferRequestConfig &bufferCfg, PointerRenderer &render);
     bool InitTransparentBuffer(const OHOS::BufferRequestConfig &bufferCfg);
     bool InitCommonBuffer(const OHOS::BufferRequestConfig &bufferCfg);
+    bool InitBuffers(const OHOS::BufferRequestConfig &bufferCfg, PointerRenderer &render);
     buffer_ptr_t CreateSurfaceBuffer(const OHOS::BufferRequestConfig &bufferCfg);
     bool IsDefaultCfg(const RenderConfig &cfg);
     bool InitRSUIContext(uint64_t screenId);
+    bool CommitHwcPosition(int32_t x, int32_t y);
 
 private:
     std::mutex mtx_;
@@ -243,9 +292,25 @@ private:
     std::shared_ptr<OHOS::Rosen::RSUIContext> rsUIContext_{nullptr};
 
     RenderConfig defaultCursorCfg_;
+    // Resolved once in Init() from const.multimodalinput.support_blur_cursor: BLUR_CURSOR_SIZE when
+    // true, DEFAULT_CURSOR_SIZE otherwise. All paths that allocate or size a buffer, compute a
+    // hotspot, or position a node must derive their side from this member rather than from the
+    // compile-time constant, so they all agree as a set.
+    uint32_t bufferSize_ {DEFAULT_CURSOR_SIZE};
+    // Hotspot position within the rendered buffer, cached for Move()/MoveSoft(), which receive only
+    // a position. Held per path: the two are driven from different threads with their own
+    // RenderConfig (the soft path renders at the screen dpi and has its own direction), so a single
+    // pair let one path's write reposition the other's cursor -- e.g. at direction 90 the hard and
+    // soft hotspots differ by the half-buffer term and the hard cursor would jump by that amount.
+    // Initialised to the buffer centre so behaviour before the first render matches the old
+    // unconditional half-buffer offset.
+    int32_t hotspotHardX_{DEFAULT_CURSOR_SIZE / 2};
+    int32_t hotspotHardY_{DEFAULT_CURSOR_SIZE / 2};
+    int32_t hotspotSoftX_{DEFAULT_CURSOR_SIZE / 2};
+    int32_t hotspotSoftY_{DEFAULT_CURSOR_SIZE / 2};
     buffer_ptr_t transparentBuffer_{nullptr};
     buffer_ptr_t defaultBuffer_{nullptr};
-    std::shared_mutex bufferMutex_;
+    mutable std::shared_mutex bufferMutex_;
     buffer_ptr_t currentBuffer_{nullptr};
     std::vector<buffer_ptr_t> commonBuffers_;
     std::atomic<uint32_t> bufferId_ {0};

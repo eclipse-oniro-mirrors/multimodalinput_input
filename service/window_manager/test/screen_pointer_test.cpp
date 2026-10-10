@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2024 Huawei Device Co., Ltd.
+/**
+ * Copyright (c) 2024-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -2497,6 +2497,110 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_ResolveScreenLiteInfo_005, TestSiz
     EXPECT_EQ(result.height, 1920);
     EXPECT_EQ(result.rotation, OHOS::Rosen::Rotation::ROTATION_0);
     OHOS::system::g_mockProductType.clear();
+}
+
+/**
+ * @tc.name: ScreenPointerTest_GetBufferSize_001
+ * @tc.desc: The buffer side is one of exactly two tiers, chosen by const.multimodalinput.support_blur_cursor
+ *           at boot: 512 with the drag trail enabled, 256 otherwise. The test asserts the tier is one
+ *           of those two and that the ScreenPointer agrees with the shared resolver, rather than
+ *           pinning 256 -- the property is read through a cached static, so a test that hardcoded one
+ *           tier would fail on a device configured for the other.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetBufferSize_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_unique<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+
+    // Exactly two tiers are allowed; anything else means the mapping drifted.
+    int32_t resolved = GetCursorBufferSize();
+    EXPECT_TRUE(resolved == DEFAULT_CURSOR_SIZE || resolved == BLUR_CURSOR_SIZE)
+        << "unexpected cursor buffer tier: " << resolved;
+    // The instance and the shared resolver must not disagree -- they are the same decision.
+    EXPECT_EQ(screenpointer->GetBufferSize(), static_cast<uint32_t>(resolved));
+    // The rotation pivot and the Move/MoveSoft offsets both derive from the side, so the focus is
+    // exactly half of whichever tier was selected.
+    EXPECT_EQ(screenpointer->GetBufferSize() % 2u, 0u) << "side must be even for an exact half-side focus";
+}
+
+/**
+ * @tc.name: ScreenPointerTest_UpdateHotspotInBuffer_001
+ * @tc.desc: The hard and soft cursor paths run on different threads with their own RenderConfig
+ *           (the soft path renders at the screen dpi and carries its own direction), so each must
+ *           keep its own hotspot. A single shared pair let the soft path's write reposition the
+ *           hard cursor -- at direction 90 the two hotspots differ by the half-buffer term.
+ *           Also covers the original defect: the soft path never calls RequestBuffer, so it has
+ *           to cache its own hotspot rather than keeping the initial default.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+
+    const int32_t side = static_cast<int32_t>(screenpointer->GetBufferSize());
+    RenderConfig corner;
+    corner.style_ = MOUSE_ICON::DEFAULT;
+    corner.align_ = ICON_TYPE::ANGLE_NW;
+    corner.size = 7;
+    corner.dpi = 1.93f;
+    corner.direction = 0;
+    corner.displayDirection = 0;
+
+    // Each path caches into its own slot.
+    screenpointer->UpdateHotspotInBuffer(corner, true, side);
+    if (side == BLUR_CURSOR_SIZE) {
+        // 512-tier: draw origin is BufferFocus-GetFocusX/Y; hotspot = origin+focus = side/2.
+        EXPECT_EQ(screenpointer->hotspotHardX_, side / 2);
+        EXPECT_EQ(screenpointer->hotspotHardY_, side / 2);
+    } else {
+        EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side));
+        EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side));
+        // 256-tier ANGLE_NW hotspot is the image corner, never the buffer centre.
+        EXPECT_NE(screenpointer->hotspotHardX_, side / 2);
+    }
+
+    // A subsequent soft write must not disturb the hard value, even for a config whose hotspot
+    // differs -- this is the cross-thread clobber the split storage prevents.
+    RenderConfig softCfg = corner;
+    softCfg.direction = 1;      // direction 90 rotates the hotspot about the buffer centre
+    screenpointer->UpdateHotspotInBuffer(softCfg, false, side);
+    if (side == BLUR_CURSOR_SIZE) {
+        EXPECT_EQ(screenpointer->hotspotSoftX_, side / 2);
+        EXPECT_EQ(screenpointer->hotspotSoftY_, side / 2);
+        EXPECT_EQ(screenpointer->hotspotHardX_, side / 2)
+            << "soft write changed the hard hotspot";
+        EXPECT_EQ(screenpointer->hotspotHardY_, side / 2)
+            << "soft write changed the hard hotspot";
+    } else {
+        EXPECT_EQ(screenpointer->hotspotSoftX_, softCfg.HotspotInBufferX(side));
+        EXPECT_EQ(screenpointer->hotspotSoftY_, softCfg.HotspotInBufferY(side));
+        EXPECT_EQ(screenpointer->hotspotHardX_, corner.HotspotInBufferX(side))
+            << "soft write changed the hard hotspot";
+        EXPECT_EQ(screenpointer->hotspotHardY_, corner.HotspotInBufferY(side))
+            << "soft write changed the hard hotspot";
+    }
+    // The two really do differ here, so the assertions above are not vacuous. Compare the pair:
+    // for direction 90 the X components coincide and only Y separates them.
+    // 512-tier: both slots are side/2, so this check is skipped (vacuousness accepted).
+    if (side != BLUR_CURSOR_SIZE) {
+        EXPECT_TRUE(screenpointer->hotspotHardX_ != screenpointer->hotspotSoftX_ ||
+            screenpointer->hotspotHardY_ != screenpointer->hotspotSoftY_)
+            << "hard and soft hotspots are identical, test input does not exercise the split";
+    }
 }
 } // namespace MMI
 } // namespace OHOS

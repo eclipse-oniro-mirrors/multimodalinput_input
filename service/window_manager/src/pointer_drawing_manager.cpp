@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2021-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -910,12 +910,12 @@ int32_t PointerDrawingManager::InitVsync(MOUSE_ICON mouseStyle)
     return RequestNextVSync();
 }
 
-sptr<OHOS::SurfaceBuffer> PointerDrawingManager::RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer)
+sptr<OHOS::SurfaceBuffer> PointerDrawingManager::RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide)
 {
     sptr<OHOS::SurfaceBuffer> buffer;
     if (GetHardCursorEnabled()) {
         for (size_t i = 0; i < RETRY_TIMES; i++) {
-            buffer = GetSurfaceBuffer(layer);
+            buffer = GetSurfaceBuffer(layer, bufferSide);
             if (buffer != nullptr && buffer->GetVirAddr() != nullptr) {
                 return buffer;
             }
@@ -1192,11 +1192,40 @@ int32_t PointerDrawingManager::DrawDynamicHardwareCursor(std::shared_ptr<ScreenP
     auto buffer = sp->RequestBuffer(cfg, isCommonBuffer);
     CHKPR(buffer, RET_ERR);
     if (isCommonBuffer) {
+        // Recompute the spinner pivot from the actual buffer's width.  The caller computed a
+        // tentative pivot from GetBufferSize() before calling RequestBuffer(); if a tier-change
+        // rebuild completed between those two points the tentative value is wrong.  Using the
+        // buffer's own width here guarantees the pivot, the drawn pixels, and the hotspot all
+        // come from the same tier.
+        RenderConfig renderCfg = cfg;
+        uint32_t bufferSide = static_cast<uint32_t>(buffer->GetWidth());
+        float drawnSize = static_cast<float>(renderCfg.GetClampedImageSize(bufferSide));
+        int32_t iSize = static_cast<int32_t>(drawnSize);
+        int32_t iOriginBase;
+        if (bufferSide == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+            iOriginBase = static_cast<int32_t>(bufferSide / CALCULATE_IMAGE_MIDDLE) -
+                static_cast<int32_t>(renderCfg.GetFocusX(bufferSide));
+        } else {
+            iOriginBase = static_cast<int32_t>(bufferSide / CALCULATE_IMAGE_MIDDLE) -
+                static_cast<int32_t>(drawnSize / CALCULATE_IMAGE_MIDDLE);
+        }
+        if (renderCfg.style_ == MOUSE_ICON::LOADING) {
+            renderCfg.rotationFocusX = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(renderCfg.GetFocusX(bufferSide)));
+            renderCfg.rotationFocusY = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(renderCfg.GetFocusY(bufferSide)));
+        } else {
+            renderCfg.rotationFocusX = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_X_RATIO));
+            renderCfg.rotationFocusY = static_cast<float>(
+                iOriginBase + static_cast<int32_t>(drawnSize * RUNNING_Y_RATIO));
+        }
         auto addr = static_cast<uint8_t*>(buffer->GetVirAddr());
         CHKPR(addr, RET_ERR);
-        if (pointerRenderer_.DynamicRender(addr, buffer->GetWidth(), buffer->GetHeight(), cfg) != RET_OK) {
-            MMI_HILOGE("DynamicRender failed");
-        };
+        if (pointerRenderer_.DynamicRender(addr, buffer->GetWidth(), buffer->GetHeight(), renderCfg) != RET_OK) {
+            MMI_HILOGE("DynamicRender failed, skipping PublishFrame to avoid hotspot/pixel mismatch");
+            return RET_ERR;
+        }
     }
 
     MMI_HILOGI("DrawDynamicHardwareCursor on ScreenPointer success, screenId = %{public}" PRIu64 ", style = %{public}d",
@@ -1206,6 +1235,7 @@ int32_t PointerDrawingManager::DrawDynamicHardwareCursor(std::shared_ptr<ScreenP
         MMI_HILOGE("FlushCache ret: %{public}d", sret);
         return sret;
     }
+    sp->PublishFrame(cfg, buffer);
     return RET_OK;
 }
 
@@ -1222,7 +1252,6 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         .direction = displayInfo_.direction,
         .isHard = true,
         .rotationAngle = currentFrame_ * DYNAMIC_ROTATION_ANGLE,
-        .userIconPixelMap = DecodeImageToPixelMap(mouseStyle),
     };
     for (auto it : screenPointers) {
         CHKPV(it.second);
@@ -1232,13 +1261,6 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         MMI_HILOGD("HardwareCursorRender, screen = %{public}" PRIu64 ", dpi = %{public}f",
             it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
-            if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = GetFocusCoordinates();
-                cfg.rotationFocusY = GetFocusCoordinates();
-            } else {
-                cfg.rotationFocusX = GetFocusCoordinates() + cfg.GetImageSize() * RUNNING_X_RATIO;
-                cfg.rotationFocusY = GetFocusCoordinates() + cfg.GetImageSize() * RUNNING_Y_RATIO;
-            }
             cfg.direction = it.second->IsMirror() ? DIRECTION0 : displayInfo_.direction;
             DrawDynamicHardwareCursor(it.second, cfg);
         } else {
@@ -1249,12 +1271,12 @@ void PointerDrawingManager::HardwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
 }
 
 int32_t PointerDrawingManager::DrawDynamicSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> sn,
-    const RenderConfig &cfg)
+    const RenderConfig &cfg, int32_t bufferSide)
 {
     CHKPR(sn, RET_ERR);
     auto layer = sn->GetSurface();
     CHKPR(layer, RET_ERR);
-    auto buffer = GetSurfaceBuffer(layer);
+    auto buffer = GetSurfaceBuffer(layer, bufferSide);
     CHKPR(buffer, RET_ERR);
     auto addr = static_cast<uint8_t*>(buffer->GetVirAddr());
     CHKPR(addr, RET_ERR);
@@ -1299,20 +1321,51 @@ void PointerDrawingManager::SoftwareCursorDynamicRender(MOUSE_ICON mouseStyle, u
         cfg.screenId = it.first;
         MMI_HILOGD("SoftwareCursorDynamicRender, screen = %{public}" PRIu64 ", dpi = %{public}f", it.first, cfg.dpi);
         if (it.second->IsMirror() || it.first == displayId) {
-            if (mouseStyle == MOUSE_ICON::LOADING) {
-                cfg.rotationFocusX = GetFocusCoordinates();
-                cfg.rotationFocusY = GetFocusCoordinates();
-            } else {
-                cfg.rotationFocusX = GetFocusCoordinates() + cfg.GetImageSize() * RUNNING_X_RATIO;
-                cfg.rotationFocusY = GetFocusCoordinates() + cfg.GetImageSize() * RUNNING_Y_RATIO;
-            }
-            DrawDynamicSoftCursor(sn, cfg);
+            // The animation redraws the glyph, so the cached hotspot must be refreshed here just as
+            // the static soft path does. Without this a style or size change leaves the previous
+            // hotspot in place and MoveSoft offsets by it -- e.g. switching the default arrow to
+            // LOADING kept hot spot 108 where 128 is correct, shifting the spinner by 20px.
+            // The animated soft path renders at bufferSize_, the same side its buffer is
+            // requested at and the same the node bounds use.
+            int32_t softSide = static_cast<int32_t>(it.second->GetBufferSize());
+            it.second->UpdateHotspotInBuffer(cfg, false, softSide);
+            ComputeSoftPivot(cfg, softSide, mouseStyle);
+            DrawDynamicSoftCursor(sn, cfg, static_cast<int32_t>(it.second->GetBufferSize()));
         } else {
             cfg.style_ = MOUSE_ICON::TRANSPARENT_ICON;
             cfg.align_ = CursorDrawingInformation::GetInstance().MouseIcon2IconType(cfg.style_);
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
-            DrawDynamicSoftCursor(it.second->GetSurfaceNode(), cfg);
+            DrawDynamicSoftCursor(it.second->GetSurfaceNode(), cfg,
+                static_cast<int32_t>(it.second->GetBufferSize()));
         }
+    }
+}
+
+void PointerDrawingManager::ComputeSoftPivot(RenderConfig &cfg, int32_t softSide, MOUSE_ICON mouseStyle)
+{
+    // Same pivot rule as the hard path: the spinner turns about its own centre, which the
+    // draw origin puts at origin + size*ratio. Deriving it from the buffer centre
+    // instead double-counts the centring offset and swings the ink out of the buffer.
+    float softSize = static_cast<float>(cfg.GetClampedImageSize(softSide));
+    int32_t iSoftSize = static_cast<int32_t>(softSize);
+    int32_t iSoftOriginBase;
+    if (static_cast<uint32_t>(softSide) == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+        iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
+            static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide)));
+    } else {
+        iSoftOriginBase = static_cast<int32_t>(softSide / CALCULATE_IMAGE_MIDDLE) -
+            static_cast<int32_t>(softSize / CALCULATE_IMAGE_MIDDLE);
+    }
+    if (mouseStyle == MOUSE_ICON::LOADING) {
+        cfg.rotationFocusX = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusX(static_cast<uint32_t>(softSide))));
+        cfg.rotationFocusY = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(cfg.GetFocusY(static_cast<uint32_t>(softSide))));
+    } else {
+        cfg.rotationFocusX = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_X_RATIO));
+        cfg.rotationFocusY = static_cast<float>(
+            iSoftOriginBase + static_cast<int32_t>(softSize * RUNNING_Y_RATIO));
     }
 }
 
@@ -1510,7 +1563,11 @@ void PointerDrawingManager::DrawRunningPointerAnimate(const MOUSE_ICON mouseStyl
         DecodeImageToPixelMap(MOUSE_ICON::RUNNING_RIGHT);
     CHKPV(pixelmap);
     MMI_HILOGD("Set mouseicon to OHOS system");
+    RecordRunningAnimationCanvas(pixelmap);
+}
 
+void PointerDrawingManager::RecordRunningAnimationCanvas(std::shared_ptr<OHOS::Media::PixelMap> pixelmap)
+{
 #ifndef USE_ROSEN_DRAWING
     auto canvas = static_cast<Rosen::RSRecordingCanvas *>(canvasNode_->BeginRecording(imageWidth_, imageHeight_));
     canvas->DrawPixelMap(pixelmap, 0, 0, SkSamplingOptions(), nullptr);
@@ -1766,57 +1823,71 @@ void PointerDrawingManager::FixCursorPosition(int32_t &physicalX, int32_t &physi
     if (physicalY < 0) {
         physicalY = 0;
     }
-    const int32_t cursorUnit = 16;
     Direction direction = GetDisplayDirection(&displayInfo_);
     if (!Rosen::SceneBoardJudgement::IsSceneBoardEnabled()) {
         direction = displayInfo_.direction;
     }
-    if (GetHardCursorEnabled()) {
-        if (direction == DIRECTION0) {
-            if (physicalX > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalX = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalY = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
-        } else if (direction == DIRECTION90) {
-            if (physicalX > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalX = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
-            if (physicalY < imageWidth_ / cursorUnit) {
-                physicalY = imageWidth_ / cursorUnit;
-            }
-        } else if (direction == DIRECTION180) {
-            if (physicalX < imageHeight_ / cursorUnit) {
-                physicalX = imageHeight_ / cursorUnit;
-            }
-            if (physicalY < imageWidth_ / cursorUnit) {
-                physicalY = imageWidth_ / cursorUnit;
-            }
-        } else if (direction == DIRECTION270) {
-            if (physicalX < imageHeight_ / cursorUnit) {
-                physicalX = imageHeight_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalY = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
-        }
-    } else {
+    ClampCursorByDirection(physicalX, physicalY, direction);
+}
+
+// Clamps value into [0, limit]; a limit at or below zero pins the value to 0 rather than
+// producing a negative bound. Kept separate so ClampCursorByDirection stays a flat set of
+// per-direction bound computations instead of a deeply nested comparison tree.
+static int32_t ClampToLimit(int32_t value, int32_t limit)
+{
+    if (value > limit) {
+        return limit;
+    }
+    return value;
+}
+
+// Raises value up to at least floor.
+static int32_t ClampToFloor(int32_t value, int32_t floor)
+{
+    if (value < floor) {
+        return floor;
+    }
+    return value;
+}
+
+void PointerDrawingManager::ClampCursorByDirection(int32_t &physicalX, int32_t &physicalY, Direction direction)
+{
+    const int32_t cursorUnit = 16;
+    int32_t widthLimit = displayInfo_.validWidth - imageWidth_ / cursorUnit;
+    int32_t heightLimit = displayInfo_.validHeight - imageHeight_ / cursorUnit;
+    int32_t widthFloor = imageWidth_ / cursorUnit;
+    int32_t heightFloor = imageHeight_ / cursorUnit;
+    int32_t rotatedWidthLimit = displayInfo_.validHeight - imageHeight_ / cursorUnit;
+    int32_t rotatedHeightLimit = displayInfo_.validWidth - imageWidth_ / cursorUnit;
+    if (!GetHardCursorEnabled()) {
         if (direction == DIRECTION0 || direction == DIRECTION180) {
-            if (physicalX > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalX = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalY = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
+            physicalX = ClampToLimit(physicalX, widthLimit);
+            physicalY = ClampToLimit(physicalY, heightLimit);
         } else {
-            if (physicalX > (displayInfo_.validHeight - imageHeight_ / cursorUnit)) {
-                physicalX = displayInfo_.validHeight - imageHeight_ / cursorUnit;
-            }
-            if (physicalY > (displayInfo_.validWidth - imageWidth_ / cursorUnit)) {
-                physicalY = displayInfo_.validWidth - imageWidth_ / cursorUnit;
-            }
+            physicalX = ClampToLimit(physicalX, rotatedWidthLimit);
+            physicalY = ClampToLimit(physicalY, rotatedHeightLimit);
         }
+        return;
+    }
+    switch (direction) {
+        case DIRECTION0:
+            physicalX = ClampToLimit(physicalX, widthLimit);
+            physicalY = ClampToLimit(physicalY, heightLimit);
+            break;
+        case DIRECTION90:
+            physicalX = ClampToLimit(physicalX, rotatedWidthLimit);
+            physicalY = ClampToFloor(physicalY, widthFloor);
+            break;
+        case DIRECTION180:
+            physicalX = ClampToFloor(physicalX, heightFloor);
+            physicalY = ClampToFloor(physicalY, widthFloor);
+            break;
+        case DIRECTION270:
+            physicalX = ClampToFloor(physicalX, heightFloor);
+            physicalY = ClampToLimit(physicalY, rotatedHeightLimit);
+            break;
+        default:
+            break;
     }
 }
 
@@ -2037,7 +2108,7 @@ sptr<OHOS::Surface> PointerDrawingManager::GetLayer()
     return surfaceNodePtr->GetSurface();
 }
 
-sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Surface> layer)
+sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide)
 {
     CALL_DEBUG_ENTER;
     sptr<OHOS::SurfaceBuffer> buffer;
@@ -2045,11 +2116,24 @@ sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Sur
     int32_t width = 0;
     int32_t height = 0;
     if (GetHardCursorEnabled()) {
-        CALCULATE_CANVAS_SIZE(CALCULATE_CANVAS_SIZE_, CHANGE) = GetCanvasSize();
-        auto canvasSize = static_cast<int32_t>(CALCULATE_CANVAS_SIZE_CHANGE);
-        width = canvasSize;
-        height = canvasSize;
+        // With a hard cursor the soft path only provides a placeholder layer, and the rest of the
+        // cursor code (draw origin, HotspotInBuffer, MoveSoft's node bounds) assumes a buffer of
+        // this side, so it must not take a size of its own. Deriving it from GetCanvasSize() here made the image
+        // lay out for a 512 buffer while the hotspot was computed for a 256 one: a constant
+        // (128,128) misalignment.
+        //
+        // The side comes from the owning ScreenPointer: it is per-screen now that mirror and
+        // off-screen extended screens resolve 512 while others follow the boot-fixed switch.
+        // Falling back to the global here would size a mirror screen's placeholder 256 while its
+        // hotspot, animation pivot and node bounds were all computed for 512.
+        int32_t hardSide = (bufferSide > 0) ? bufferSide : GetCursorBufferSize();
+        width = hardSide;
+        height = hardSide;
     } else {
+        // Without a hard cursor the soft cursor is the only cursor, so the buffer has to fit the
+        // rendered glyph. canvasWidth_/Height_ are derived from the pointer size and dpi (rounded
+        // up to a 64px step), which keeps large-pointer and high-dpi devices correct. Forcing a
+        // flat 256 here clipped a 480dpi gear-7 cursor (~395px of glyph) down to 256.
         width = canvasWidth_;
         height = canvasHeight_;
     }
@@ -2528,10 +2612,7 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
     CALL_DEBUG_ENTER;
     auto sp = GetScreenPointer(displayInfo.rsId);
     if (GetHardCursorEnabled() && sp != nullptr) {
-        sp->OnDisplayInfo(displayInfo);
-        if (sp->IsMain()) {
-            UpdateMirrorScreens(sp, displayInfo);
-        }
+        ReinitHardCursorIfNeeded(sp, displayInfo);
     }
 
     hasDisplay_ = true;
@@ -2557,6 +2638,43 @@ void PointerDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo &displayInf
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
     MAGIC_CURSOR->SetDisplayInfo(displayInfo);
 #endif // OHOS_BUILD_ENABLE_MAGICCURSOR
+}
+
+void PointerDrawingManager::ReinitHardCursorIfNeeded(std::shared_ptr<ScreenPointer> sp,
+    const OLD::DisplayInfo &displayInfo)
+{
+    sp->OnDisplayInfo(displayInfo);
+    // OnDisplayInfo() carries the off-screen-rendering flag, which arrives after the
+    // ScreenPointer was constructed and can move an extended screen onto the 512 side.
+    // Re-drive Init() (the only place with a renderer) when the pool no longer matches.
+    if (sp->GetBufferSize() != sp->ResolveBufferSide() || sp->IsPoolEmpty()) {
+        MMI_HILOGI("Buffer side changed or pool empty on display info, re-initialising screenId=%{public}" PRIu64,
+            displayInfo.rsId);
+        if (sp->Init(pointerRenderer_)) {
+            if (displayInfo.rsId == displayInfo_.rsId) {
+                SetSurfaceNode(sp->GetSurfaceNode());
+            }
+            // Force a first frame so currentBuffer_ is populated before the next Move().
+            // Respect the effective visibility: if the cursor is hidden, publish a transparent
+            // frame rather than drawing the current style — otherwise we would make a hidden
+            // cursor visible again after a successful rebuild.
+            MMI_HILOGI("Re-init succeeded, forcing first-frame redraw for screenId=%{public}" PRIu64,
+                displayInfo.rsId);
+            if (CursorDrawingInformation::GetInstance().IsPointerVisible() && mouseDisplayState_) {
+                HardwareCursorRender(MOUSE_ICON(lastMouseStyle_.id), lastPhysicalX_, lastPhysicalY_,
+                    displayInfo.rsId);
+            } else {
+                // Cursor is currently hidden — publish a transparent frame so Move() has a
+                // valid currentBuffer_ to submit without making the cursor visible.
+                sp->SetInvisible();
+            }
+        } else {
+            MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, displayInfo.rsId);
+        }
+    }
+    if (sp->IsMain()) {
+        UpdateMirrorScreens(sp, displayInfo);
+    }
 }
 
 int32_t PointerDrawingManager::GetIndependentPixels()
@@ -3215,6 +3333,39 @@ void PointerDrawingManager::Dump(int32_t fd, const std::vector<std::string> &arg
     std::ostringstream oss;
     oss << std::endl;
 
+    DumpDisplayAndCursorInfo(oss);
+
+    std::vector<std::string> styleTitles = {"name", "Size", "Color", "ID"};
+    std::vector<std::vector<std::string>> styleData = {
+        {"lastMouseStyle", std::to_string(lastMouseStyle_.size), std::to_string(lastMouseStyle_.color),
+         std::to_string(lastMouseStyle_.id)},
+        {"currentMouseStyle", std::to_string(currentMouseStyle_.size), std::to_string(currentMouseStyle_.color),
+         std::to_string(currentMouseStyle_.id)}};
+
+    DumpFullTable(oss, "Cursor Style Info", styleTitles, styleData);
+    oss << std::endl;
+
+    std::vector<std::string> pidTitles = {"pid", "visible"};
+    std::vector<std::vector<std::string>> pidInfos;
+    auto dumpPidInfos = CursorDrawingInformation::GetInstance().GetPidInfos();
+    for (const auto &pidInfo : dumpPidInfos) {
+        pidInfos.push_back({std::to_string(pidInfo.pid), pidInfo.visible ? "true" : "false"});
+    }
+    DumpFullTable(oss, "Visible Info", pidTitles, pidInfos);
+    oss << std::endl;
+
+    std::vector<std::string> hardCursorTitles = {"isHardCursorEnabled"};
+    std::vector<std::vector<std::string>> hardCursorInfos;
+    hardCursorInfos.push_back({GetHardCursorEnabled() ? "true" : "false"});
+    DumpFullTable(oss, "Hard Cursor Info", hardCursorTitles, hardCursorInfos);
+    oss << std::endl;
+
+    std::string dumpInfo = oss.str();
+    dprintf(fd, dumpInfo.c_str());
+}
+
+void PointerDrawingManager::DumpDisplayAndCursorInfo(std::ostringstream &oss)
+{
     std::vector<std::string> displayTitles = {"ID", "X", "Y", "Width", "Height", "DPI", "Name", "Uniq",
                                               "Direction", "Display Direction", "Display Mode",
                                               "Is Current Off Screen Rendering", "Screen Real Width",
@@ -3246,34 +3397,6 @@ void PointerDrawingManager::Dump(int32_t fd, const std::vector<std::string> &arg
 
     DumpFullTable(oss, "Cursor Info", titles2, data2);
     oss << std::endl;
-
-    std::vector<std::string> styleTitles = {"name", "Size", "Color", "ID"};
-    std::vector<std::vector<std::string>> styleData = {
-        {"lastMouseStyle", std::to_string(lastMouseStyle_.size), std::to_string(lastMouseStyle_.color),
-         std::to_string(lastMouseStyle_.id)},
-        {"currentMouseStyle", std::to_string(currentMouseStyle_.size), std::to_string(currentMouseStyle_.color),
-         std::to_string(currentMouseStyle_.id)}};
-
-    DumpFullTable(oss, "Cursor Style Info", styleTitles, styleData);
-    oss << std::endl;
-
-    std::vector<std::string> pidTitles = {"pid", "visible"};
-    std::vector<std::vector<std::string>> pidInfos;
-    auto dumpPidInfos = CursorDrawingInformation::GetInstance().GetPidInfos();
-    for (const auto &pidInfo : dumpPidInfos) {
-        pidInfos.push_back({std::to_string(pidInfo.pid), pidInfo.visible ? "true" : "false"});
-    }
-    DumpFullTable(oss, "Visible Info", pidTitles, pidInfos);
-    oss << std::endl;
-
-    std::vector<std::string> hardCursorTitles = {"isHardCursorEnabled"};
-    std::vector<std::vector<std::string>> hardCursorInfos;
-    hardCursorInfos.push_back({GetHardCursorEnabled() ? "true" : "false"});
-    DumpFullTable(oss, "Hard Cursor Info", hardCursorTitles, hardCursorInfos);
-    oss << std::endl;
-
-    std::string dumpInfo = oss.str();
-    dprintf(fd, dumpInfo.c_str());
 }
 
 void PointerDrawingManager::UpdateBindDisplayId(uint64_t rsId, int32_t groupId, bool multiDefaultGroup)
@@ -3393,6 +3516,26 @@ bool PointerDrawingManager::ShouldSkipScreen(const sptr<OHOS::Rosen::ScreenInfo>
     return false;
 }
 
+void PointerDrawingManager::ReinitScreenPointerIfTierChanged(std::shared_ptr<ScreenPointer> sp, uint64_t sid,
+    bool needDrawPointer)
+{
+    // The buffer side depends on the mode and the off-screen flag, both of which can change here
+    // (extend -> mirror, or the off-screen flag arriving late). Init() is the only place with a
+    // renderer to rebuild the pool, so re-drive it whenever the resolved side no longer matches
+    // the one the existing pool was built at.
+    if (sp->GetBufferSize() == sp->ResolveBufferSide() && !sp->IsPoolEmpty()) {
+        return;
+    }
+    MMI_HILOGI("Buffer side changed or pool empty for screenId=%{public}" PRIu64 ", re-initialising", sid);
+    if (!sp->Init(pointerRenderer_, needDrawPointer)) {
+        MMI_HILOGE("Failed to re-init ScreenPointer, screenId=%{public}" PRIu64, sid);
+        return;
+    }
+    if (sid == displayInfo_.rsId) {
+        SetSurfaceNode(sp->GetSurfaceNode());
+    }
+}
+
 sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindMainScreenInfo(
     const std::vector<sptr<OHOS::Rosen::ScreenInfo>> &screens)
 {
@@ -3415,6 +3558,7 @@ sptr<OHOS::Rosen::ScreenInfo> PointerDrawingManager::UpdateScreenPointerAndFindM
             // Update ScreenPointer when it already exist
             auto sp = GetScreenPointer(sid);
             sp->UpdateScreenInfo(screen, needDrawPointer);
+            ReinitScreenPointerIfTierChanged(sp, sid, needDrawPointer);
             MMI_HILOGI("Update ScreenPointer, screenId=%{public}" PRIu64, sid);
         } else {
             // Create and init ScreenPointer when it does not exist
@@ -3572,6 +3716,10 @@ void PointerDrawingManager::CreateRenderConfig(RenderConfig& cfg, std::shared_pt
     cfg.x = x * sp->GetScale();
     cfg.y = y * sp->GetScale();
     cfg.screenId = screenId;
+    // The trail is deliberately narrow in scope: the hard cursor's DEFAULT arrow only, and only on
+    // devices that opt in via const.multimodalinput.support_blur_cursor. Every other style, the soft
+    // path (BlurRender requires isHard) and non-opted devices render without it. This bounds the
+    // gear-7 trail clipping in a 256 buffer to that one style on those devices.
     cfg.isBlur = isBlur && isHard && mouseStyle == MOUSE_ICON::DEFAULT && GetCursorBlurEnabled();
     float scale = isHard ? sp->GetScale() : 1.0f;
     cfg.dpi = sp->GetDPI() * scale;
@@ -3630,21 +3778,23 @@ void PointerDrawingManager::SoftwareCursorRender(MOUSE_ICON mouseStyle, int32_t 
             cfg.align_ = CursorDrawingInformation::GetInstance().MouseIcon2IconType(cfg.style_);
             cfg.path_ = mouseIcons[cfg.style_].iconPath;
         }
-        DrawSoftCursor(it.second->GetSurfaceNode(), cfg);
+        it.second->UpdateHotspotInBuffer(cfg, false, static_cast<int32_t>(it.second->GetBufferSize()));
+        DrawSoftCursor(it.second->GetSurfaceNode(), cfg,
+            static_cast<int32_t>(it.second->GetBufferSize()));
     }
     MMI_HILOGD("SoftwareCursorRender success");
 }
 
 int32_t PointerDrawingManager::DrawSoftCursor(std::shared_ptr<Rosen::RSSurfaceNode> surfaceNode,
-    const RenderConfig &cfg)
+    const RenderConfig &cfg, int32_t bufferSide)
 {
     CHKPR(surfaceNode, RET_ERR);
 
     auto layer = surfaceNode->GetSurface();
     CHKPR(layer, RET_ERR);
-    auto buffer = GetSurfaceBuffer(layer);
+    auto buffer = GetSurfaceBuffer(layer, bufferSide);
     if (buffer == nullptr || buffer->GetVirAddr() == nullptr) {
-        buffer = RetryGetSurfaceBuffer(layer);
+        buffer = RetryGetSurfaceBuffer(layer, bufferSide);
     }
     CHKPR(buffer, RET_ERR);
     CHKPR(buffer->GetVirAddr(), RET_ERR);
@@ -3685,18 +3835,23 @@ int32_t PointerDrawingManager::DrawHardCursor(std::shared_ptr<ScreenPointer> sp,
         BytraceAdapter::StartHardPointerRender(buffer->GetWidth(), buffer->GetHeight(), sp->GetBufferId(),
             sp->GetScreenId(), cfg.style_);
         if (pointerRenderer_.Render(addr, buffer->GetWidth(), buffer->GetHeight(), cfg) != RET_OK) {
-            MMI_HILOGE("Render failed");
+            MMI_HILOGE("Render failed, skipping PublishFrame to avoid hotspot/pixel mismatch");
+            BytraceAdapter::StopHardPointerRender();
+            return RET_ERR;
         }
         BytraceAdapter::StopHardPointerRender();
     }
 
-    MMI_HILOGI("DrawHardCursor on ScreenPointer success, screenId=%{public}" PRIu64 ", style=%{public}d",
-        sp->GetScreenId(), cfg.style_);
     auto sret = buffer->FlushCache();
     if (sret != RET_OK) {
         MMI_HILOGE("FlushCache ret: %{public}d", sret);
         return sret;
     }
+    // Publish hotspot and currentBuffer_ only after the pixels are on-screen so that
+    // MoveRetry never pairs a freshly-selected slot with stale pixels from the previous frame.
+    sp->PublishFrame(cfg, buffer);
+    MMI_HILOGI("DrawHardCursor on ScreenPointer success, screenId=%{public}" PRIu64 ", style=%{public}d",
+        sp->GetScreenId(), cfg.style_);
     return RET_OK;
 }
 

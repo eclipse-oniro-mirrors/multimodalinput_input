@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2025-2025 Huawei Device Co., Ltd.
+/**
+ * Copyright (c) 2025-2026 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,6 +18,8 @@
 #include <regex>
 #include <unistd.h>
 #include "image_source.h"
+#include "message_parcel.h"
+#include "screen_pointer.h"
 #include "window_info.h"
 #include "util.h"
 
@@ -33,7 +35,6 @@ constexpr int32_t MIN_POINTER_COLOR{0x000000};
 constexpr int32_t MAX_POINTER_COLOR{0xFFFFFF};
 constexpr int32_t OTHER_POINTER_COLOR{0x171717};
 constexpr float CALCULATE_IMAGE_MIDDLE{2.0f};
-constexpr uint32_t FOCUS_POINT{256};
 constexpr float CALCULATE_MOUSE_ICON_BIAS{ 5.0f / 33.0f };
 constexpr float ROTATION_ANGLE90 {90.0f};
 constexpr float MAX_DPI {1.93f};   //1.93 is the max dpi for hardware cursor pointer to limit the image size within 256
@@ -48,23 +49,139 @@ constexpr float DEFAULT_BLUR[] = {0.4f, 0.4f, 0.4f};
 
 namespace OHOS::MMI {
 
+// The buffer focus is the centre of the actual buffer, derived from its size rather than a fixed
+// constant. Everything that anchors to the buffer centre (rotation pivots, draw origins) must come
+// from here so every caller stays pixel-identical whatever side it renders at: the hard cursor and
+// the placeholder soft cursor both use DEFAULT_CURSOR_SIZE, while a standalone soft cursor sizes
+// its buffer from the glyph (canvasWidth_/canvasHeight_) and so can be larger.
+static int32_t BufferFocus(uint32_t side)
+{
+    return static_cast<int32_t>(side / CALCULATE_IMAGE_MIDDLE);
+}
+
+// The side the image is actually drawn at: the built-in SVG path is sized from the gear and dpi,
+// but an app-supplied pixelmap keeps its own dimensions unless it would not fit the buffer.
+int32_t RenderConfig::GetPlacedImageSize(uint32_t bufferSide) const
+{
+    if (userIconPixelMap == nullptr) {
+        return GetClampedImageSize(bufferSide);
+    }
+    Media::ImageInfo imageInfo;
+    userIconPixelMap->GetImageInfo(imageInfo);
+    int32_t iconWidth = imageInfo.size.width;
+    int32_t iconHeight = imageInfo.size.height;
+    if (iconWidth <= 0 || iconHeight <= 0) {
+        MMI_HILOGE("Invalid user icon size, width:%{public}d, height:%{public}d", iconWidth, iconHeight);
+        return GetClampedImageSize(bufferSide);
+    }
+    // A user icon larger than the buffer is scaled down to fit (see UserIconScale); anything that
+    // already fits keeps its original size, so a legal 256x256 icon renders at 256, not 255.
+    int32_t longSide = (iconWidth > iconHeight ? iconWidth : iconHeight);
+    int32_t maxSide = static_cast<int32_t>(bufferSide);
+    if (longSide > maxSide) {
+        return maxSide;
+    }
+    return longSide;
+}
+
+float RenderConfig::UserIconScaleRatio(uint32_t bufferSide) const
+{
+    if (userIconPixelMap == nullptr) {
+        return 1.0f;
+    }
+    Media::ImageInfo imageInfo;
+    userIconPixelMap->GetImageInfo(imageInfo);
+    int32_t iconWidth = imageInfo.size.width;
+    int32_t iconHeight = imageInfo.size.height;
+    if (iconWidth <= 0 || iconHeight <= 0) {
+        return 1.0f;
+    }
+    int32_t longSide = (iconWidth > iconHeight ? iconWidth : iconHeight);
+    int32_t maxSide = static_cast<int32_t>(bufferSide);
+    if (longSide <= maxSide) {
+        return 1.0f;
+    }
+    return static_cast<float>(maxSide) / static_cast<float>(longSide);
+}
+
+// The draw origin centres the image in the buffer. It deliberately does NOT align the
+// style's own focus (GetFocusX/Y) onto the buffer centre: that older scheme let a non-centred
+// align (ANGLE_NW's hotspot, ANGLE_SW's (0,h)) push the image almost a full imageSize away from
+// the centre, so it needed a 2x buffer and clipped 8 styles once the side shrank to 256.
+// Centring the image needs only 1x: imageSize <= side - 1 already guarantees origin >= 0 and
+// origin + imageSize <= side, for every align, direction and app-supplied hotspot alike.
+// The hotspot then lands at origin + GetFocusX/Y, which ScreenPointer::Move must offset by --
+// see HotspotInBufferX/Y.
+static int32_t CalcDrawOriginX(uint32_t width, const RenderConfig &cfg)
+{
+    // Uses the size the image is actually placed at, so an app-supplied pixelmap is centred by its
+    // own dimensions rather than by the system gear size.
+    return BufferFocus(width) - static_cast<int32_t>(cfg.GetPlacedImageSize(width) / CALCULATE_IMAGE_MIDDLE);
+}
+
+static int32_t CalcDrawOriginY(uint32_t height, const RenderConfig &cfg)
+{
+    return BufferFocus(height) - static_cast<int32_t>(cfg.GetPlacedImageSize(height) / CALCULATE_IMAGE_MIDDLE);
+}
+
+// Tier-aware draw origin. 512-tier (blur) uses the pre-centring formula
+// BufferFocus - GetFocusX/Y, which matches the original GetOffsetX/Y from the
+// merge-base and preserves the original trail geometry (default glyph at 256,
+// 256px of slack).  256-tier uses the centred formula CalcDrawOriginX/Y.
+// The corresponding hotspot is: 512 → side/2;  256 → HotspotInBufferX/Y.
+// Every draw site must use this helper so the draw and hotspot stay consistent.
+static int32_t TierOriginX(uint32_t width, const RenderConfig &cfg)
+{
+    if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+        return BufferFocus(width) - static_cast<int32_t>(cfg.GetFocusX(width));
+    }
+    return CalcDrawOriginX(width, cfg);
+}
+
+static int32_t TierOriginY(uint32_t height, const RenderConfig &cfg)
+{
+    if (height == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+        return BufferFocus(height) - static_cast<int32_t>(cfg.GetFocusY(height));
+    }
+    return CalcDrawOriginY(height, cfg);
+}
+
 int32_t RenderConfig::GetImageSize() const
 {
     float increaseRatio = AdjustIncreaseRatio(dpi);
     return pow(increaseRatio, size - 1) * dpi * DEVCIE_INDEPENDENT_PIXELS;
 }
 
+int32_t RenderConfig::GetClampedImageSize(uint32_t bufferSide) const
+{
+    int32_t imageSize = GetImageSize();
+    if (bufferSide == 0) {
+        MMI_HILOGE("The bufferSide cannot be 0, return unclamped image size");
+        return imageSize;
+    }
+    // Leave one pixel of headroom so the glyph's far edge stays strictly inside the buffer.
+    int32_t maxSize = static_cast<int32_t>(bufferSide) - 1;
+    if (imageSize <= maxSize) {
+        return imageSize;
+    }
+    // HILOGD, not HILOGW: this runs on every render, and the condition is stable rather than
+    // transient, so a warn-level log would repeat once per frame for as long as it holds.
+    MMI_HILOGD("ImageSize:%{public}d exceeds buffer:%{public}u, clamp to %{public}d",
+        imageSize, bufferSide, maxSize);
+    return maxSize;
+}
+
 float RenderConfig::AdjustIncreaseRatio(float originDpi) const
 {
-    if (std::fabs(originDpi) < EPSILON) {
+    if (std::fabs(originDpi) < EPSILON || originDpi == 0.0f) {
         MMI_HILOGE("The originDpi cannot be 0, return default increase ratio");
         return INCREASE_RATIO;
     }
     if (originDpi <= MAX_DPI) {
         return INCREASE_RATIO;
-    } else {
-        return INCREASE_RATIO * pow(MAX_DPI / originDpi, float(1.0f / float(MAX_POINTER_SIZE - 1)));
     }
+    float divisor = originDpi;
+    return INCREASE_RATIO * pow(MAX_DPI / divisor, float(1.0f / float(MAX_POINTER_SIZE - 1)));
 }
 
 std::string RenderConfig::ToString() const
@@ -77,67 +194,158 @@ std::string RenderConfig::ToString() const
     return oss.str();
 }
 
-int32_t RenderConfig::GetOffsetX() const
+// Render()/BlurRender() call canvas.Rotate(-direction * 90, bufferCentre) before drawing, so the
+// rotation carries the hotspot along with the image. The old scheme aligned the hotspot onto the
+// buffer centre -- the one point a rotation about the centre leaves fixed -- so it needed no
+// compensation here, and paid for that with a 2x buffer. Now that the origin centres the image
+// instead, an off-centre hotspot does move, and Move() would offset by the unrotated position.
+// Rotate the centre-relative offset by the same angle to recover where the hotspot really is.
+static void RotateOffsetAboutCentre(uint32_t direction, int32_t &dx, int32_t &dy)
 {
-    int32_t width = this->GetImageSize();
-    switch (this->align_) {
-        case ANGLE_E:
-            return FOCUS_POINT;
-        case ANGLE_S:       // fall-though
-        case ANGLE_N:       // fall-though
-        case ANGLE_CENTER:  // fall-though
-            return static_cast<int32_t>(FOCUS_POINT - width / CALCULATE_IMAGE_MIDDLE);
-        case ANGLE_W:       // fall-though
-        case ANGLE_SE:      // fall-though
-        case ANGLE_NE:      // fall-though
-            return FOCUS_POINT - width;
-        case ANGLE_SW:
-            return FOCUS_POINT;
-        case ANGLE_NW:
-            return FOCUS_POINT - this->userIconHotSpotX;
-        case ANGLE_NW_RIGHT:
-            return FOCUS_POINT - width * CALCULATE_MOUSE_ICON_BIAS;
-        default:
-            MMI_HILOGW("No need calculate physicalX offset");
-            return FOCUS_POINT;
+    // Quarter turns need no trig. The canvas applies -direction * 90, i.e. the inverse of the
+    // +90 mapping in AdjustDeltaForDirection(), so the signs here are that one's transposed.
+    int32_t tempDx = dx;
+    int32_t tempDy = dy;
+    Direction angle = static_cast<Direction>(direction % DIRECTION_NUM);
+    if (angle == DIRECTION90) {
+        dx = tempDy;
+        dy = -tempDx;
+    } else if (angle == DIRECTION180) {
+        dx = -tempDx;
+        dy = -tempDy;
+    } else if (angle == DIRECTION270) {
+        dx = -tempDy;
+        dy = tempDx;
     }
 }
 
-int32_t RenderConfig::GetOffsetY() const
+// The hotspot's position relative to the buffer centre, after rotation.
+static void HotspotOffsetFromCentre(uint32_t bufferSide, const RenderConfig &cfg, int32_t &dx, int32_t &dy)
 {
-    int32_t height = this->GetImageSize();
+    // Half of the size the image is actually placed at, so an app-supplied icon is centred by its
+    // own dimensions rather than by the system gear size.
+    int32_t half = static_cast<int32_t>(cfg.GetPlacedImageSize(bufferSide) / CALCULATE_IMAGE_MIDDLE);
+    dx = static_cast<int32_t>(cfg.GetFocusX(bufferSide)) - half;
+    dy = static_cast<int32_t>(cfg.GetFocusY(bufferSide)) - half;
+    RotateOffsetAboutCentre(cfg.direction, dx, dy);
+}
+
+int32_t RenderConfig::HotspotInBufferX(uint32_t bufferSide) const
+{
+    int32_t dx = 0;
+    int32_t dy = 0;
+    HotspotOffsetFromCentre(bufferSide, *this, dx, dy);
+    return BufferFocus(bufferSide) + dx;
+}
+
+int32_t RenderConfig::HotspotInBufferY(uint32_t bufferSide) const
+{
+    int32_t dx = 0;
+    int32_t dy = 0;
+    HotspotOffsetFromCentre(bufferSide, *this, dx, dy);
+    return BufferFocus(bufferSide) + dy;
+}
+
+uint32_t RenderConfig::GetFocusX(uint32_t bufferSide) const
+{
+    // Must use the clamped size: the bitmap is decoded at GetClampedImageSize(), so deriving the
+    // focus from the unclamped GetImageSize() would offset the hotspot by the clamp delta.
+    int32_t width = this->GetClampedImageSize(bufferSide);
     switch (this->align_) {
-        case ANGLE_E:
-            return FOCUS_POINT - height / CALCULATE_IMAGE_MIDDLE;
-        case ANGLE_S:
-            return FOCUS_POINT;
-        case ANGLE_W:
-            return FOCUS_POINT - height;
-        case ANGLE_N:
-            return FOCUS_POINT - height;
-        case ANGLE_SE:
-            return FOCUS_POINT - height;
-        case ANGLE_NE:
-            return FOCUS_POINT;
+        case ANGLE_E:       // fall-though
         case ANGLE_SW:
-            return FOCUS_POINT - height;
-        case ANGLE_NW:
-            return FOCUS_POINT - this->userIconHotSpotY;
+            return 0;
+        case ANGLE_S:       // fall-though
+        case ANGLE_N:       // fall-though
         case ANGLE_CENTER:
-            return FOCUS_POINT - height / CALCULATE_IMAGE_MIDDLE;
+            // The pre-change offset truncated (buffer focus - width / 2.0f) as a whole, which rounds
+            // the focus up for an odd width. Keep that exact rounding so the display stays identical.
+            return static_cast<uint32_t>(width - static_cast<int32_t>(width / CALCULATE_IMAGE_MIDDLE));
+        case ANGLE_W:       // fall-though
+        case ANGLE_SE:      // fall-though
+        case ANGLE_NE:
+            return static_cast<uint32_t>(width);
+        case ANGLE_NW:
+            // The app's hotspot is in the icon's own pixel coordinates. When the icon is scaled
+            // down to fit the buffer, the hotspot must shrink by the same ratio, or it points at
+            // the wrong part of the drawn image.
+            return static_cast<uint32_t>(static_cast<float>(this->userIconHotSpotX) *
+                this->UserIconScaleRatio(bufferSide));
         case ANGLE_NW_RIGHT:
-            return FOCUS_POINT;
+            // Do NOT simplify to static_cast<uint32_t>(width * CALCULATE_MOUSE_ICON_BIAS): the
+            // pre-change expression truncated (focus - width * BIAS) as a whole, which rounds this
+            // focus up. A plain multiply truncates instead and lands 1px low at every width tested
+            // (w=73 -> 12 vs 11, w=256 -> 39 vs 38). Keep the whole-expression form.
+            return static_cast<uint32_t>(width - static_cast<int32_t>(width - width * CALCULATE_MOUSE_ICON_BIAS));
         default:
-            MMI_HILOGW("No need calculate physicalY offset");
-            return FOCUS_POINT;
+            MMI_HILOGD("No need calculate focus x");
+            return 0;
+    }
+}
+
+uint32_t RenderConfig::GetFocusY(uint32_t bufferSide) const
+{
+    // See GetFocusX(): the clamped size is what the bitmap was decoded at.
+    int32_t height = this->GetClampedImageSize(bufferSide);
+    switch (this->align_) {
+        case ANGLE_S:       // fall-though
+        case ANGLE_NE:      // fall-though
+        case ANGLE_NW_RIGHT:
+            return 0;
+        case ANGLE_E:       // fall-though
+        case ANGLE_CENTER:
+            // Same whole-expression truncation as GetFocusX(); see the comment there.
+            return static_cast<uint32_t>(height - static_cast<int32_t>(height / CALCULATE_IMAGE_MIDDLE));
+        case ANGLE_W:       // fall-though
+        case ANGLE_N:       // fall-though
+        case ANGLE_SE:      // fall-though
+        case ANGLE_SW:
+            return static_cast<uint32_t>(height);
+        case ANGLE_NW:
+            // See GetFocusX(): the hotspot scales with the icon.
+            return static_cast<uint32_t>(static_cast<float>(this->userIconHotSpotY) *
+                this->UserIconScaleRatio(bufferSide));
+        default:
+            MMI_HILOGD("No need calculate focus y");
+            return 0;
     }
 }
 
 image_ptr_t PointerRenderer::UserIconScale(uint32_t width, uint32_t height, const RenderConfig &cfg)
 {
-    image_ptr_t image = nullptr;
-    image = ExtractDrawingImage(cfg.userIconPixelMap);
-    return image;
+    CHKPP(cfg.userIconPixelMap);
+    // An app-supplied pixelmap is unbounded external input, so it is bounded here rather than by
+    // GetClampedImageSize(), which only constrains the built-in SVG path. The bound is the buffer
+    // side itself, not side-1: the draw origin centres the image, so an icon exactly the size of
+    // the buffer lands at [0, side) and is fully visible. Trimming a pixel would change the
+    // rendering of a legal 256x256 icon, which this change must not do.
+    if (width == 0 || height == 0) {
+        MMI_HILOGE("Invalid buffer size, width:%{public}u, height:%{public}u", width, height);
+        return ExtractDrawingImage(cfg.userIconPixelMap);
+    }
+    float ratio = cfg.UserIconScaleRatio(width);
+    if (ratio >= 1.0f) {
+        // Already fits: draw at native size, keeping the app's pixels and hotspot untouched.
+        return ExtractDrawingImage(cfg.userIconPixelMap);
+    }
+    Media::ImageInfo imageInfo;
+    cfg.userIconPixelMap->GetImageInfo(imageInfo);
+    // Same reasoning as GetClampedImageSize(): this runs per render, and an oversized user icon is
+    // a stable condition, so it must not be warn-level.
+    MMI_HILOGD("User icon %{public}dx%{public}d exceeds buffer %{public}u, scale by %{public}f",
+        imageInfo.size.width, imageInfo.size.height, width, ratio);
+    MessageParcel data;
+    cfg.userIconPixelMap->Marshalling(data);
+    std::shared_ptr<Media::PixelMap> scaled(Media::PixelMap::Unmarshalling(data));
+    if (scaled == nullptr) {
+        // Copy failed: return nullptr so the caller's CHKPR aborts this frame rather than
+        // drawing the original unscaled image with a hotspot already computed for the
+        // scaled-down size.  The previous frame's pixels and hotspot stay in place.
+        MMI_HILOGE("Copy user icon failed, skipping frame to avoid hotspot/pixel mismatch");
+        return nullptr;
+    }
+    scaled->scale(ratio, ratio, Media::AntiAliasingOption::SLR);
+    return ExtractDrawingImage(scaled);
 }
 
 int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, const RenderConfig &cfg)
@@ -170,26 +378,41 @@ int32_t PointerRenderer::Render(uint8_t *addr, uint32_t width, uint32_t height, 
     OHOS::Rosen::Drawing::Canvas canvas;
     canvas.Bind(bitmap);
     canvas.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
+    int32_t focusX = BufferFocus(width);
+    int32_t focusY = BufferFocus(height);
     if (cfg.direction) {
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        canvas.Rotate(degree, FOCUS_POINT, FOCUS_POINT);
+        canvas.Rotate(degree, focusX, focusY);
     }
     image_ptr_t image = nullptr;
     if (cfg.userIconPixelMap == nullptr) {
-        image = LoadPointerImage(cfg);
+        image = LoadPointerImage(width, cfg);
     } else {
         image = UserIconScale(width, height, cfg);
     }
     CHKPR(image, RET_ERR);
-    // Draw image on canvas
-    canvas.DrawImage(*image, cfg.GetOffsetX(), cfg.GetOffsetY(), Rosen::Drawing::SamplingOptions());
+    canvas.DrawImage(*image, TierOriginX(width, cfg), TierOriginY(height, cfg),
+        Rosen::Drawing::SamplingOptions());
     errno_t ret = memcpy_s(addr, addrSize, bitmap.GetPixels(), bitmap.ComputeByteSize());
     if (ret != EOK) {
         MMI_HILOGE("Memcpy_s failed");
         return RET_ERR;
     }
     return RET_OK;
+}
+
+// (Re)builds the blur canvas bitmap at the given dimensions and loads the current pointer image
+// into it. Used both for the first blur frame and whenever the buffer tier changes underneath us.
+void PointerRenderer::SetupBlurBitmap(uint32_t width, uint32_t height, const RenderConfig &cfg)
+{
+    if (!defaultBitmap_.Build(width, height, defaultFormat_)) {
+        MMI_HILOGE("Default Bitmap build failed");
+    }
+    defaultCanvas_.Bind(defaultBitmap_);
+    LoadDefaultPointerImage(width, cfg);
+    SetPointerCfg(cfg);
+    defaultCanvas_.Save();
 }
 
 int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t width, uint32_t height,
@@ -200,19 +423,21 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         return RET_ERR;
     }
     if (!defaultInit_) {
-        if (!defaultBitmap_.Build(width, height, defaultFormat_)) {
-            MMI_HILOGE("Default Bitmap build failed");
-        }
-        defaultCanvas_.Bind(defaultBitmap_);
-        LoadDefaultPointerImage(cfg);
-        SetPointerCfg(cfg);
-        defaultCanvas_.Save();
+        SetupBlurBitmap(width, height, cfg);
         defaultInit_ = true;
         MMI_HILOGI("Blur Render init success");
+    } else if (defaultBitmap_.GetWidth() != static_cast<int32_t>(width) ||
+               defaultBitmap_.GetHeight() != static_cast<int32_t>(height)) {
+        // Buffer tier changed since the bitmap was built (e.g. a mirror screen being initialised
+        // after the main screen already drew one blur frame).  Rebuild at the new dimensions so
+        // the memcpy_s below never reads past the bitmap's allocation.
+        MMI_HILOGI("Blur bitmap tier mismatch (%{public}dx%{public}d vs %{public}ux%{public}u), rebuilding",
+            defaultBitmap_.GetWidth(), defaultBitmap_.GetHeight(), width, height);
+        SetupBlurBitmap(width, height, cfg);
     }
     if (!HasPointerCfg(cfg)) {
         MMI_HILOGI("cfg change, render cfg:%{private}s", cfg.ToString().c_str());
-        LoadDefaultPointerImage(cfg);
+        LoadDefaultPointerImage(width, cfg);
         SetPointerCfg(cfg);
     }
     if (cfg.direction >= 0) {
@@ -221,12 +446,12 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         defaultCanvas_.Save();
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        defaultCanvas_.Rotate(degree, FOCUS_POINT, FOCUS_POINT);
+        defaultCanvas_.Rotate(degree, BufferFocus(width), BufferFocus(height));
     }
     defaultCanvas_.Clear(OHOS::Rosen::Drawing::Color::COLOR_TRANSPARENT);
     const auto& lastCfg = GetPointerCfg(cfg);
     DrawBlurPointer(width, height, lastCfg, cfg);
-    DrawDefaultPointer(cfg);
+    DrawDefaultPointer(width, height, cfg);
     SetPointerCfg(cfg);
     errno_t ret = memcpy_s(addr, addrSize, defaultBitmap_.GetPixels(), addrSize);
     if (ret != EOK) {
@@ -236,7 +461,7 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
     return RET_OK;
 }
 
-void PointerRenderer::DrawDefaultPointer(const RenderConfig &cfg)
+void PointerRenderer::DrawDefaultPointer(uint32_t width, uint32_t height, const RenderConfig &cfg)
 {
     const auto& images = GetPointerImage(cfg);
     if (images.size() < BLUR_NUM + 1) {
@@ -247,7 +472,8 @@ void PointerRenderer::DrawDefaultPointer(const RenderConfig &cfg)
         MMI_HILOGE("Default pointer image is null");
         return;
     }
-    defaultCanvas_.DrawImage(*images[0], cfg.GetOffsetX(), cfg.GetOffsetY(), Rosen::Drawing::SamplingOptions());
+    defaultCanvas_.DrawImage(*images[0], TierOriginX(width, cfg), TierOriginY(height, cfg),
+        Rosen::Drawing::SamplingOptions());
 }
 
 void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const RenderConfig &lastCfg,
@@ -261,9 +487,11 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
     int32_t dx = lastCfg.x - cfg.x;
     int32_t dy = lastCfg.y - cfg.y;
     AdjustDeltaForDirection(dx, dy, cfg.direction, cfg.displayDirection);
-    const int32_t offsetX = cfg.GetOffsetX();
-    const int32_t offsetY = cfg.GetOffsetY() ;
-    const int32_t imageSize = cfg.GetImageSize();
+    const int32_t offsetX = TierOriginX(width, cfg);
+    const int32_t offsetY = TierOriginY(height, cfg);
+    // Clamped, matching what the bitmap was decoded at; the unclamped size would over-report the
+    // extent.
+    const int32_t imageSize = cfg.GetClampedImageSize(width);
     for (int32_t i = 1; i <= BLUR_NUM; i++) {
         if (!images[i]) {
             MMI_HILOGE("Blur pointer image %{public}d is null", i);
@@ -271,7 +499,20 @@ void PointerRenderer::DrawBlurPointer(uint32_t width, uint32_t height, const Ren
         }
         int32_t localX = offsetX + dx * DEFAULT_OFFSET[i - 1];
         int32_t localY = offsetY + dy * DEFAULT_OFFSET[i - 1];
-        if (IsPositionOutCanvas(localX, localY, imageSize, width, height)) {
+        bool skip;
+        if (width == static_cast<uint32_t>(BLUR_CURSOR_SIZE)) {
+            // 512-tier: localX/Y are centre coordinates (matching original GetOffsetX).
+            // Replicate the original boundary check exactly:
+            //   x - half < -slack || x + half > width + slack (and same for y)
+            // where half = imageSize/2, slack = imageSize/4.
+            int32_t half = imageSize / 2;
+            int32_t slack = imageSize / 4;
+            skip = (localX - half < -slack) || (localX + half > static_cast<int32_t>(width) + slack) ||
+                   (localY - half < -slack) || (localY + half > static_cast<int32_t>(height) + slack);
+        } else {
+            skip = IsPositionOutCanvas(localX, localY, imageSize, width, height);
+        }
+        if (skip) {
             MMI_HILOGD("The blur image is out of bounds, no need to draw");
             continue;
         }
@@ -300,15 +541,19 @@ void PointerRenderer::AdjustDeltaForDirection(int32_t &dx, int32_t &dy, uint32_t
         static_cast<int32_t>(direction), static_cast<int32_t>(displayDirection), static_cast<int32_t>(angle));
 }
 
-bool PointerRenderer::IsPositionOutCanvas(int32_t x, int32_t y, int32_t imageSize, uint32_t width, uint32_t height)
+// Bounds check for a blur image about to be drawn at (left, top). These coordinates are a
+// top-left corner, the same value DrawImage() consumes -- not a centre. An earlier version
+// subtracted imageSize/2 from them, which double-counted the offset: at gear 7 the image is
+// centred with origin 1, so the check saw left = -126 and skipped every horizontal blur frame.
+bool PointerRenderer::IsPositionOutCanvas(int32_t left, int32_t top, int32_t imageSize,
+    uint32_t width, uint32_t height)
 {
-    int32_t left = x - imageSize / 2;
-    int32_t right = x + imageSize / 2;
-    int32_t top = y + imageSize / 2;
-    int32_t bottom = y - imageSize / 2;
-    int32_t scale = imageSize / 4;
-    return left < -scale || right > static_cast<int32_t>(width) + scale ||
-            bottom < -scale || top > static_cast<int32_t>(height) + scale;
+    int32_t right = left + imageSize;
+    int32_t bottom = top + imageSize;
+    // Allow a quarter of the image to hang off each edge so a partially visible blur still draws.
+    int32_t slack = imageSize / 4;
+    return right < -slack || left > static_cast<int32_t>(width) + slack ||
+            bottom < -slack || top > static_cast<int32_t>(height) + slack;
 }
 
 bool PointerRenderer::HasPointerCfg(const RenderConfig &cfg)
@@ -350,11 +595,11 @@ std::vector<image_ptr_t> PointerRenderer::GetPointerImage(const RenderConfig &cf
     return it->second;
 }
 
-void PointerRenderer::LoadDefaultPointerImage(const RenderConfig &cfg)
+void PointerRenderer::LoadDefaultPointerImage(uint32_t bufferSide, const RenderConfig &cfg)
 {
     std::vector<image_ptr_t> images;
     images.resize(BLUR_NUM + 1);
-    auto pixelmap = LoadCursorSvgWithColor(cfg);
+    auto pixelmap = LoadCursorSvgWithColor(bufferSide, cfg);
     if (!pixelmap) {
         MMI_HILOGE("Load default cursor svg failed");
         return;
@@ -366,7 +611,7 @@ void PointerRenderer::LoadDefaultPointerImage(const RenderConfig &cfg)
     }
     images[0] = defaultImage;
     for (int32_t i = 1; i <= BLUR_NUM; i++) {
-        pixelmap_ptr_t blurPixelMap = LoadCursorSvgWithColor(cfg);
+        pixelmap_ptr_t blurPixelMap = LoadCursorSvgWithColor(bufferSide, cfg);
         if (!blurPixelMap) {
             MMI_HILOGE("Load blur cursor svg failed");
             continue;
@@ -459,9 +704,9 @@ bool PointerRenderer::GetPointerFromCache(const RenderConfig &cfg, std::string& 
     return false;
 }
 
-image_ptr_t PointerRenderer::LoadPointerImage(const RenderConfig &cfg)
+image_ptr_t PointerRenderer::LoadPointerImage(uint32_t bufferSide, const RenderConfig &cfg)
 {
-    auto pixelmap = LoadCursorSvgWithColor(cfg);
+    auto pixelmap = LoadCursorSvgWithColor(bufferSide, cfg);
     return ExtractDrawingImage(pixelmap);
 }
 
@@ -498,7 +743,7 @@ void SetCursorColorBaseOnStyle(const RenderConfig &cfg, OHOS::Media::DecodeOptio
     }
 }
 
-pixelmap_ptr_t PointerRenderer::LoadCursorSvgWithColor(const RenderConfig &cfg)
+pixelmap_ptr_t PointerRenderer::LoadCursorSvgWithColor(uint32_t bufferSide, const RenderConfig &cfg)
 {
     std::string svgContent;
     if (!GetPointerFromCache(cfg, svgContent)) {
@@ -519,7 +764,8 @@ pixelmap_ptr_t PointerRenderer::LoadCursorSvgWithColor(const RenderConfig &cfg)
     }
     CHKPP(imageSource);
 
-    int32_t imgSize = cfg.GetImageSize();
+    // Clamp so an unbounded gear-1 dpi cannot decode a glyph larger than the buffer (INV-6).
+    int32_t imgSize = cfg.GetClampedImageSize(bufferSide);
     OHOS::Media::DecodeOptions decodeOpts;
     decodeOpts.desiredSize = {.width = imgSize, .height = imgSize};
     if (!isPartColor) {
@@ -640,46 +886,48 @@ image_ptr_t PointerRenderer::ExtractDrawingImage(pixelmap_ptr_t pixelMap)
     return image;
 }
 
-int32_t PointerRenderer::DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, const RenderConfig &cfg)
+int32_t PointerRenderer::DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, uint32_t width, uint32_t height,
+    const RenderConfig &cfg)
 {
     if (cfg.style_ == MOUSE_ICON::LOADING) {
-        auto loadingImg = FindImg(cfg);
+        auto loadingImg = FindImg(width, cfg);
         if (loadingImg == nullptr) {
-            loadingImg = LoadPointerImage(cfg);
+            loadingImg = LoadPointerImage(width, cfg);
             CHKPR(loadingImg, RET_ERR);
-            PushImg(cfg, loadingImg);
+            PushImg(width, cfg, loadingImg);
         }
         canvas.Rotate(cfg.rotationAngle, cfg.rotationFocusX, cfg.rotationFocusY);
-        canvas.DrawImage(*loadingImg, cfg.GetOffsetX(), cfg.GetOffsetY(), Rosen::Drawing::SamplingOptions());
+        canvas.DrawImage(*loadingImg, TierOriginX(width, cfg), TierOriginY(height, cfg),
+            Rosen::Drawing::SamplingOptions());
     } else {
         RenderConfig runingLCfg = cfg;
         runingLCfg.style_ = MOUSE_ICON::RUNNING_LEFT;
         runingLCfg.align_ = ANGLE_NW;
         runingLCfg.path_ = IMAGE_POINTER_DEFAULT_PATH + "Loading_Left.svg";
-        auto runningImgLeft = FindImg(runingLCfg);
+        auto runningImgLeft = FindImg(width, runingLCfg);
         if (runningImgLeft == nullptr) {
-            runningImgLeft = LoadPointerImage(runingLCfg);
+            runningImgLeft = LoadPointerImage(width, runingLCfg);
             CHKPR(runningImgLeft, RET_ERR);
-            PushImg(runingLCfg, runningImgLeft);
+            PushImg(width, runingLCfg, runningImgLeft);
         }
         CHKPR(runningImgLeft, RET_ERR);
-        canvas.DrawImage(*runningImgLeft, runingLCfg.GetOffsetX(), runingLCfg.GetOffsetY(),
-            Rosen::Drawing::SamplingOptions());
+        canvas.DrawImage(*runningImgLeft, TierOriginX(width, runingLCfg),
+            TierOriginY(height, runingLCfg), Rosen::Drawing::SamplingOptions());
 
         RenderConfig runingRCfg = cfg;
         runingRCfg.style_ = MOUSE_ICON::RUNNING_RIGHT;
         runingRCfg.align_ = ANGLE_NW;
         runingRCfg.path_ = IMAGE_POINTER_DEFAULT_PATH + "Loading_Right.svg";
-        auto runningImgRight = FindImg(runingRCfg);
+        auto runningImgRight = FindImg(width, runingRCfg);
         if (runningImgRight == nullptr) {
-            runningImgRight = LoadPointerImage(runingRCfg);
+            runningImgRight = LoadPointerImage(width, runingRCfg);
             CHKPR(runningImgRight, RET_ERR);
-            PushImg(runingRCfg, runningImgRight);
+            PushImg(width, runingRCfg, runningImgRight);
         }
         canvas.Rotate(runingRCfg.rotationAngle, runingRCfg.rotationFocusX, runingRCfg.rotationFocusY);
         CHKPR(runningImgRight, RET_ERR);
-        canvas.DrawImage(*runningImgRight, runingRCfg.GetOffsetX(), runingRCfg.GetOffsetY(),
-            Rosen::Drawing::SamplingOptions());
+        canvas.DrawImage(*runningImgRight, TierOriginX(width, runingRCfg),
+            TierOriginY(height, runingRCfg), Rosen::Drawing::SamplingOptions());
     }
     return RET_OK;
 }
@@ -718,10 +966,10 @@ int32_t PointerRenderer::DynamicRender(uint8_t *addr, uint32_t width, uint32_t h
     if (cfg.direction) {
         int32_t directionFlag = -1;
         int32_t degree = static_cast<int32_t>(directionFlag * static_cast<int32_t>(cfg.direction) * ROTATION_ANGLE90);
-        canvas.Rotate(degree, FOCUS_POINT, FOCUS_POINT);
+        canvas.Rotate(degree, BufferFocus(width), BufferFocus(height));
     }
 
-    if (DrawImage(canvas, cfg) != RET_OK) {
+    if (DrawImage(canvas, width, height, cfg) != RET_OK) {
         return RET_ERR;
     }
     errno_t ret = memcpy_s(addr, addrSize, bitmap.GetPixels(), bitmap.ComputeByteSize());
