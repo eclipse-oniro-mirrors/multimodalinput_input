@@ -91,6 +91,7 @@ public:
         GlobalCoords &globalCoords);
     int32_t SetDisplayBind(int32_t deviceId, int32_t displayId, std::string &msg);
     int32_t BindToDisplay(int32_t deviceId, int32_t displayId, std::string &msg);
+    void ResetCursorToBindDisplayCenter(int32_t deviceId, int32_t displayId);
     int32_t AppendExtraData(const ExtraData& extraData);
     bool IsWindowVisible(int32_t pid, int32_t userId = -1);
     void ClearExtraData();
@@ -117,6 +118,8 @@ public:
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
     MouseLocation GetMouseInfo();
     CursorPosition GetCursorPos();
+    MouseLocation GetMouseInfoByDisplay(int32_t displayId);
+    CursorPosition GetCursorPosByDisplay(int32_t displayId);
     CursorPosition ResetCursorPos();
     void UpdateAndAdjustMouseLocation(int32_t& displayId, double& x, double& y, bool isRealData = true);
     std::shared_ptr<PointerEvent> CreatePointerByLastPointer(int32_t pointerAction);

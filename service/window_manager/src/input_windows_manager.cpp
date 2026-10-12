@@ -1183,7 +1183,19 @@ int32_t InputWindowsManager::BindToDisplay(int32_t deviceId, int32_t displayId, 
         ArmPendingBindTimer(deviceId);
         return RET_OK;
     }
-    return bindInfo_.BindToDisplay(deviceId, displayId, displayInfo->rsId, displayInfo->uniq, msg);
+    // Re-centering is reserved for a GROUP switch, mirroring ApplyBoundDisplayId's no-jump rule
+    // within a group: when the device's cursor base already lives in the target display's group
+    // (repeat bind, or the default mapping already places the device on that screen), the cursor
+    // keeps its current position instead of jumping back to the center.
+    int32_t prevBoundDisplayId = bindInfo_.GetBindDisplayIdByInputDevice(deviceId);
+    int32_t currentGroupId = (prevBoundDisplayId >= 0) ? FindDisplayGroupId(prevBoundDisplayId)
+                                                       : GetDefaultGroupId();
+    int32_t ret = bindInfo_.BindToDisplay(deviceId, displayId, displayInfo->rsId, displayInfo->uniq, msg);
+    if (ret == RET_OK && FindDisplayGroupId(displayId) != currentGroupId) {
+        // The cursor follows the device into the other group and restarts from the display center.
+        ResetCursorToBindDisplayCenter(deviceId, displayId);
+    }
+    return ret;
 }
 
 void InputWindowsManager::UpdateActiveSequence(int32_t deviceId, int32_t delta)
@@ -1215,7 +1227,53 @@ void InputWindowsManager::FlushPendingBind(int32_t deviceId)
         return;
     }
     std::string bindMsg;
-    bindInfo_.BindToDisplay(deviceId, displayId, displayInfo->rsId, displayInfo->uniq, bindMsg);
+    // Mirror BindToDisplay: only a group switch recenters the cursor. If the device's cursor
+    // base already lives in the target display's group (e.g. it was bound there while this
+    // request was pending), the flush must not recenter it either.
+    int32_t prevBoundDisplayId = bindInfo_.GetBindDisplayIdByInputDevice(deviceId);
+    int32_t currentGroupId = (prevBoundDisplayId >= 0) ? FindDisplayGroupId(prevBoundDisplayId)
+                                                       : GetDefaultGroupId();
+    int32_t ret = bindInfo_.BindToDisplay(deviceId, displayId, displayInfo->rsId, displayInfo->uniq, bindMsg);
+    if (ret == RET_OK && FindDisplayGroupId(displayId) != currentGroupId) {
+        ResetCursorToBindDisplayCenter(deviceId, displayId);
+    }
+}
+
+void InputWindowsManager::ResetCursorToBindDisplayCenter(int32_t deviceId, int32_t displayId)
+{
+#if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
+    CALL_DEBUG_ENTER;
+    // Only pointer devices drive the cursor; binding a touch device must not move the cursor
+    // of the bound group.
+    auto device = INPUT_DEV_MGR->GetInputDevice(deviceId);
+    if (device == nullptr || !device->HasCapability(InputDeviceCapability::INPUT_DEV_CAP_POINTER)) {
+        return;
+    }
+    const auto *displayInfo = GetPhysicalDisplay(displayId);
+    if (displayInfo == nullptr) {
+        MMI_HILOGE("displayId:%{public}d info is nullptr", displayId);
+        return;
+    }
+    double x = displayInfo->validWidth * HALF_RATIO;
+    double y = displayInfo->validHeight * HALF_RATIO;
+#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
+    if (IsPointerActiveRectValid(*displayInfo)) {
+        x = displayInfo->pointerActiveWidth * HALF_RATIO;
+        y = displayInfo->pointerActiveHeight * HALF_RATIO;
+    }
+#endif // OHOS_BUILD_ENABLE_VKEYBOARD
+    Direction direction = GetDisplayDirection(displayInfo);
+    if (direction == DIRECTION90 || direction == DIRECTION270) {
+        std::swap(x, y);
+    }
+    // UpdateAndAdjustMouseLocation drops the write when the group's state maps have no entry yet,
+    // so seed both maps of the bound display's group first.
+    (void)GetCursorPosByDisplay(displayId);
+    (void)GetMouseInfoByDisplay(displayId);
+    UpdateAndAdjustMouseLocation(displayId, x, y);
+    MMI_HILOGI("Reset cursor to center of bound display, deviceId:%{public}d, displayId:%{public}d",
+        deviceId, displayId);
+#endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH
 }
 
 void InputWindowsManager::ArmPendingBindTimer(int32_t deviceId)
@@ -8017,6 +8075,33 @@ MouseLocation InputWindowsManager::GetMouseInfo()
     return curMouseLocation;
 }
 
+MouseLocation InputWindowsManager::GetMouseInfoByDisplay(int32_t displayId)
+{
+    CALL_DEBUG_ENTER;
+    if (displayId < 0) {
+        return GetMouseInfo();
+    }
+    int32_t groupId = FindDisplayGroupId(displayId);
+    MouseLocation curMouseLocation;
+    const auto iter = mouseLocationMap_.find(groupId);
+    if (iter != mouseLocationMap_.end()) {
+        curMouseLocation = iter->second;
+    }
+    if (curMouseLocation.displayId < 0) {
+        // Mirror GetMouseInfo(): seed the group's mouse location at the center of the given display.
+        const auto *displayInfo = GetPhysicalDisplay(displayId);
+        if (displayInfo == nullptr) {
+            MMI_HILOGE("GetPhysicalDisplay failed, displayId:%{public}d", displayId);
+            return curMouseLocation;
+        }
+        mouseLocationMap_[groupId].displayId = displayId;
+        mouseLocationMap_[groupId].physicalX = displayInfo->validWidth / TWOFOLD;
+        mouseLocationMap_[groupId].physicalY = displayInfo->validHeight / TWOFOLD;
+        curMouseLocation = mouseLocationMap_[groupId];
+    }
+    return curMouseLocation;
+}
+
 CursorPosition InputWindowsManager::GetCursorPos()
 {
     CALL_DEBUG_ENTER;
@@ -8047,6 +8132,41 @@ CursorPosition InputWindowsManager::GetCursorPos()
             cursorPosMap_[defaultGroupId].displayDirection = displayInfo.displayDirection;
             cursorPos = cursorPosMap_[defaultGroupId];
         }
+    }
+    return cursorPos;
+}
+
+CursorPosition InputWindowsManager::GetCursorPosByDisplay(int32_t displayId)
+{
+    CALL_DEBUG_ENTER;
+    if (displayId < 0) {
+        return GetCursorPos();
+    }
+    int32_t groupId = FindDisplayGroupId(displayId);
+    CursorPosition cursorPos;
+    const auto iter = cursorPosMap_.find(groupId);
+    if (iter != cursorPosMap_.end()) {
+        cursorPos = iter->second;
+    }
+    if (cursorPos.displayId < 0) {
+        // Mirror GetCursorPos(): seed the group's cursor at the center of the given display.
+        const auto *displayInfo = GetPhysicalDisplay(displayId);
+        if (displayInfo == nullptr) {
+            MMI_HILOGE("GetPhysicalDisplay failed, displayId:%{public}d", displayId);
+            return cursorPos;
+        }
+        int32_t validW = displayInfo->validWidth;
+        int32_t validH = displayInfo->validHeight;
+        Direction direction = GetDisplayDirection(displayInfo);
+        if (direction == DIRECTION90 || direction == DIRECTION270) {
+            std::swap(validW, validH);
+        }
+        cursorPosMap_[groupId].displayId = displayId;
+        cursorPosMap_[groupId].cursorPos.x = validW * HALF_RATIO;
+        cursorPosMap_[groupId].cursorPos.y = validH * HALF_RATIO;
+        cursorPosMap_[groupId].direction = displayInfo->direction;
+        cursorPosMap_[groupId].displayDirection = displayInfo->displayDirection;
+        cursorPos = cursorPosMap_[groupId];
     }
     return cursorPos;
 }
