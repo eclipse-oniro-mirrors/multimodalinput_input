@@ -59,7 +59,8 @@ bool TouchGestureDetector::OnTouchEvent(std::shared_ptr<PointerEvent> event)
         }
         case PointerEvent::POINTER_ACTION_UP:
         case PointerEvent::POINTER_ACTION_CANCEL:
-        case PointerEvent::POINTER_ACTION_PULL_UP: {
+        case PointerEvent::POINTER_ACTION_PULL_UP:
+        case PointerEvent::POINTER_ACTION_PULL_CANCEL: {
             HandleUpEvent(event);
             break;
         }
@@ -313,7 +314,10 @@ bool TouchGestureDetector::WhetherDiscardTouchEvent(std::shared_ptr<PointerEvent
         return true;
     }
     int32_t action = event->GetPointerAction();
-    if (action == PointerEvent::POINTER_ACTION_UP) {
+    if (action == PointerEvent::POINTER_ACTION_UP ||
+        action == PointerEvent::POINTER_ACTION_CANCEL ||
+        action == PointerEvent::POINTER_ACTION_PULL_UP ||
+        action == PointerEvent::POINTER_ACTION_PULL_CANCEL) {
         gestureDisplayId_ = INT32_MAX;
         return false;
     }
@@ -707,8 +711,11 @@ void TouchGestureDetector::CheckGestureTrend(std::shared_ptr<PointerEvent> event
 
 bool TouchGestureDetector::IsLastTouchUp(std::shared_ptr<PointerEvent> event) const
 {
-    return ((event->GetPointerAction() == PointerEvent::POINTER_ACTION_UP) &&
-            (event->GetPointerIds().size() == SINGLE_TOUCH));
+    return ((event->GetPointerIds().size() == SINGLE_TOUCH) &&
+            ((event->GetPointerAction() == PointerEvent::POINTER_ACTION_UP) ||
+            (event->GetPointerAction() == PointerEvent::POINTER_ACTION_CANCEL) ||
+            (event->GetPointerAction() == PointerEvent::POINTER_ACTION_PULL_UP) ||
+            (event->GetPointerAction() == PointerEvent::POINTER_ACTION_PULL_CANCEL)));
 }
 
 void TouchGestureDetector::OnGestureSendEvent(std::shared_ptr<PointerEvent> event) const
