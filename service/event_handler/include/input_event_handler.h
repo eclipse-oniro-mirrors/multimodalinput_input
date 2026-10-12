@@ -114,8 +114,10 @@ private:
     double touchpadEventAbsY_ { 0.0 };
     // disable-while-typing
     bool isDwtEdgeAreaForTouchpadMotionActing_ { false };
+    int64_t lastBeginDwtEdgeAreaForTouchpadMotionTime_ { 0 };
     bool isDwtEdgeAreaForTouchpadButtonActing_ { false };
     bool isDwtEdgeAreaForTouchpadTapActing_ { false };
+    int64_t lastBeginDwtEdgeAreaForTouchpadTapTime_ { 0 };
     bool isButtonMistouch_ { false };
     bool isTapMistouch_ { false };
     int modifierPressedCount_ { 0 };
@@ -132,6 +134,8 @@ private:
     static constexpr double TOUCHPAD_EDGE_WIDTH_FOR_BUTTON = 8.0;
     static constexpr double TOUCHPAD_EDGE_WIDTH_FOR_TAP = 25.0;
     static constexpr double TOUCHPAD_MIN_X_SIZE_FOR_DWT = 52.0;
+    static constexpr int64_t TOUCHPAD_DWT_FOR_TAP_DURATION = 1000000;  // 1S
+    static constexpr int64_t TOUCHPAD_DWT_FOR_MOTION_DURATION = 1000000;  // 1S
 };
 #define InputHandler ::OHOS::DelayedSingleton<InputEventHandler>::GetInstance()
 } // namespace MMI
