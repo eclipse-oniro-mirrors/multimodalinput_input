@@ -34,6 +34,10 @@ struct MockControllerConfig {
     bool recordDestruction { false };
     int32_t mouseCreateCount { 0 };
     int32_t keyboardCreateCount { 0 };
+    int32_t touchCreateResult { 0 };
+    std::string touchFailureCall;
+    int32_t touchFailureResult { 0 };
+    int32_t touchCreateCount { 0 };
 };
 
 struct MockControllerOptions {
@@ -44,6 +48,9 @@ struct MockControllerOptions {
     bool recordDestruction { false };
     std::string keyboardFailureCall;
     int32_t keyboardFailureResult { 0 };
+    int32_t touchCreateResult { 0 };
+    std::string touchFailureCall;
+    int32_t touchFailureResult { 0 };
 };
 
 MockControllerConfig &MockControllerState();
@@ -64,6 +71,7 @@ public:
 
     int32_t MouseCreateCount() const;
     int32_t KeyboardCreateCount() const;
+    int32_t TouchCreateCount() const;
 };
 } // namespace OHOS::MMI::InputCli
 
