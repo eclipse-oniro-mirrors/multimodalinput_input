@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <mutex>
+#include <vector>
 
 #include "pointer_event.h"
 namespace OHOS {
@@ -77,7 +79,7 @@ struct DisplayTouchArbitrationState {
 
 class TouchArbitrationManager {
 public:
-    explicit TouchArbitrationManager(InputWindowsManager *inputWindowsManager);
+    explicit TouchArbitrationManager(InputWindowsManager &inputWindowsManager);
 
     TouchArbitrationSource GetTouchArbitrationSource(
         const std::shared_ptr<PointerEvent> &pointerEvent) const;
@@ -88,19 +90,29 @@ public:
     void ClearTouchArbitrationStateByDevice(int32_t deviceId);
 
 private:
+    struct TouchArbitrationCancelInfo {
+        int32_t deviceId { -1 };
+        int32_t pointerId { -1 };
+        std::shared_ptr<PointerEvent> currentEvent { nullptr };
+    };
+
     bool IsRealTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
     bool IsVirtualTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
     bool HasConflictingTouchSource(int32_t displayId, TouchArbitrationSource source) const;
-    bool IsActiveTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent,
-        TouchArbitrationSource source) const;
+    bool IsClosedTouchArbitrationStream(const std::shared_ptr<PointerEvent> &pointerEvent) const;
+    bool UpdateActiveTouchArbitrationEventIfActive(const std::shared_ptr<PointerEvent> &pointerEvent,
+        TouchArbitrationSource source);
+    void UpdateTouchArbitrationStateOnDown(const std::shared_ptr<PointerEvent> &pointerEvent,
+        TouchArbitrationSource source);
     void MarkClosedPointerItemsCanceled(const std::shared_ptr<PointerEvent> &pointerEvent);
     void ClearTouchArbitrationPointerState(int32_t displayId, TouchArbitrationSource source,
         int32_t pointerId, int32_t deviceId);
+    std::vector<TouchArbitrationCancelInfo> ResolveConflictingTouchPointers(
+        int32_t displayId, TouchArbitrationSource source);
     void CancelConflictingTouchSource(int32_t displayId, TouchArbitrationSource source);
-    void CloseConflictingTouchPointer(int32_t displayId, int32_t deviceId, int32_t pointerId,
-        DisplayTouchArbitrationState &displayState);
 
-    InputWindowsManager *inputWindowsManager_ { nullptr };
+    InputWindowsManager &inputWindowsManager_;
+    mutable std::mutex statesMutex_;
     std::map<int32_t, DisplayTouchArbitrationState> states_;
 };
 } // namespace MMI

@@ -99,6 +99,7 @@ public:
     std::map<LastTouch, LastTouchInfo>& GetLastTouchInfos();
     std::map<int32_t, std::vector<std::shared_ptr<WindowInfo>>>& GetCancelEventList();
     std::map<int32_t, std::map<int32_t, WindowInfoEX>>& GetTouchItemDownInfos();
+    void ClearTouchItemDownInfosByDevice(int32_t deviceId);
 
     bool Abandon(const std::shared_ptr<PointerEvent>& pointerEvent);
 

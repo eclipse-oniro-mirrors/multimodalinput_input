@@ -190,7 +190,7 @@ void InputWindowsManager::InitWindowInfo(WindowInfo& info)
 
 InputWindowsManager::InputWindowsManager() : bindInfo_(BIND_CFG_FILE_NAME)
 #ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
-    , touchArbitration_(this)
+    , touchArbitration_(*this)
 #endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 {
     MMI_HILOGD("Bind cfg file name:%{private}s", BIND_CFG_FILE_NAME.c_str());
@@ -5851,9 +5851,9 @@ void InputWindowsManager::ClearTouchTargetState(int32_t displayId, int32_t devic
     auto &infos = TouchItemDownInfos();
     auto devIter = infos.find(deviceId);
     if (devIter != infos.end()) {
-        auto pointIter = devIter->second.find(pointerId);
-        if (pointIter != devIter->second.end()) {
-            pointIter->second.flag = false;
+        devIter->second.erase(pointerId);
+        if (devIter->second.empty()) {
+            infos.erase(devIter);
         }
     }
     ClearTargetWindowId(pointerId, deviceId);

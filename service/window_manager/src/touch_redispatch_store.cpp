@@ -158,6 +158,14 @@ std::map<int32_t, std::map<int32_t, WindowInfoEX>>& TouchRedispatchStore::GetTou
     return touchItemDownInfos_[zOrder_];
 }
 
+void TouchRedispatchStore::ClearTouchItemDownInfosByDevice(int32_t deviceId)
+{
+    for (auto &[zOrder, deviceInfos] : touchItemDownInfos_) {
+        (void)zOrder;
+        deviceInfos.erase(deviceId);
+    }
+}
+
 bool TouchRedispatchStore::Abandon(const std::shared_ptr<PointerEvent>& pointerEvent)
 {
     CHKPF(pointerEvent);
