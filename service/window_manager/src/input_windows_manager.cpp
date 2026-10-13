@@ -2408,18 +2408,16 @@ void InputWindowsManager::UpdateDisplayInfo(OLD::DisplayGroupInfo &displayGroupI
         HandleWindowPositionChange(displayGroupInfo);
         EnterMouseCaptureMode(displayGroupInfo);
 
-        // Notify plugins about display changes (async notification)
-        if (hasChanged) {
-            auto pluginMgr = InputPluginManager::GetInstance();
-            if (pluginMgr != nullptr) {
-                MMI_HILOGI("Notified display info changed to plugins");
-                pluginMgr->NotifyDisplayChange();
-            }
-        }
-
         const auto iter = displayGroupInfoMap_.find(groupId);
         if (iter != displayGroupInfoMap_.end()) {
             displayGroupInfoTemp = iter->second;
+        }
+    }
+    if (hasChanged) {
+        auto pluginMgr = InputPluginManager::GetInstance();
+        if (pluginMgr != nullptr) {
+            MMI_HILOGI("Notified display info changed to plugins");
+            pluginMgr->NotifyDisplayChange();
         }
     }
     PrintDisplayGroupInfo(displayGroupInfoTemp);
@@ -9042,7 +9040,7 @@ bool InputWindowsManager::HasDisplayGroupInfoChanged(const OLD::DisplayGroupInfo
     const OLD::DisplayGroupInfo &newGroupInfo, bool hasOldGroupInfo) const
 {
     if (!hasOldGroupInfo) {
-        MMI_HILOGD("No old display group info, skip plugin display change detection");
+        MMI_HILOGI("No old display group info, should notify display change");
         return true;
     }
 
