@@ -39,6 +39,12 @@ enum class TouchArbitrationPointerState {
     CLOSED,
 };
 
+struct TouchArbitrationCancelInfo {
+    int32_t deviceId { -1 };
+    int32_t pointerId { -1 };
+    std::shared_ptr<PointerEvent> currentEvent { nullptr };
+};
+
 struct TouchArbitrationDeviceState {
     TouchArbitrationSource source { TouchArbitrationSource::OTHER };
     std::shared_ptr<PointerEvent> currentEvent { nullptr };
@@ -90,12 +96,6 @@ public:
     void ClearTouchArbitrationStateByDevice(int32_t deviceId);
 
 private:
-    struct TouchArbitrationCancelInfo {
-        int32_t deviceId { -1 };
-        int32_t pointerId { -1 };
-        std::shared_ptr<PointerEvent> currentEvent { nullptr };
-    };
-
     bool IsRealTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
     bool IsVirtualTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent) const;
     bool HasConflictingTouchSource(int32_t displayId, TouchArbitrationSource source) const;

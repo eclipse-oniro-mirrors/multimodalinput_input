@@ -343,9 +343,8 @@ void TouchArbitrationManager::ClearTouchArbitrationStateByDevice(int32_t deviceI
     }
 }
 
-std::vector<TouchArbitrationManager::TouchArbitrationCancelInfo>
-    TouchArbitrationManager::ResolveConflictingTouchPointers(int32_t displayId,
-    TouchArbitrationSource source)
+std::vector<TouchArbitrationCancelInfo> TouchArbitrationManager::ResolveConflictingTouchPointers(
+    int32_t displayId, TouchArbitrationSource source)
 {
     std::vector<TouchArbitrationCancelInfo> cancelInfos;
     std::lock_guard<std::mutex> lock(statesMutex_);
