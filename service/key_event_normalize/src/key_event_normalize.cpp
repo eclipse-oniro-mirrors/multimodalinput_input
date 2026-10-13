@@ -815,6 +815,7 @@ std::shared_ptr<KeyEvent> KeyEventNormalize::PackageKeyUpEvent(int32_t deviceId,
     keyEvent->SetKeyCode(keyCode);
     keyEvent->SetRawCode(rawCode);
     keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_UP);
+    keyEvent->SetAction(KeyEvent::KEY_ACTION_UP);
     keyEvent->SetRepeatCount(0);
     keyEvent->SetActionTime(time);
 
