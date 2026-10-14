@@ -16559,7 +16559,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchRedispatchWindowL
     item.SetPointerId(pointerId);
     downEvent->AddPointerItem(item);
 
-    store.SetFingerActive(zOrder, deviceId, pointerId, downEvent);
+    store.SetFingerActive(zOrder, deviceId, pointerId, PointerEvent::TOOL_TYPE_FINGER, downEvent);
     EXPECT_TRUE(store.IsFingerActive(zOrder, deviceId, pointerId));
     EXPECT_EQ(store.GetFingerWindowId(zOrder, deviceId, pointerId), downWindowId);
 

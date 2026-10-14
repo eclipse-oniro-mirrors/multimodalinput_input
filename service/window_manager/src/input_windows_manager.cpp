@@ -3268,10 +3268,10 @@ void InputWindowsManager::DispatchPointerRedispatch(int32_t pointerAction, const
 }
 
 void InputWindowsManager::DispatchTouchRedispatch(int32_t pointerAction, float zOrder,
-    int32_t deviceId, int32_t pointerId, const WindowInfo& windowInfo)
+    int32_t deviceId, int32_t pointerId, int32_t toolType, const WindowInfo& windowInfo)
 {
     CALL_DEBUG_ENTER;
-    auto fingerEvent = touchRedispatchStore_.GetFingerEvent(zOrder, deviceId, pointerId);
+    auto fingerEvent = touchRedispatchStore_.GetFingerEvent(zOrder, deviceId, pointerId, toolType);
     if (fingerEvent == nullptr) {
         MMI_HILOGW("No finger event for zOrder:%{public}f deviceId:%{public}d pointerId:%{public}d",
             zOrder, deviceId, pointerId);
@@ -6457,14 +6457,19 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
          action == PointerEvent::POINTER_ACTION_HOVER_ENTER) &&
         !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH)) {
         for (const auto& [zOrder, fingerMap] : touchRedispatchStore_.GetFingerMap()) {
-            auto iter = fingerMap.find({pointerEvent->GetDeviceId(), pointerId});
+            auto iter = fingerMap.find({pointerEvent->GetDeviceId(), pointerId,
+                pointerItem.GetToolType()});
             if (iter != fingerMap.end() && iter->second.windowId == touchWindow->id) {
                 MMI_HILOGI("Touch DOWN conflicts with active redispatch finger, "
-                    "zOrder:%{public}f deviceId:%{public}d pointerId:%{public}d windowId:%{public}d",
-                    zOrder, pointerEvent->GetDeviceId(), pointerId, touchWindow->id);
+                    "zOrder:%{public}f deviceId:%{public}d pointerId:%{public}d toolType:%{public}d"
+                    " windowId:%{public}d",
+                    zOrder, pointerEvent->GetDeviceId(), pointerId, pointerItem.GetToolType(),
+                    touchWindow->id);
                 DispatchTouchRedispatch(PointerEvent::POINTER_ACTION_CANCEL,
-                    zOrder, pointerEvent->GetDeviceId(), pointerId, *touchWindow);
-                touchRedispatchStore_.DeactivateFinger(zOrder, pointerEvent->GetDeviceId(), pointerId);
+                    zOrder, pointerEvent->GetDeviceId(), pointerId, pointerItem.GetToolType(),
+                    *touchWindow);
+                touchRedispatchStore_.DeactivateFinger(zOrder, pointerEvent->GetDeviceId(), pointerId,
+                    pointerItem.GetToolType());
                 break;
             }
         }
@@ -6801,7 +6806,8 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         infos[deviceId][pointerId] = windowInfoEX;
         if (touchRedispatchStore_.IsActive()) {
             touchRedispatchStore_.SetFingerActive(pointerEvent->GetZOrder(),
-                pointerEvent->GetDeviceId(), pointerEvent->GetPointerId(), pointerEvent);
+                pointerEvent->GetDeviceId(), pointerEvent->GetPointerId(),
+                pointerItem.GetToolType(), pointerEvent);
         }
         MMI_HILOGD("PointerId:%{public}d, touchWindow:%{public}d", pointerId, touchWindow->id);
     } else if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_PULL_UP) {

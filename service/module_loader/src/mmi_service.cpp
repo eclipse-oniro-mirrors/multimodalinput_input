@@ -6621,6 +6621,17 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
 {
     pointerEvent->SetTargetWindowId(-1);
     pointerEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_REDISPATCH);
+#ifdef OHOS_BUILD_ENABLE_TOUCH
+    if (pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN) {
+        int32_t pointerAction = pointerEvent->GetPointerAction();
+        if (pointerAction == PointerEvent::POINTER_ACTION_HOVER_ENTER ||
+            pointerAction == PointerEvent::POINTER_ACTION_HOVER_EXIT) {
+            MMI_HILOGI("Redispatch discard derived hover event, action:%{public}d, id:%{public}d",
+                pointerAction, pointerEvent->GetId());
+            return RET_OK;
+        }
+    }
+#endif // OHOS_BUILD_ENABLE_TOUCH
     LogTracer lt(pointerEvent->GetId(), pointerEvent->GetEventType(),
         pointerEvent->GetPointerAction());
     auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
@@ -6633,7 +6644,9 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
 #ifdef OHOS_BUILD_ENABLE_TOUCH
         case PointerEvent::SOURCE_TYPE_TOUCHSCREEN: {
             PointerEvent::PointerItem pointerItem;
+            int32_t toolType = PointerEvent::TOOL_TYPE_FINGER;
             if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
+                toolType = pointerItem.GetToolType();
                 pointerItem.SetTargetWindowId(-1);
                 pointerEvent->UpdatePointerItem(pointerEvent->GetPointerId(), pointerItem);
             }
@@ -6645,8 +6658,8 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
                 float zOrder = pointerEvent->GetZOrder();
                 int32_t deviceId = pointerEvent->GetDeviceId();
                 int32_t pointerId = pointerEvent->GetPointerId();
-                if (store.IsFingerActive(zOrder, deviceId, pointerId)) {
-                    int32_t savedWindowId = store.GetFingerWindowId(zOrder, deviceId, pointerId);
+                if (store.IsFingerActive(zOrder, deviceId, pointerId, toolType)) {
+                    int32_t savedWindowId = store.GetFingerWindowId(zOrder, deviceId, pointerId, toolType);
                     if (savedWindowId >= 0) {
                         pointerEvent->SetTargetWindowId(savedWindowId);
                         if (pointerEvent->GetPointerItem(pointerId, pointerItem)) {
@@ -6667,7 +6680,7 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
                         pointerEvent->GetDeviceId(), pointerEvent->GetPointerId(), realWindowId);
                     auto& store = WIN_MGR->GetTouchRedispatchStore();
                     store.DeactivateFinger(pointerEvent->GetZOrder(),
-                        pointerEvent->GetDeviceId(), pointerEvent->GetPointerId());
+                        pointerEvent->GetDeviceId(), pointerEvent->GetPointerId(), toolType);
                     return RET_ERR;
                 }
             }

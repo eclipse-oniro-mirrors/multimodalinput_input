@@ -40,7 +40,7 @@ TouchRedispatchStore::Guard::~Guard()
 }
 
 void TouchRedispatchStore::SetFingerActive(float zOrder, int32_t deviceId, int32_t pointerId,
-    const std::shared_ptr<PointerEvent>& event)
+    int32_t toolType, const std::shared_ptr<PointerEvent>& event)
 {
     RedispatchFingerInfo info;
     if (event != nullptr) {
@@ -48,55 +48,58 @@ void TouchRedispatchStore::SetFingerActive(float zOrder, int32_t deviceId, int32
     }
     info.event = event;
     info.active = true;
-    redispatchFingers_[zOrder][{deviceId, pointerId}] = info;
+    redispatchFingers_[zOrder][{deviceId, pointerId, toolType}] = info;
 }
 
-bool TouchRedispatchStore::IsFingerActive(float zOrder, int32_t deviceId, int32_t pointerId) const
+bool TouchRedispatchStore::IsFingerActive(float zOrder, int32_t deviceId, int32_t pointerId,
+    int32_t toolType) const
 {
     auto outerIter = redispatchFingers_.find(zOrder);
     if (outerIter == redispatchFingers_.end()) {
         return false;
     }
-    auto innerIter = outerIter->second.find({deviceId, pointerId});
+    auto innerIter = outerIter->second.find({deviceId, pointerId, toolType});
     if (innerIter != outerIter->second.end()) {
         return innerIter->second.active;
     }
     return false;
 }
 
-void TouchRedispatchStore::DeactivateFinger(float zOrder, int32_t deviceId, int32_t pointerId)
+void TouchRedispatchStore::DeactivateFinger(float zOrder, int32_t deviceId, int32_t pointerId,
+    int32_t toolType)
 {
     auto outerIter = redispatchFingers_.find(zOrder);
     if (outerIter == redispatchFingers_.end()) {
         return;
     }
-    outerIter->second.erase({deviceId, pointerId});
+    outerIter->second.erase({deviceId, pointerId, toolType});
     if (outerIter->second.empty()) {
         redispatchFingers_.erase(outerIter);
     }
 }
 
 std::shared_ptr<PointerEvent> TouchRedispatchStore::GetFingerEvent(float zOrder, int32_t deviceId,
-    int32_t pointerId) const
+    int32_t pointerId, int32_t toolType) const
 {
     auto outerIter = redispatchFingers_.find(zOrder);
     if (outerIter == redispatchFingers_.end()) {
         return nullptr;
     }
-    auto innerIter = outerIter->second.find({deviceId, pointerId});
+    auto innerIter = outerIter->second.find({deviceId, pointerId, toolType});
     if (innerIter != outerIter->second.end()) {
         return innerIter->second.event;
     }
     return nullptr;
 }
 
-int32_t TouchRedispatchStore::GetFingerWindowId(float zOrder, int32_t deviceId, int32_t pointerId) const
+int32_t TouchRedispatchStore::GetFingerWindowId(float zOrder, int32_t deviceId, int32_t pointerId,
+    int32_t toolType) const
 {
     auto outerIter = redispatchFingers_.find(zOrder);
     if (outerIter == redispatchFingers_.end()) {
         return -1;
     }
-    auto innerIter = outerIter->second.find({deviceId, pointerId});
+    auto innerIter = outerIter->second.find({deviceId, pointerId, toolType});
     if (innerIter != outerIter->second.end()) {
         return innerIter->second.windowId;
     }
@@ -169,31 +172,32 @@ bool TouchRedispatchStore::Abandon(const std::shared_ptr<PointerEvent>& pointerE
     if (pointerEvent->GetPointerItem(pointerId, pointerItem)) {
         toolType = pointerItem.GetToolType();
     }
+    bool isPen = (toolType == PointerEvent::TOOL_TYPE_PEN ||
+        toolType == PointerEvent::TOOL_TYPE_PENCIL);
     int32_t action = pointerEvent->GetPointerAction();
-    if (toolType == PointerEvent::TOOL_TYPE_PEN &&
-        action == PointerEvent::POINTER_ACTION_PROXIMITY_IN) {
-        SetFingerActive(zOrder, deviceId, pointerId, pointerEvent);
-        MMI_HILOGD("Auto-activate pen on PROXIMITY_IN, z:%{public}f d:%{public}d p:%{public}d",
-            zOrder, deviceId, pointerId);
+    if (isPen && action == PointerEvent::POINTER_ACTION_PROXIMITY_IN) {
+        SetFingerActive(zOrder, deviceId, pointerId, toolType, pointerEvent);
+        MMI_HILOGD("Auto-activate pen on PROXIMITY_IN, z:%{public}f d:%{public}d p:%{public}d t:%{public}d",
+            zOrder, deviceId, pointerId, toolType);
         return false;
     }
-    if (!IsFingerActive(zOrder, deviceId, pointerId)) {
-        MMI_HILOGD("Abandon touch redispatch, not active, z:%{public}f d:%{public}d p:%{public}d",
-            zOrder, deviceId, pointerId);
+    if (!IsFingerActive(zOrder, deviceId, pointerId, toolType)) {
+        MMI_HILOGD("Abandon touch redispatch, not active, z:%{public}f d:%{public}d p:%{public}d t:%{public}d",
+            zOrder, deviceId, pointerId, toolType);
         return true;
     }
-    if (toolType == PointerEvent::TOOL_TYPE_PEN) {
+    if (isPen) {
         if (action == PointerEvent::POINTER_ACTION_PROXIMITY_OUT) {
-            DeactivateFinger(zOrder, deviceId, pointerId);
-            MMI_HILOGD("Deactivate pen on PROXIMITY_OUT, d:%{public}d p:%{public}d",
-                deviceId, pointerId);
+            DeactivateFinger(zOrder, deviceId, pointerId, toolType);
+            MMI_HILOGD("Deactivate pen on PROXIMITY_OUT, d:%{public}d p:%{public}d t:%{public}d",
+                deviceId, pointerId, toolType);
         }
     } else {
         if (action == PointerEvent::POINTER_ACTION_UP ||
             action == PointerEvent::POINTER_ACTION_CANCEL ||
             action == PointerEvent::POINTER_ACTION_HOVER_CANCEL ||
             action == PointerEvent::POINTER_ACTION_HOVER_EXIT) {
-            DeactivateFinger(zOrder, deviceId, pointerId);
+            DeactivateFinger(zOrder, deviceId, pointerId, toolType);
             MMI_HILOGD("Deactivate finger on action:%{public}d, d:%{public}d p:%{public}d",
                 action, deviceId, pointerId);
         }
