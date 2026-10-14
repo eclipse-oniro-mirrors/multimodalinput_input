@@ -132,6 +132,11 @@ public:
     virtual MouseLocation GetMouseInfo() = 0;
     virtual CursorPosition GetCursorPos() = 0;
     virtual CursorPosition ResetCursorPos() = 0;
+    // Cursor/mouse state of the group the given display belongs to, for devices bound to a
+    // display outside the default group. Non-pure with defaults delegating to the default-group
+    // accessors so facility mocks need not override them.
+    virtual MouseLocation GetMouseInfoByDisplay(int32_t displayId) { return GetMouseInfo(); }
+    virtual CursorPosition GetCursorPosByDisplay(int32_t displayId) { return GetCursorPos(); }
     virtual void UpdateAndAdjustMouseLocation(int32_t& displayId, double& x, double& y, bool isRealData = true) = 0;
 #endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH
 #ifdef OHOS_BUILD_ENABLE_POINTER

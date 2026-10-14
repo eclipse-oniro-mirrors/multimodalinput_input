@@ -17760,6 +17760,520 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetBindToDisplayIdByIn
     EXPECT_EQ(WIN_MGR->GetBindToDisplayIdByInputDevice(devId), 1);
 }
 
+// =====================================================================================
+// Coverage for the bind-cursor recentering feature: GetCursorPosByDisplay /
+// GetMouseInfoByDisplay / ResetCursorToBindDisplayCenter, plus the BindToDisplay
+// success path that lands the cursor at the center of the bound display's group.
+// Layout used by these cases: default group 0 holds display 1 (800x600, the main
+// screen); special group 5 holds display 2 (1000x800, the bound co-driver screen),
+// mirroring the multi-user cockpit scenario the fix targets. Pointer devices are
+// injected into InputDeviceManager's virtual-device table so GetInputDevice resolves
+// them without libinput.
+// =====================================================================================
+static void SetupBindCursorDisplays()
+{
+    auto group0 = InputWindowsManagerTest::CreateDisplayGroupInfo(0, 1);
+    group0.type = GroupType::GROUP_DEFAULT;
+    OLD::DisplayInfo &mainDisplay = group0.displaysInfo.front();
+    mainDisplay.width = 800;
+    mainDisplay.height = 600;
+    mainDisplay.validWidth = 800;
+    mainDisplay.validHeight = 600;
+    mainDisplay.direction = DIRECTION0;
+    mainDisplay.displayDirection = DIRECTION0;
+    mainDisplay.rsId = 1;
+    mainDisplay.uniq = "bind_cursor_main";
+
+    auto group5 = InputWindowsManagerTest::CreateDisplayGroupInfo(5, 2);
+    OLD::DisplayInfo &boundDisplay = group5.displaysInfo.front();
+    boundDisplay.width = 1000;
+    boundDisplay.height = 800;
+    boundDisplay.validWidth = 1000;
+    boundDisplay.validHeight = 800;
+    boundDisplay.direction = DIRECTION0;
+    boundDisplay.displayDirection = DIRECTION0;
+    boundDisplay.rsId = 88;
+    boundDisplay.uniq = "bind_cursor_target";
+
+    WIN_MGR->displayGroupInfoMap_.clear();
+    WIN_MGR->displayGroupInfoMap_[0] = group0;
+    WIN_MGR->displayGroupInfoMap_[5] = group5;
+
+    // Seed a non-center cursor on the default group so later assertions can prove that a
+    // write to the bound group does not leak into the default group's state.
+    WIN_MGR->cursorPosMap_.clear();
+    WIN_MGR->mouseLocationMap_.clear();
+    // WindowInfo::flags has no default initializer; pin it so no stale pointer-lock state
+    // diverts the centering write.
+    WIN_MGR->pointerLockedWindow_.flags = 0;
+    WIN_MGR->cursorPosMap_[0].displayId = 1;
+    WIN_MGR->cursorPosMap_[0].cursorPos.x = 100.0;
+    WIN_MGR->cursorPosMap_[0].cursorPos.y = 120.0;
+    WIN_MGR->mouseLocationMap_[0].displayId = 1;
+    WIN_MGR->mouseLocationMap_[0].physicalX = 100;
+    WIN_MGR->mouseLocationMap_[0].physicalY = 120;
+}
+
+// Drop the special group added by SetupBindCursorDisplays so later cases start from the
+// state the fixture's SetUp normally provides.
+static void TeardownBindCursorDisplays()
+{
+    constexpr int32_t specialGroupId { 5 };
+    WIN_MGR->displayGroupInfoMap_.erase(specialGroupId);
+    WIN_MGR->cursorPosMap_.erase(specialGroupId);
+    WIN_MGR->mouseLocationMap_.erase(specialGroupId);
+}
+
+// Register a pointer-capable device both in bindInfo_ (for the bind relation) and in
+// InputDeviceManager's virtual table (for ResetCursorToBindDisplayCenter's capability check).
+static void RegisterPointerDevice(int32_t deviceId)
+{
+    RegisterBindDevice(WIN_MGR, deviceId);
+    auto device = std::make_shared<InputDevice>();
+    device->AddCapability(InputDeviceCapability::INPUT_DEV_CAP_POINTER);
+    INPUT_DEV_MGR->AddVirtualInputDeviceInner(deviceId, device);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetCursorPosByDisplay_001
+ * @tc.desc: GetCursorPosByDisplay seeds the bound display's group at the display center when
+ *           the group has no cursor state yet, leaving the default group untouched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetCursorPosByDisplay_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    constexpr int32_t boundGroup { 5 };
+    CursorPosition result = WIN_MGR->GetCursorPosByDisplay(2);
+    EXPECT_EQ(result.displayId, 2);
+    EXPECT_EQ(result.cursorPos.x, 500.0); // 1000 * HALF_RATIO
+    EXPECT_EQ(result.cursorPos.y, 400.0); // 800 * HALF_RATIO
+    // The seeded state persists in the bound group's own entry.
+    ASSERT_EQ(WIN_MGR->cursorPosMap_.count(boundGroup), 1u);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[boundGroup].displayId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[boundGroup].cursorPos.x, 500.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[boundGroup].cursorPos.y, 400.0);
+    // The default group's cursor is untouched.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].displayId, 1);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.x, 100.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.y, 120.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetCursorPosByDisplay_002
+ * @tc.desc: A negative display id falls back to the default group's cursor state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetCursorPosByDisplay_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    CursorPosition result = WIN_MGR->GetCursorPosByDisplay(-1);
+    EXPECT_EQ(result.displayId, 1);
+    EXPECT_EQ(result.cursorPos.x, 100.0);
+    EXPECT_EQ(result.cursorPos.y, 120.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetCursorPosByDisplay_003
+ * @tc.desc: An existing cursor entry for the display's group is returned as-is, without
+ *           being re-seeded at the display center.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetCursorPosByDisplay_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    constexpr int32_t boundGroup { 5 };
+    WIN_MGR->cursorPosMap_[boundGroup].displayId = 2;
+    WIN_MGR->cursorPosMap_[boundGroup].cursorPos.x = 30.0;
+    WIN_MGR->cursorPosMap_[boundGroup].cursorPos.y = 60.0;
+    CursorPosition result = WIN_MGR->GetCursorPosByDisplay(2);
+    EXPECT_EQ(result.displayId, 2);
+    EXPECT_EQ(result.cursorPos.x, 30.0);
+    EXPECT_EQ(result.cursorPos.y, 60.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetCursorPosByDisplay_004
+ * @tc.desc: An unknown display id resolves to the default group, whose cursor state is
+ *           returned unchanged.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetCursorPosByDisplay_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    constexpr int32_t unknownDisplay { 999 };
+    CursorPosition result = WIN_MGR->GetCursorPosByDisplay(unknownDisplay);
+    EXPECT_EQ(result.displayId, 1);
+    EXPECT_EQ(result.cursorPos.x, 100.0);
+    EXPECT_EQ(result.cursorPos.y, 120.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetMouseInfoByDisplay_001
+ * @tc.desc: GetMouseInfoByDisplay seeds the bound display's group at the display center when
+ *           the group has no mouse location yet, leaving the default group untouched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetMouseInfoByDisplay_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    constexpr int32_t boundGroup { 5 };
+    MouseLocation result = WIN_MGR->GetMouseInfoByDisplay(2);
+    EXPECT_EQ(result.displayId, 2);
+    EXPECT_EQ(result.physicalX, 500); // 1000 / TWOFOLD
+    EXPECT_EQ(result.physicalY, 400); // 800 / TWOFOLD
+    // The seeded state persists in the bound group's own entry.
+    ASSERT_EQ(WIN_MGR->mouseLocationMap_.count(boundGroup), 1u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[boundGroup].displayId, 2);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[boundGroup].physicalX, 500);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[boundGroup].physicalY, 400);
+    // The default group's mouse location is untouched.
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[0].displayId, 1);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[0].physicalX, 100);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[0].physicalY, 120);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetMouseInfoByDisplay_002
+ * @tc.desc: A negative display id falls back to the default group's mouse location.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetMouseInfoByDisplay_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    MouseLocation result = WIN_MGR->GetMouseInfoByDisplay(-1);
+    EXPECT_EQ(result.displayId, 1);
+    EXPECT_EQ(result.physicalX, 100);
+    EXPECT_EQ(result.physicalY, 120);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_GetMouseInfoByDisplay_003
+ * @tc.desc: An existing mouse location for the display's group is returned as-is.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetMouseInfoByDisplay_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    constexpr int32_t boundGroup { 5 };
+    WIN_MGR->mouseLocationMap_[boundGroup].displayId = 2;
+    WIN_MGR->mouseLocationMap_[boundGroup].physicalX = 30;
+    WIN_MGR->mouseLocationMap_[boundGroup].physicalY = 60;
+    MouseLocation result = WIN_MGR->GetMouseInfoByDisplay(2);
+    EXPECT_EQ(result.displayId, 2);
+    EXPECT_EQ(result.physicalX, 30);
+    EXPECT_EQ(result.physicalY, 60);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_ResetCursorToBindDisplayCenter_001
+ * @tc.desc: An unknown device id (GetInputDevice returns nullptr) leaves all cursor state
+ *           untouched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_ResetCursorToBindDisplayCenter_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    ResetDeferredBindState(WIN_MGR);
+    constexpr int32_t devId { 8830 }; // never registered anywhere
+    WIN_MGR->ResetCursorToBindDisplayCenter(devId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_.count(5), 0u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_.count(5), 0u);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.x, 100.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.y, 120.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_ResetCursorToBindDisplayCenter_002
+ * @tc.desc: A device without the pointer capability (e.g. a keyboard) must not move the
+ *           cursor of the bound group.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_ResetCursorToBindDisplayCenter_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    ResetDeferredBindState(WIN_MGR);
+    constexpr int32_t devId { 8831 };
+    auto device = std::make_shared<InputDevice>();
+    device->AddCapability(InputDeviceCapability::INPUT_DEV_CAP_KEYBOARD);
+    INPUT_DEV_MGR->AddVirtualInputDeviceInner(devId, device);
+    WIN_MGR->ResetCursorToBindDisplayCenter(devId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_.count(5), 0u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_.count(5), 0u);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_ResetCursorToBindDisplayCenter_003
+ * @tc.desc: For a pointer device and an existing display, the cursor of the bound display's
+ *           group restarts at the display center, and the default group is untouched.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_ResetCursorToBindDisplayCenter_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    ResetDeferredBindState(WIN_MGR);
+    constexpr int32_t devId { 8832 };
+    auto device = std::make_shared<InputDevice>();
+    device->AddCapability(InputDeviceCapability::INPUT_DEV_CAP_POINTER);
+    INPUT_DEV_MGR->AddVirtualInputDeviceInner(devId, device);
+    WIN_MGR->ResetCursorToBindDisplayCenter(devId, 2);
+    ASSERT_EQ(WIN_MGR->cursorPosMap_.count(5), 1u);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].displayId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 500.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.y, 400.0);
+    ASSERT_EQ(WIN_MGR->mouseLocationMap_.count(5), 1u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].displayId, 2);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalX, 500);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalY, 400);
+    // The default group's cursor is untouched.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].displayId, 1);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.x, 100.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.y, 120.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_ResetCursorToBindDisplayCenter_004
+ * @tc.desc: A pointer device bound to a non-existent display is a no-op (no group state is
+ *           created).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_ResetCursorToBindDisplayCenter_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    SetupBindCursorDisplays();
+    ResetDeferredBindState(WIN_MGR);
+    constexpr int32_t devId { 8833 };
+    constexpr int32_t unknownDisplay { 999 };
+    auto device = std::make_shared<InputDevice>();
+    device->AddCapability(InputDeviceCapability::INPUT_DEV_CAP_POINTER);
+    INPUT_DEV_MGR->AddVirtualInputDeviceInner(devId, device);
+    WIN_MGR->ResetCursorToBindDisplayCenter(devId, unknownDisplay);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_.count(5), 0u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_.count(5), 0u);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_BindToDisplay_005
+ * @tc.desc: Cross-group bind success (cockpit scenario): binding a pointer device of the
+ *           default group to a display of a special group restarts the cursor at that
+ *           display's center, in the special group's own state.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_BindToDisplay_005, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    ResetDeferredBindState(WIN_MGR);
+    SetupBindCursorDisplays();
+    constexpr int32_t devId { 8834 };
+    RegisterPointerDevice(devId);
+    std::string msg;
+    EXPECT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 2);
+    // The cursor restarts at the center of the bound display's group.
+    ASSERT_EQ(WIN_MGR->cursorPosMap_.count(5), 1u);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].displayId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 500.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.y, 400.0);
+    ASSERT_EQ(WIN_MGR->mouseLocationMap_.count(5), 1u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].displayId, 2);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalX, 500);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalY, 400);
+    // The default group's cursor is untouched.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].displayId, 1);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.x, 100.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.y, 120.0);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_BindToDisplay_006
+ * @tc.desc: A deferred cross-group bind centers the cursor only when the in-flight sequence
+ *           ends and the pending bind is flushed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_BindToDisplay_006, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    ResetDeferredBindState(WIN_MGR);
+    SetupBindCursorDisplays();
+    constexpr int32_t devId { 8835 };
+    RegisterPointerDevice(devId);
+    WIN_MGR->activeSequenceCount_[devId] = 1; // an in-flight gesture blocks immediate binding
+    std::string msg;
+    EXPECT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->pendingBinds_[devId], 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_.count(5), 0u); // cursor not moved while deferred
+    // Sequence ends -> the pending bind is applied and the cursor lands at the center.
+    WIN_MGR->UpdateActiveSequence(devId, -1);
+    EXPECT_EQ(WIN_MGR->pendingBinds_.count(devId), 0u);
+    EXPECT_EQ(WIN_MGR->pendingBindTimers_.count(devId), 0u);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 2);
+    ASSERT_EQ(WIN_MGR->cursorPosMap_.count(5), 1u);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].displayId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 500.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.y, 400.0);
+    ASSERT_EQ(WIN_MGR->mouseLocationMap_.count(5), 1u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalX, 500);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalY, 400);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_BindToDisplay_007
+ * @tc.desc: Binding a non-pointer device succeeds but must not move the cursor: no group
+ *           cursor state is created.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_BindToDisplay_007, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    ResetDeferredBindState(WIN_MGR);
+    SetupBindCursorDisplays();
+    constexpr int32_t devId { 8836 };
+    RegisterBindDevice(WIN_MGR, devId);
+    auto device = std::make_shared<InputDevice>();
+    device->AddCapability(InputDeviceCapability::INPUT_DEV_CAP_KEYBOARD);
+    INPUT_DEV_MGR->AddVirtualInputDeviceInner(devId, device);
+    std::string msg;
+    EXPECT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 2);
+    // Binding a keyboard does not move the cursor.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_.count(5), 0u);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_.count(5), 0u);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_BindToDisplay_008
+ * @tc.desc: Re-binding the display the device is already bound to keeps the cursor at its
+ *           current position (only the first bind centers it).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_BindToDisplay_008, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    ResetDeferredBindState(WIN_MGR);
+    SetupBindCursorDisplays();
+    constexpr int32_t devId { 8837 };
+    RegisterPointerDevice(devId);
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    ASSERT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 500.0); // first bind centered the cursor
+
+    // The user moves the cursor away from the center, then re-binds the same display.
+    WIN_MGR->cursorPosMap_[5].cursorPos.x = 30.0;
+    WIN_MGR->cursorPosMap_[5].cursorPos.y = 60.0;
+    WIN_MGR->mouseLocationMap_[5].physicalX = 30;
+    WIN_MGR->mouseLocationMap_[5].physicalY = 60;
+    EXPECT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 2);
+    // The repeat bind must not re-center the cursor.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].displayId, 2);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 30.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.y, 60.0);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalX, 30);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalY, 60);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_BindToDisplay_009
+ * @tc.desc: A repeat bind deferred by an active sequence keeps the cursor position when the
+ *           pending bind is flushed.
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_BindToDisplay_009, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    ResetDeferredBindState(WIN_MGR);
+    SetupBindCursorDisplays();
+    constexpr int32_t devId { 8838 };
+    RegisterPointerDevice(devId);
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    WIN_MGR->cursorPosMap_[5].cursorPos.x = 30.0;
+    WIN_MGR->cursorPosMap_[5].cursorPos.y = 60.0;
+    WIN_MGR->mouseLocationMap_[5].physicalX = 30;
+    WIN_MGR->mouseLocationMap_[5].physicalY = 60;
+
+    // Repeat the bind while a sequence is active: deferred, then flushed on sequence end.
+    WIN_MGR->activeSequenceCount_[devId] = 1;
+    EXPECT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->pendingBinds_[devId], 2);
+    WIN_MGR->UpdateActiveSequence(devId, -1);
+    EXPECT_EQ(WIN_MGR->pendingBinds_.count(devId), 0u);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 2);
+    // The flushed repeat bind must not re-center the cursor either.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 30.0);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.y, 60.0);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalX, 30);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[5].physicalY, 60);
+    TeardownBindCursorDisplays();
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_BindToDisplay_010
+ * @tc.desc: Re-binding to a different display still recenters the cursor at that display's
+ *           center (the guard only suppresses re-centering for a repeat bind).
+ * @tc.type: FUNC
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_BindToDisplay_010, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    ResetDeferredBindState(WIN_MGR);
+    SetupBindCursorDisplays();
+    constexpr int32_t devId { 8839 };
+    RegisterPointerDevice(devId);
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->BindToDisplay(devId, 2, msg), RET_OK);
+    ASSERT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 500.0);
+
+    // Move the device to the main display (group 0, 800x600): the cursor recenters there.
+    EXPECT_EQ(WIN_MGR->BindToDisplay(devId, 1, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 1);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].displayId, 1);
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.x, 400.0); // 800 * HALF_RATIO
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[0].cursorPos.y, 300.0); // 600 * HALF_RATIO
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[0].physicalX, 400);
+    EXPECT_EQ(WIN_MGR->mouseLocationMap_[0].physicalY, 300);
+    // The previously bound group's state is left untouched.
+    EXPECT_EQ(WIN_MGR->cursorPosMap_[5].cursorPos.x, 500.0);
+    TeardownBindCursorDisplays();
+}
+
 /**
  * @tc.name: InputWindowsManagerTest_HandleKeyEventWindowId_BackfillDisplayId
  * @tc.desc: Test HandleKeyEventWindowId backfills TargetDisplayId from the focus window

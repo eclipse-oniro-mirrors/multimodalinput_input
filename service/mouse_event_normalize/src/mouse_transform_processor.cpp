@@ -207,7 +207,11 @@ MouseTransformProcessor::MotionDataContext MouseTransformProcessor::ExtractMotio
     ctx.libinputEventType = libinput_event_get_type(event);
     ctx.offset = Offset { unaccelerated_.dx, unaccelerated_.dy };
 
-    CursorPosition cursorPos = winMgr->GetCursorPos();
+    // A device bound to a display outside the default group keeps its cursor state in that
+    // group; read the base from the bound display's group so motion accumulates there.
+    int32_t boundDisplayId = winMgr->GetBindDisplayIdByInputDevice(deviceId_);
+    CursorPosition cursorPos = (boundDisplayId >= 0) ? winMgr->GetCursorPosByDisplay(boundDisplayId)
+        : winMgr->GetCursorPos();
     if (cursorPos.displayId < 0) {
         MMI_HILOGE("No display");
         return ctx;
@@ -692,7 +696,9 @@ int32_t MouseTransformProcessor::UpdateCursorPositionOnButtonPress()
         return RET_ERR;
     }
 
-    CursorPosition cursorPos = winMgr->GetCursorPos();
+    int32_t boundDisplayId = winMgr->GetBindDisplayIdByInputDevice(deviceId_);
+    CursorPosition cursorPos = (boundDisplayId >= 0) ? winMgr->GetCursorPosByDisplay(boundDisplayId)
+        : winMgr->GetCursorPos();
     if (cursorPos.displayId < 0) {
         MMI_HILOGE("No display");
         return RET_ERR;
@@ -1018,7 +1024,9 @@ int32_t MouseTransformProcessor::UpdateCursorLocationIfNeeded()
         MMI_HILOGE("winMgr is nullptr");
         return RET_ERR;
     }
-    CursorPosition cursorPos = winMgr->GetCursorPos();
+    int32_t boundDisplayId = winMgr->GetBindDisplayIdByInputDevice(deviceId_);
+    CursorPosition cursorPos = (boundDisplayId >= 0) ? winMgr->GetCursorPosByDisplay(boundDisplayId)
+        : winMgr->GetCursorPos();
     if (cursorPos.displayId < 0) {
         MMI_HILOGE("No display");
         return RET_ERR;
@@ -1149,7 +1157,9 @@ void MouseTransformProcessor::HandleAxisPostInner(PointerEvent::PointerItem &poi
         MMI_HILOGE("winMgr is nullptr");
         return;
     }
-    auto mouseInfo = winMgr->GetMouseInfo();
+    int32_t boundDisplayId = winMgr->GetBindDisplayIdByInputDevice(deviceId_);
+    auto mouseInfo = (boundDisplayId >= 0) ? winMgr->GetMouseInfoByDisplay(boundDisplayId)
+        : winMgr->GetMouseInfo();
     MouseState->SetMouseCoords(mouseInfo.physicalX, mouseInfo.physicalY);
     pointerItem.SetDisplayX(mouseInfo.physicalX);
     pointerItem.SetDisplayY(mouseInfo.physicalY);
@@ -1194,7 +1204,9 @@ bool MouseTransformProcessor::HandlePostInner(struct libinput_event_pointer* dat
         MMI_HILOGE("winMgr is nullptr");
         return false;
     }
-    auto mouseInfo = winMgr->GetMouseInfo();
+    int32_t boundDisplayId = winMgr->GetBindDisplayIdByInputDevice(deviceId_);
+    auto mouseInfo = (boundDisplayId >= 0) ? winMgr->GetMouseInfoByDisplay(boundDisplayId)
+        : winMgr->GetMouseInfo();
     MouseState->SetMouseCoords(mouseInfo.physicalX, mouseInfo.physicalY);
     pointerItem.SetDisplayX(mouseInfo.physicalX);
     pointerItem.SetDisplayY(mouseInfo.physicalY);
