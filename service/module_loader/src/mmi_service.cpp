@@ -3410,21 +3410,25 @@ ErrCode MMIService::GetPointerLocation(int32_t &displayId, double &displayX, dou
 {
     CALL_DEBUG_ENTER;
 #if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
-    auto tokenId = IPCSkeleton::GetCallingTokenID();
-    auto tokenType = OHOS::Security::AccessToken::AccessTokenKit::GetTokenTypeFlag(tokenId);
-    if (tokenType != OHOS::Security::AccessToken::TOKEN_HAP) {
-        MMI_HILOGE("The caller is not an application");
-        return ERROR_APP_NOT_FOCUSED;
+    // The permission requirement is removed on PC products only; other products keep
+    // the HAP token type check and the non-focused permission check.
+    const bool isPC = PRODUCT_DEVICE_TYPE == PRODUCT_TYPE_PC;
+    if (!isPC) {
+        auto tokenId = IPCSkeleton::GetCallingTokenID();
+        auto tokenType = OHOS::Security::AccessToken::AccessTokenKit::GetTokenTypeFlag(tokenId);
+        if (tokenType != OHOS::Security::AccessToken::TOKEN_HAP) {
+            MMI_HILOGE("The caller is not an application");
+            return ERROR_APP_NOT_FOCUSED;
+        }
     }
-
     int32_t clientPid = GetCallingPid();
     int32_t ret = delegateTasks_.PostSyncTask(
-        [&displayId, &displayX, &displayY, clientPid] {
+        [&displayId, &displayX, &displayY, clientPid, isPC] {
             if (!INPUT_DEV_MGR->HasPointerDeviceIncludingVirtual()) {
                 MMI_HILOGE("There hasn't any pointer device");
                 return ERROR_DEVICE_NO_POINTER;
             }
-            if (!WIN_MGR->CheckAppFocused(clientPid)) {
+            if (!isPC && !WIN_MGR->CheckAppFocused(clientPid)) {
                 if (!PER_HELPER->CheckInputDeviceCfg()) {
                     MMI_HILOGE("App not focused and missing INPUT_DEVICE_PERMISSION_CODE permission");
                     return ERROR_NO_PERMISSION;

@@ -2643,8 +2643,7 @@ Input_Result OH_Input_QueryAuthorizedStatus(Input_InjectionStatus* status);
 
 /**
  * @brief Obtains the coordinates of the mouse pointer on the current screen.
- * <br>Since API version 26.0.0, non-focused applications that have the ohos.permission.INPUT_DEVICE_CONFIGURATOR
- * permission can call this API.
+ * <br>SSince API version 26.2.0, on PC devices, there are no longer focus or permission requirements for applications.
  *
  * @param displayId Screen ID of the current screen.
  * @param displayX X coordinate of the mouse on the current screen, in pixels (px).
