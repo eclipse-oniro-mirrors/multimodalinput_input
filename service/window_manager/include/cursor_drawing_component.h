@@ -84,8 +84,6 @@ public:
     void Dump(int32_t fd, const std::vector<std::string> &args);
     void InitPointerCallback();
     void InitScreenInfo();
-    int32_t EnableHardwareCursorStats(int32_t pid, bool enable);
-    int32_t GetHardwareCursorStats(int32_t pid, uint32_t &frameCount, uint32_t &vsyncCount);
     OLD::DisplayInfo GetCurrentDisplayInfo();
     int32_t GetCursorGroupId();
     void ForceClearPointerVisibleStatus();

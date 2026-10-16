@@ -115,8 +115,6 @@ public:
     napi_value SetMoveEventFilters(napi_env env, bool flag);
     napi_value SetTouchpadThreeFingersTapSwitch(napi_env env, bool switchFlag, napi_value handle = nullptr);
     napi_value GetTouchpadThreeFingersTapSwitch(napi_env env, napi_value handle = nullptr);
-    napi_value EnableHardwareCursorStats(napi_env env, bool enable);
-    napi_value GetHardwareCursorStats(napi_env env);
     napi_value SetTouchpadScrollRows(napi_env env, int32_t rows, napi_value handle = nullptr);
     napi_value GetTouchpadScrollRows(napi_env env, napi_value handle = nullptr);
     napi_value SetCustomCursor(napi_env env, int32_t windowId, CustomCursor cursor, CursorOptions options);

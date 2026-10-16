@@ -772,16 +772,6 @@ int32_t InputManager::GetTouchpadDoubleTapAndDragState(bool &switchFlag)
     return InputMgrImpl.GetTouchpadDoubleTapAndDragState(switchFlag);
 }
 
-int32_t InputManager::EnableHardwareCursorStats(bool enable)
-{
-    return InputMgrImpl.EnableHardwareCursorStats(enable);
-}
-
-int32_t InputManager::GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    return InputMgrImpl.GetHardwareCursorStats(frameCount, vsyncCount);
-}
-
 int32_t InputManager::GetPointerSnapshot(void *pixelMapPtr)
 {
     return InputMgrImpl.GetPointerSnapshot(pixelMapPtr);

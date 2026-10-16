@@ -255,14 +255,6 @@ int32_t PointerDrawingManager::SwitchPointerStyle()
 void PointerDrawingManager::DrawMovePointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
     int32_t groupId, bool multiDefaultGroup) {}
 void PointerDrawingManager::Dump(int32_t fd, const std::vector<std::string> &args) {}
-int32_t PointerDrawingManager::EnableHardwareCursorStats(int32_t pid, bool enable)
-{
-    return 0;
-}
-int32_t PointerDrawingManager::GetHardwareCursorStats(int32_t pid, uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    return 0;
-}
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
 int32_t PointerDrawingManager::GetPointerSnapshot(void *pixelMap)
 {

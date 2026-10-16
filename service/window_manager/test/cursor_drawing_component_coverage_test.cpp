@@ -637,41 +637,6 @@ HWTEST_F(CursorDrawingComponentCoverageTest, InitScreenInfo_NotLoaded_001, TestS
     SUCCEED();
 }
 
-/**
- * @tc.name: EnableHardwareCursorStats_NotLoaded_001
- * @tc.desc: Test EnableHardwareCursorStats when library loads successfully
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentCoverageTest, EnableHardwareCursorStats_NotLoaded_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    int32_t windowId = 100;
-    CursorDrawingComponent component;
-    auto *instance = &component;
-    auto ret = instance->EnableHardwareCursorStats(windowId, true);
-
-    EXPECT_GE(ret, RET_OK);
-}
-
-/**
- * @tc.name: GetHardwareCursorStats_NotLoaded_001
- * @tc.desc: Test GetHardwareCursorStats when library loads successfully
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentCoverageTest, GetHardwareCursorStats_NotLoaded_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    int32_t windowId = 100;
-    CursorDrawingComponent component;
-    auto *instance = &component;
-    uint32_t frameCount = 0;
-    uint32_t vsyncCount = 0;
-    auto ret = instance->GetHardwareCursorStats(windowId, frameCount, vsyncCount);
-
-    EXPECT_GE(ret, RET_OK);
-}
 
 /**
  * @tc.name: ForceClearPointerVisibleStatus_NotLoaded_001

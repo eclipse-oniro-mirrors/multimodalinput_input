@@ -164,8 +164,6 @@ public:
     std::vector<std::vector<std::string>> GetDisplayInfo(OLD::DisplayInfo &di);
     void Dump(int32_t fd, const std::vector<std::string> &args) override;
     void AttachToDisplay();
-    int32_t EnableHardwareCursorStats(int32_t pid, bool enable) override;
-    int32_t GetHardwareCursorStats(int32_t pid, uint32_t &frameCount, uint32_t &vsyncCount) override;
     void SubscribeScreenModeChange(uint64_t tid = 0) override;
     void RegisterDisplayStatusReceiver() override;
     OLD::DisplayInfo GetCurrentDisplayInfo() override;

@@ -25,13 +25,6 @@
 
 namespace OHOS {
 namespace MMI {
-void GetHardwareCursorStatsFuzz(FuzzedDataProvider &fdp)
-{
-    uint32_t frameCount = fdp.ConsumeIntegral<uint32_t>();
-    uint32_t vsyncCount = fdp.ConsumeIntegral<uint32_t>();
-    MULTIMODAL_INPUT_CONNECT_MGR->GetHardwareCursorStats(frameCount, vsyncCount);
-}
-
 void SetMouseCaptureModeFuzz(FuzzedDataProvider &fdp)
 {
     int32_t windowId = fdp.ConsumeIntegral<int32_t>();
@@ -60,7 +53,6 @@ void SetTouchpadScrollDirectionFuzz(FuzzedDataProvider &fdp)
 void ConnectProxy7FuzzTest(const uint8_t *data, size_t size)
 {
     FuzzedDataProvider fdp(data, size);
-    GetHardwareCursorStatsFuzz(fdp);
     SetMouseCaptureModeFuzz(fdp);
     SetTouchpadScrollSwitchFuzz(fdp);
     GetTouchpadScrollSwitchFuzz(fdp);

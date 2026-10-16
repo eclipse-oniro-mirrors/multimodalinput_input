@@ -116,33 +116,6 @@ int32_t HardwareCursorPointerManager::SetPosition(uint32_t devId, int32_t x, int
     return RET_OK;
 }
 
-int32_t HardwareCursorPointerManager::EnableStats(bool enable)
-{
-    CALL_DEBUG_ENTER;
-    auto powerInterface = GetPowerInterface();
-    CHKPR(powerInterface, RET_ERR);
-    if (powerInterface->EnableHardwareCursorStats(devId_, enable) != HDI::Display::Composer::V1_2::DISPLAY_SUCCESS) {
-        MMI_HILOGE("Enable hardware cursor stats is error");
-        return RET_ERR;
-    }
-    MMI_HILOGD("EnableStats, enable:%{public}d", enable);
-    return RET_OK;
-}
-
-int32_t HardwareCursorPointerManager::GetCursorStats(uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    CALL_DEBUG_ENTER;
-    auto powerInterface = GetPowerInterface();
-    CHKPR(powerInterface, RET_ERR);
-    if (powerInterface->GetHardwareCursorStats(devId_, frameCount, vsyncCount) !=
-        HDI::Display::Composer::V1_2::DISPLAY_SUCCESS) {
-        MMI_HILOGE("Get hardware cursor stats is error");
-        return RET_ERR;
-    }
-    MMI_HILOGD("Get hardware cursor stats, frameCount:%{private}d, vsyncCount:%{private}d", frameCount, vsyncCount);
-    return RET_OK;
-}
-
 sptr<OHOS::HDI::Display::Composer::V1_2::IDisplayComposerInterface> HardwareCursorPointerManager::GetPowerInterface()
 {
     std::lock_guard<std::mutex> guard(mtx_);

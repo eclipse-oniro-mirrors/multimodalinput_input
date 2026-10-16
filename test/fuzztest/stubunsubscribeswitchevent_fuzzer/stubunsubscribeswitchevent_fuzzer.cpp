@@ -208,37 +208,6 @@ bool StubSetCurrentUserFuzzTest(const uint8_t* data, size_t size)
     return true;
 }
 
-bool StubEnableHardwareCursorStatsFuzzTest(const uint8_t* data, size_t size)
-{
-    MessageParcel datas;
-    if (!datas.WriteInterfaceToken(FORMMGR_INTERFACE_TOKEN) ||
-        !datas.WriteBuffer(data, size) || !datas.RewindRead(0)) {
-        return false;
-    }
-    MessageParcel reply;
-    MessageOption option;
-    MMIService::GetInstance()->state_ = ServiceRunningState::STATE_RUNNING;
-    MMIService::GetInstance()->OnRemoteRequest(
-        static_cast<uint32_t>(IMultimodalInputConnectIpcCode::COMMAND_ENABLE_HARDWARE_CURSOR_STATS),
-        datas, reply, option);
-    return true;
-}
-
-bool StubGetHardwareCursorStatsFuzzTest(const uint8_t* data, size_t size)
-{
-    MessageParcel datas;
-    if (!datas.WriteInterfaceToken(FORMMGR_INTERFACE_TOKEN) ||
-        !datas.WriteBuffer(data, size) || !datas.RewindRead(0)) {
-        return false;
-    }
-    MessageParcel reply;
-    MessageOption option;
-    MMIService::GetInstance()->state_ = ServiceRunningState::STATE_RUNNING;
-    MMIService::GetInstance()->OnRemoteRequest(
-        static_cast<uint32_t>(IMultimodalInputConnectIpcCode::COMMAND_GET_HARDWARE_CURSOR_STATS), datas, reply, option);
-    return true;
-}
-
 bool StubAddVirtualInputDeviceFuzzTest(const uint8_t* data, size_t size)
 {
     MessageParcel datas;
@@ -447,8 +416,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     OHOS::StubTransmitInfraredFuzzTest(data, size);
     OHOS::StubSetPixelMapDataFuzzTest(data, size);
     OHOS::StubSetCurrentUserFuzzTest(data, size);
-    OHOS::StubEnableHardwareCursorStatsFuzzTest(data, size);
-    OHOS::StubGetHardwareCursorStatsFuzzTest(data, size);
     OHOS::StubAddVirtualInputDeviceFuzzTest(data, size);
     OHOS::StubRemoveVirtualInputDeviceFuzzTest(data, size);
     OHOS::StubTransferBinderClientServiceFuzzTest(data, size);

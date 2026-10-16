@@ -179,8 +179,6 @@ public:
     MOCK_METHOD(int32_t, GetTouchpadThreeFingersTapSwitch, (bool &switchFlag), (override));
     MOCK_METHOD(int32_t, AddVirtualInputDevice, (std::shared_ptr<InputDevice> device, int32_t &deviceId), (override));
     MOCK_METHOD(int32_t, RemoveVirtualInputDevice, (int32_t deviceId), (override));
-    MOCK_METHOD(int32_t, EnableHardwareCursorStats, (bool enable), (override));
-    MOCK_METHOD(int32_t, GetHardwareCursorStats, (uint32_t & frameCount, uint32_t &vsyncCount), (override));
     MOCK_METHOD(int32_t, GetIntervalSinceLastInput, (int64_t & timeInterval), (override));
     MOCK_METHOD(int32_t, GetLastInputEventTimeByDisplay, (int32_t displayId, int64_t & lastInputEventTime), (override));
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR

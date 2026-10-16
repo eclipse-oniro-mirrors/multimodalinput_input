@@ -1132,18 +1132,6 @@ int32_t MultimodalInputConnectManager::SetMoveEventFilters(bool flag)
     return multimodalInputConnectService_->SetMoveEventFilters(flag);
 }
 
-int32_t MultimodalInputConnectManager::EnableHardwareCursorStats(bool enable)
-{
-    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->EnableHardwareCursorStats(enable);
-}
-
-int32_t MultimodalInputConnectManager::GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->GetHardwareCursorStats(frameCount, vsyncCount);
-}
-
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
 int32_t MultimodalInputConnectManager::GetPointerSnapshot(void *pixelMapPtr)
 {

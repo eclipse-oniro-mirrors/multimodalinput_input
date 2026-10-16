@@ -82,8 +82,6 @@ public:
     static napi_value SetMoveEventFilters(napi_env env, napi_callback_info info);
     static napi_value SetTouchpadThreeFingersTapSwitch(napi_env env, napi_callback_info info);
     static napi_value GetTouchpadThreeFingersTapSwitch(napi_env env, napi_callback_info info);
-    static napi_value EnableHardwareCursorStats(napi_env env, napi_callback_info info);
-    static napi_value GetHardwareCursorStats(napi_env env, napi_callback_info info);
     static napi_value SetTouchpadScrollRows(napi_env env, napi_callback_info info);
     static napi_value GetTouchpadScrollRows(napi_env env, napi_callback_info info);
     static napi_value SetMouseScrollDirection(napi_env env, napi_callback_info info);

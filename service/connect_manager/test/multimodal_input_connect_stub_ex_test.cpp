@@ -307,8 +307,6 @@ public:
         return retAddVirtualInputDevice_;
     }
     int32_t RemoveVirtualInputDevice(int32_t deviceId) override { return deviceId; }
-    int32_t EnableHardwareCursorStats(bool enable) override { return static_cast<int32_t>(enable); }
-    int32_t GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount) override { return retCursorStats_; }
     int32_t SetMoveEventFilters(bool flag) { return 0; }
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
     int32_t GetPointerSnapshot(void *pixelMap) override
@@ -441,7 +439,6 @@ public:
     int32_t retBindInfo_ = 0;
     int32_t retMmiSubscribedEvents_ = 0;
     int32_t retKeyState_ = 0;
-    int32_t retCursorStats_ = 0;
     int32_t retSnapshot_ = 0;
     int32_t retFrequencies_ = 0;
     bool switchFlag_ = false;
@@ -736,47 +733,6 @@ HWTEST_F(MultimodalInputConnectStubTest, OnRemoteRequest_021, TestSize.Level1)
     MessageParcel reply;
     MessageOption option;
     uint32_t code = static_cast<uint32_t>(MultimodalinputConnectInterfaceCode::REMOVE_VIRTUAL_INPUT_DEVICE);
-    EXPECT_NO_FATAL_FAILURE(stub->OnRemoteRequest(code, data, reply, option));
-}
-
-/**
- * @tc.name: OnRemoteRequest_022
- * @tc.desc: Test the function OnRemoteRequest
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MultimodalInputConnectStubTest, OnRemoteRequest_022, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_CALL(*messageParcelMock_, ReadInterfaceToken()).WillOnce(Return(IMultimodalInputConnect::GetDescriptor()));
-    EXPECT_CALL(*messageParcelMock_, ReadBool(_)).WillOnce(Return(false));
-    std::shared_ptr<MultimodalInputConnectStub> stub = std::make_shared<MMIServiceTest>();
-    ASSERT_NE(stub, nullptr);
-    MessageParcel data;
-    MessageParcel reply;
-    MessageOption option;
-    uint32_t code = static_cast<uint32_t>(MultimodalinputConnectInterfaceCode::ENABLE_HARDWARE_CURSOR_STATS);
-    EXPECT_NO_FATAL_FAILURE(stub->OnRemoteRequest(code, data, reply, option));
-}
-
-/**
- * @tc.name: OnRemoteRequest_023
- * @tc.desc: Test the function OnRemoteRequest
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MultimodalInputConnectStubTest, OnRemoteRequest_023, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_CALL(*messageParcelMock_, ReadInterfaceToken()).WillOnce(Return(IMultimodalInputConnect::GetDescriptor()));
-    std::shared_ptr<MultimodalInputConnectStub> stub = std::make_shared<MMIServiceTest>();
-    ASSERT_NE(stub, nullptr);
-    std::shared_ptr<MMIServiceTest> service = std::static_pointer_cast<MMIServiceTest>(stub);
-    service->retCursorStats_ = -1;
-    MessageParcel data;
-    MessageParcel reply;
-    MessageOption option;
-    uint32_t code = static_cast<uint32_t>(MultimodalinputConnectInterfaceCode::GET_HARDWARE_CURSOR_STATS);
     EXPECT_NO_FATAL_FAILURE(stub->OnRemoteRequest(code, data, reply, option));
 }
 
@@ -5752,40 +5708,6 @@ HWTEST_F(MultimodalInputConnectStubTest, StubSetCurrentUser_003, TestSize.Level1
 }
 
 /**
- * @tc.name: StubEnableHardwareCursorStats_001
- * @tc.desc: Test the function StubEnableHardwareCursorStats
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MultimodalInputConnectStubTest, StubEnableHardwareCursorStats_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_CALL(*messageParcelMock_, ReadBool(_)).WillOnce(DoAll(SetArgReferee<0>(true), Return(true)));
-    std::shared_ptr<MultimodalInputConnectStub> stub = std::make_shared<MMIServiceTest>();
-    ASSERT_NE(stub, nullptr);
-    MessageParcel data;
-    MessageParcel reply;
-    EXPECT_NO_FATAL_FAILURE(stub->StubEnableHardwareCursorStats(data, reply));
-}
-
-/**
- * @tc.name: StubEnableHardwareCursorStats_002
- * @tc.desc: Test the function StubEnableHardwareCursorStats
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MultimodalInputConnectStubTest, StubEnableHardwareCursorStats_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_CALL(*messageParcelMock_, ReadBool(_)).WillOnce(DoAll(SetArgReferee<0>(false), Return(true)));
-    std::shared_ptr<MultimodalInputConnectStub> stub = std::make_shared<MMIServiceTest>();
-    ASSERT_NE(stub, nullptr);
-    MessageParcel data;
-    MessageParcel reply;
-    EXPECT_NO_FATAL_FAILURE(stub->StubEnableHardwareCursorStats(data, reply));
-}
-
-/**
  * @tc.name: StubRemoveVirtualInputDevice_001
  * @tc.desc: Test the function StubRemoveVirtualInputDevice
  * @tc.type: FUNC
@@ -5916,43 +5838,6 @@ HWTEST_F(MultimodalInputConnectStubTest, StubGetKeyState_004, TestSize.Level1)
     MessageParcel data;
     MessageParcel reply;
     EXPECT_NO_FATAL_FAILURE(stub->StubGetKeyState(data, reply));
-}
-
-/**
- * @tc.name: StubGetHardwareCursorStats_001
- * @tc.desc: Test the function StubGetHardwareCursorStats
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MultimodalInputConnectStubTest, StubGetHardwareCursorStats_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    std::shared_ptr<MultimodalInputConnectStub> stub = std::make_shared<MMIServiceTest>();
-    ASSERT_NE(stub, nullptr);
-    std::shared_ptr<MMIServiceTest> service = std::static_pointer_cast<MMIServiceTest>(stub);
-    service->retCursorStats_ = -1;
-    MessageParcel data;
-    MessageParcel reply;
-    EXPECT_NO_FATAL_FAILURE(stub->StubGetHardwareCursorStats(data, reply));
-}
-
-/**
- * @tc.name: StubGetHardwareCursorStats_002
- * @tc.desc: Test the function StubGetHardwareCursorStats
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MultimodalInputConnectStubTest, StubGetHardwareCursorStats_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_CALL(*messageParcelMock_, WriteUint32(_)).WillOnce(Return(true)).WillOnce(Return(true));
-    std::shared_ptr<MultimodalInputConnectStub> stub = std::make_shared<MMIServiceTest>();
-    ASSERT_NE(stub, nullptr);
-    std::shared_ptr<MMIServiceTest> service = std::static_pointer_cast<MMIServiceTest>(stub);
-    service->retCursorStats_ = 0;
-    MessageParcel data;
-    MessageParcel reply;
-    EXPECT_NO_FATAL_FAILURE(stub->StubGetHardwareCursorStats(data, reply));
 }
 
 /**

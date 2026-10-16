@@ -202,8 +202,6 @@ public:
     ErrCode GetTouchpadThreeFingersTapSwitch(bool &switchFlag) override;
     ErrCode AddVirtualInputDevice(const InputDevice& device, int32_t& deviceId) override;
     ErrCode RemoveVirtualInputDevice(int32_t deviceId) override;
-    ErrCode EnableHardwareCursorStats(bool enable) override;
-    ErrCode GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount) override;
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
     ErrCode GetPointerSnapshot(CursorPixelMap& pixelMap) override;
 #endif // OHOS_BUILD_ENABLE_MAGICCURSOR

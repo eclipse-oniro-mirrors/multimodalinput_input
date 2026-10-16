@@ -2811,36 +2811,6 @@ int32_t InputManagerImpl::GetTouchpadDoubleTapAndDragState(bool &switchFlag)
 #endif // OHOS_BUILD_ENABLE_POINTER
 }
 
-int32_t InputManagerImpl::EnableHardwareCursorStats(bool enable)
-{
-    CALL_DEBUG_ENTER;
-#ifdef OHOS_BUILD_ENABLE_POINTER
-    int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->EnableHardwareCursorStats(enable);
-    if (ret != RET_OK) {
-        MMI_HILOGE("Enable hardware cursor stats failed");
-    }
-    return ret;
-#else
-    MMI_HILOGW("Pointer device does not support");
-    return ERROR_UNSUPPORT;
-#endif // OHOS_BUILD_ENABLE_POINTER
-}
-
-int32_t InputManagerImpl::GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    CALL_DEBUG_ENTER;
-#ifdef OHOS_BUILD_ENABLE_POINTER
-    int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->GetHardwareCursorStats(frameCount, vsyncCount);
-    if (ret != RET_OK) {
-        MMI_HILOGE("Get hardware cursor stats failed");
-    }
-    MMI_HILOGD("GetHardwareCursorStats, frameCount:%{public}d, vsyncCount:%{public}d", frameCount, vsyncCount);
-    return ret;
-#else
-    MMI_HILOGW("Pointer device does not support");
-    return ERROR_UNSUPPORT;
-#endif // OHOS_BUILD_ENABLE_POINTER
-}
 
 int32_t InputManagerImpl::GetPointerSnapshot(void *pixelMapPtr)
 {
