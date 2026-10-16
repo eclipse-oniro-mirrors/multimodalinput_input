@@ -856,5 +856,69 @@ HWTEST_F(KeyEventNormalizeTest, KeyEventNormalizeTest_SyncSwitchFunctionKeyState
     ASSERT_NE(keyEvent, nullptr);
     EXPECT_NO_FATAL_FAILURE(KeyEventHdr->SyncSwitchFunctionKeyState(keyEvent, KeyEvent::KEYCODE_A));
 }
+
+/**
+ * @tc.name: KeyEventNormalizeTest_PackageKeyUpEvent_SyncActionAndReleaseKey_001
+ * @tc.desc: Verify PackageKeyUpEvent syncs action_ with keyAction_ so the pressed key item
+ *           is released from the global keyEvent_, and later events carry no residue.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyEventNormalizeTest, KeyEventNormalizeTest_PackageKeyUpEvent_SyncActionAndReleaseKey_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    constexpr int32_t testRawCode = 29; // KEY_LEFTCTRL
+    KeyEventHdr->keyEvent_ = nullptr;
+    KeyEventHdr->pressedKeys_.clear();
+    vKeyboard_.SendEvent(EV_KEY, testRawCode, 1);
+    vKeyboard_.SendEvent(EV_SYN, SYN_REPORT, 0);
+    libinput_event *event = libinput_.Dispatch();
+    ASSERT_TRUE(event != nullptr);
+    struct libinput_device *dev = libinput_event_get_device(event);
+    ASSERT_TRUE(dev != nullptr);
+    int32_t deviceId = INPUT_DEV_MGR->FindInputDeviceId(dev);
+    auto keyEvent = KeyEventHdr->GetKeyEvent();
+    ASSERT_TRUE(keyEvent != nullptr);
+    ASSERT_EQ(KeyEventHdr->Normalize(event, keyEvent), RET_OK);
+    ASSERT_EQ(keyEvent->GetKeyAction(), KeyEvent::KEY_ACTION_DOWN);
+    ASSERT_FALSE(keyEvent->GetPressedKeys().empty());
+    ASSERT_TRUE(KeyEventHdr->pressedKeys_.find(deviceId) != KeyEventHdr->pressedKeys_.end());
+
+    auto upEvent = KeyEventHdr->PackageKeyUpEvent(deviceId, testRawCode);
+    ASSERT_TRUE(upEvent != nullptr);
+    EXPECT_EQ(upEvent->GetKeyAction(), KeyEvent::KEY_ACTION_UP);
+    EXPECT_EQ(upEvent->GetAction(), KeyEvent::KEY_ACTION_UP);
+    EXPECT_TRUE(upEvent->GetPressedKeys().empty());
+    auto keyItem = upEvent->GetKeyItem(upEvent->GetKeyCode());
+    ASSERT_TRUE(keyItem.has_value());
+    EXPECT_FALSE(keyItem->IsPressed());
+
+    vKeyboard_.SendEvent(EV_KEY, KEY_C, 1);
+    vKeyboard_.SendEvent(EV_SYN, SYN_REPORT, 0);
+    libinput_event *nextEvent = libinput_.Dispatch();
+    ASSERT_TRUE(nextEvent != nullptr);
+    ASSERT_EQ(KeyEventHdr->Normalize(nextEvent, keyEvent), RET_OK);
+    auto pressedKeys = keyEvent->GetPressedKeys();
+    ASSERT_EQ(pressedKeys.size(), 1U);
+}
+
+/**
+ * @tc.name: KeyEventNormalizeTest_PackageKeyUpEvent_UnknownDevice_002
+ * @tc.desc: Verify PackageKeyUpEvent returns nullptr when the device is not found, in which case
+ *           the key code stays KEYCODE_UNKNOWN and the global keyEvent_ is left untouched.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyEventNormalizeTest, KeyEventNormalizeTest_PackageKeyUpEvent_UnknownDevice_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyEventHdr->keyEvent_ = nullptr;
+    KeyEventHdr->pressedKeys_.clear();
+    auto keyEvent = KeyEventHdr->GetKeyEvent();
+    ASSERT_TRUE(keyEvent != nullptr);
+    auto upEvent = KeyEventHdr->PackageKeyUpEvent(-1, 29); // KEY_LEFTCTRL on an unknown device
+    EXPECT_TRUE(upEvent == nullptr);
+    EXPECT_TRUE(keyEvent->GetPressedKeys().empty());
+}
 }
 }
