@@ -385,6 +385,7 @@ const static std::map<int32_t, keyCode::KeyCode> KEY_CODE_TRANSFORMATION = {
     { KEYCODE_PTZ_SHUTTER_RIGHT_ETS,         keyCode::KeyCode::key_t::KEYCODE_PTZ_SHUTTER_RIGHT },
     { KEYCODE_PTZ_APERTURE_LEFT_ETS,         keyCode::KeyCode::key_t::KEYCODE_PTZ_APERTURE_LEFT },
     { KEYCODE_PTZ_APERTURE_RIGHT_ETS,        keyCode::KeyCode::key_t::KEYCODE_PTZ_APERTURE_RIGHT },
+    { KEYCODE_DESKTOP_ETS,                   keyCode::KeyCode::key_t::KEYCODE_DESKTOP },
     { KEYCODE_WRIST_TURN_ETS,                keyCode::KeyCode::key_t::KEYCODE_WRIST_TURN },
     { KEYCODE_BACK_PANEL_DOUBLE_TAP_ETS,     keyCode::KeyCode::key_t::KEYCODE_BACK_PANEL_DOUBLE_TAP }
 };
