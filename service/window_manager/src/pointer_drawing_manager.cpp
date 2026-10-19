@@ -421,6 +421,15 @@ PointerDrawingManager::PointerDrawingManager()
         g_hardwareCanvasSize = GetCanvasSize();
         g_focalPoint = GetFocusCoordinates();
     }
+    int32_t cursoeW = CursorDrawingComponent::GetInstance().GetCustomCursorWidth();
+    int32_t cursoeH = CursorDrawingComponent::GetInstance().GetCustomCursorHeight();
+    int32_t focusX = CursorDrawingComponent::GetInstance().GetCustomCursorFocusX();
+    int32_t focusY = CursorDrawingComponent::GetInstance().GetCustomCursorFocusY();
+    int32_t hotSpotX = CursorDrawingComponent::GetInstance().GetCustomCursorHotSpotX();
+    int32_t hotSpotY = CursorDrawingComponent::GetInstance().GetCustomCursorHotSpotY();
+    if (cursorW > 0 && cursorH > 0) {
+        RestoreCustomCursorProperty(cursoeW, cursoeH, focusX, focusY, hotSpotX, hotSpotY);
+    }
 }
 
 PointerDrawingManager::~PointerDrawingManager()
@@ -498,14 +507,14 @@ PointerStyle PointerDrawingManager::GetLastMouseStyle()
 }
 
 void PointerDrawingManager::RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
-    int32_t hotSpotX, int32_t hotSpotY)
+    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY);
 {
     cursorWidth_ = cursorWidth;
     cursorHeight_ = cursorHeight;
+    focusX_ = focusX;
+    focusY_ = focusY;
     userIconHotSpotX_ = hotSpotX;
     userIconHotSpotY_ = hotSpotY;
-    focusX_ = hotSpotX;
-    focusY_ = hotSpotY;
 }
 
 bool PointerDrawingManager::SetCursorLocation(int32_t physicalX, int32_t physicalY)
@@ -566,9 +575,6 @@ void PointerDrawingManager::ForceClearPointerVisibleStatus()
 int32_t PointerDrawingManager::UpdateMouseLayer(int32_t physicalX, int32_t physicalY)
 {
     if (lastMouseStyle_.id == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
-        if (cursorWidth_ == 0 && cursorHeight_ == 0) {
-            RestoreCustomCursorFromPersistence(0,0);
-        }
         ExpandCanvasForCustomCursor();
     }
     if (InitLayer(MOUSE_ICON(lastMouseStyle_.id)) != RET_OK) {
@@ -2295,10 +2301,10 @@ int32_t PointerDrawingManager::UpdateCursorProperty(CursorPixelMap curPixelMap,
     CursorDrawingInformation::GetInstance().SetUserIconPixelMap(newPixelMap);
     userIconHotSpotX_ = static_cast<int32_t>((float)newFocusX * xAxis);
     userIconHotSpotY_ = static_cast<int32_t>((float)newFocusY * yAxis);
-#ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
+    focusX_ = newFocusX;
+    focusY_ = newFocusY;
     CursorDrawingInformation::GetInstance().SetCustomCursorProperty(cursorWidth_, cursorHeight_,
-        userIconHotSpotX_, userIconHotSpotY_);
-#endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
+        focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     MMI_HILOGI("cursorWidth:%{public}d, cursorHeight:%{public}d, imageWidth:%{public}d, imageHeight:%{public}d,"
         "focusX:%{private}d, focuxY:%{private}d, xAxis:%{public}f, yAxis:%{public}f, userIconHotSpotX_:%{private}d,"
         "userIconHotSpotY_:%{private}d", cursorWidth_, cursorHeight_, imageInfo.size.width, imageInfo.size.height,
@@ -2334,10 +2340,10 @@ int32_t PointerDrawingManager::SetMouseHotSpot(int32_t pid, int32_t windowId, in
     }
     userIconHotSpotX_ = hotSpotX;
     userIconHotSpotY_ = hotSpotY;
-#ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
+    focusX_ = hotSpotX;
+    focusY_ = hotSpotY;
     CursorDrawingInformation::GetInstance().SetCustomCursorProperty(cursorWidth_, cursorHeight_,
-        userIconHotSpotX_, userIconHotSpotY_);
-#endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
+        focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     return RET_OK;
 }
 
@@ -4030,11 +4036,6 @@ std::shared_ptr<OHOS::Media::PixelMap> PointerDrawingManager::GetUserIconCopy(bo
     if (followSystem_) {
         ScaleUserIconBySystem(pixelMapPtr);
     }
-
-    if (cursorWidth_ == 0 && cursorHeight_ ==0) {
-        RestoreCustomCursorFromPersistence(pixelMapPtr->GetWidth(), pixelMapPtr->GetHeight());
-    }
-    
     if (needUpdateCanvasProperty && !GetHardCursorEnabled()) {
         ExpandCanvasForCustomCursor();
     }
@@ -4066,26 +4067,6 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
         "userIconHotSpotX_:%{private}d, userIconHotSpotY_:%{private}d",
         cursorWidth_, cursorHeight_, imageInfo.size.width, imageInfo.size.height,
         focusX_, focusY_, axis, userIconHotSpotX_, userIconHotSpotY_);
-}
-
-void PointerDrawingManager::RestoreCustomCursorFromPersistence(int32_t defaultWidth, int32_t defaultHeight)
-{
-    cursorWidth_ = defaultWidth;
-    cursorHeight_ = defaultHeight;
-    userIconHotSpotX_ = 0;
-    userIconHotSpotY_ = 0;
-#ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
-    int32_t persistedW = CursorDrawingInformation::GetInstance().GetCustomCursorWidth();
-    int32_t persistedH = CursorDrawingInformation::GetInstance().GetCustomCursorHeight();
-    int32_t persistedX = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotX();
-    int32_t persistedY = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotY();
-    if (persistedW > 0 && persistedH > 0) {
-        RestoreCustomCursorProperty(persistedW, persistedH, persistedX, persistedY);
-    }
-#endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
-    MMI_HILOGD("Restore cursorProperty from persistence, cursorWidth_:%{}d, cursorHeight_:%{}d,"
-        "userIconHotSpotX_:%{}d, userIconHotSpotY_:%{}d",
-        cursorWidth_, cursorHeight_, userIconHotSpotX_, userIconHotSpotY_);
 }
 
 void PointerDrawingManager::ExpandCanvasForCustomCursor()
@@ -4148,10 +4129,8 @@ int32_t PointerDrawingManager::UpdateCursorProperty(CustomCursor cursor)
     focusY_ = cursor.focusY;
     userIconHotSpotX_ = cursor.focusX;
     userIconHotSpotY_ = cursor.focusY;
-#ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
     CursorDrawingInformation::GetInstance().SetCustomCursorProperty(cursorWidth_, cursorHeight_,
-        userIconHotSpotX_, userIconHotSpotY_);
-#endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
+        focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     MMI_HILOGI("imageWidth:%{public}d, imageHeight:%{public}d, focusX:%{private}d, focusY:%{private}d",
         imageInfo.size.width, imageInfo.size.height, cursor.focusX, cursor.focusY);
     return RET_OK;

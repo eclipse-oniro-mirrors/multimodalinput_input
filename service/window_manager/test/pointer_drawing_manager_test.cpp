@@ -5469,15 +5469,17 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCurso
     pointerDrawingManager.focusY_ = 0;
     int32_t cursorWidth = 128;
     int32_t cursorHeight = 64;
+    int32_t focusX = 5;
+    int32_t focusY = 8;
     int32_t hotSpotX = 10;
     int32_t hotSpotY = 20;
-    pointerDrawingManager.RestoreCustomCursorProperty(cursorWidth, cursorHeight, hotSpotX, hotSpotY);
+    pointerDrawingManager.RestoreCustomCursorProperty(cursorWidth, cursorHeight, focusX, focusY, hotSpotX, hotSpotY);
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, cursorWidth);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, cursorHeight);
+    EXPECT_EQ(pointerDrawingManager.focusX_, focusX_);
+    EXPECT_EQ(pointerDrawingManager.focusY_, focusY_);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, hotSpotX);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, hotSpotY);
-    EXPECT_EQ(pointerDrawingManager.focusX_, hotSpotX);
-    EXPECT_EQ(pointerDrawingManager.focusY_, hotSpotY);
 }
 
 /**
@@ -5496,7 +5498,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCurso
     pointerDrawingManager.userIconHotSpotY_ = 50;
     pointerDrawingManager.focusX_ = 50;
     pointerDrawingManager.focusY_ = 50;
-    pointerDrawingManager.RestoreCustomCursorProperty(0, 0, 0, 0);
+    pointerDrawingManager.RestoreCustomCursorProperty(0, 0, 0, 0, 0, 0);
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 0);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 0);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 0);
@@ -5627,60 +5629,6 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCus
 }
 
 /**
- * @tc.name: PointerDrawingManagerTest_RestoreCustomCursorFromPersistence_001
- * @tc.desc: Test RestoreCustomCursorFromPersistence uses default values when persistence invalid (<=0)
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCursorFromPersistence_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    pointerDrawingManager.cursorWidth_ = 999;
-    pointerDrawingManager.cursorHeight_ = 999;
-    pointerDrawingManager.userIconHotSpotX_ = 999;
-    pointerDrawingManager.userIconHotSpotY_ = 999;
-    int32_t defaultWidth = 120;
-    int32_t defaultHeight = 130;
-    pointerDrawingManager.RestoreCustomCursorFromPersistence(defaultWidth, defaultHeight);
-    EXPECT_EQ(pointerDrawingManager.cursorWidth_, defaultWidth);
-    EXPECT_EQ(pointerDrawingManager.cursorHeight_, defaultHeight);
-    EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 0);
-    EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 0);
-}
-
-/**
- * @tc.name: PointerDrawingManagerTest_RestoreCustomCursorFromPersistence_002
- * @tc.desc: Test RestoreCustomCursorFromPersistence restores from persistence when valid values exist
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCursorFromPersistence_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    int32_t persistedW = 200;
-    int32_t persistedH = 150;
-    int32_t persistedX = 30;
-    int32_t persistedY = 40;
-    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(persistedW, persistedH, persistedX, persistedY);
-    pointerDrawingManager.cursorWidth_ = 0;
-    pointerDrawingManager.cursorHeight_ = 0;
-    pointerDrawingManager.userIconHotSpotX_ = 0;
-    pointerDrawingManager.userIconHotSpotY_ = 0;
-    pointerDrawingManager.focusX_ = 0;
-    pointerDrawingManager.focusY_ = 0;
-    pointerDrawingManager.RestoreCustomCursorFromPersistence(10, 10);
-    EXPECT_EQ(pointerDrawingManager.cursorWidth_, persistedW);
-    EXPECT_EQ(pointerDrawingManager.cursorHeight_, persistedH);
-    EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, persistedX);
-    EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, persistedY);
-    EXPECT_EQ(pointerDrawingManager.focusX_, persistedX);
-    EXPECT_EQ(pointerDrawingManager.focusY_, persistedY);
-    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(0, 0, 0, 0);
-}
-
-/**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_001
  * @tc.desc: Test ScaleUserIconBySystem scales pixelMap and updates cursor dimensions and hotspot
  * @tc.type: FUNC
@@ -5762,18 +5710,19 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_GetUserIconCopy_00
     PointerDrawingManager pointerDrawingManager;
     auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
     ASSERT_NE(pixelMap, nullptr);
-    CursorDrawingInformation::GetInstance().SetUserIconPixelMap(pixelMap.get());
-    pointerDrawingManager.cursorWidth_ = 0;
-    pointerDrawingManager.cursorHeight_ = 0;
+    CursorDrawingInformation::GetInstance().userIcon_ = pixelMap;
+    pointerDrawingManager.cursorWidth_ = MOUSE_ICON_SIZE;
+    pointerDrawingManager.cursorHeight_ = MOUSE_ICON_SIZE;
     pointerDrawingManager.canvasWidth_ = 64;
     pointerDrawingManager.canvasHeight_ = 64;
     pointerDrawingManager.followSystem_ = false;
     pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = false;
     auto result = pointerDrawingManager.GetUserIconCopy();
     EXPECT_NE(result, nullptr);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 0);
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 0);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
     CursorDrawingInformation::GetInstance().SetUserIconPixelMap(nullptr);
+    CursorDrawingInformation::GetInstance().userIcon_.reset();
 }
 
 /**
@@ -5782,7 +5731,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_GetUserIconCopy_00
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_001, TestSize.Level1)
+HWTEST_F(PointerDrawingManagerTest,
+    PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
     PointerDrawingManager pointerDrawingManager;
@@ -5795,33 +5745,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_UpdateMouseLayer_D
     pointerDrawingManager.canvasWidth_ = 64;
     pointerDrawingManager.canvasHeight_ = 64;
     ASSERT_NE(pointerDrawingManager.UpdateMouseLayer(10, 20), RET_OK);
-    EXPECT_EQ( pointerDrawingManager.canvasWidth_, (100 / 64 + 1) * 64);
-    EXPECT_EQ( pointerDrawingManager.canvasHeight_, (100 / 64 + 1) * 64);
-}
-
-/**
- * @tc.name: PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_002
- * @tc.desc: Test UpdateMouseLayer with DEVELOPER_DEFINED_ICON and zero cursor dims restores from persistence
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    pointerDrawingManager.surfaceNode_ = nullptr;
-    pointerDrawingManager.hardwareCursorPointerManager_->SetHdiServiceState(true);
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = true;
-    pointerDrawingManager.lastMouseStyle_.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
-    pointerDrawingManager.cursorWidth_ = 0;
-    pointerDrawingManager.cursorHeight_ = 0;
-    int32_t persistedW = 80;
-    int32_t persistedH = 80;
-    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(persistedW, persistedH, 5, 5);
-    ASSERT_NE(pointerDrawingManager.UpdateMouseLayer(10, 20), RET_OK);
-    EXPECT_EQ( pointerDrawingManager.cursorWidth_, persistedW);
-    EXPECT_EQ( pointerDrawingManager.cursorHeight_, persistedH);
-    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(0, 0, 0, 0);
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, (100 / 64 + 1) * 64);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, (100 / 64 + 1) * 64);
 }
 
 } // namespace MMI

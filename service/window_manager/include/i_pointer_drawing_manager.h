@@ -99,8 +99,6 @@ public:
         return {};
     }
     virtual void SetLastMouseStyle(PointerStyle style) {}
-    virtual void RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
-        int32_t hotSpotX, int32_t hotSpotY) {}
     virtual int32_t SwitchPointerStyle()
     {
         return 0;

@@ -244,8 +244,6 @@ PointerStyle PointerDrawingManager::GetLastMouseStyle()
     return {};
 }
 void PointerDrawingManager::SetLastMouseStyle(PointerStyle style) {}
-void PointerDrawingManager::RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
-        int32_t hotSpotX, int32_t hotSpotY) {}
 IconStyle PointerDrawingManager::GetIconStyle(const MOUSE_ICON mouseStyle)
 {
     return {};

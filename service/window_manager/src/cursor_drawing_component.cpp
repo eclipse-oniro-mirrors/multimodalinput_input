@@ -1136,7 +1136,7 @@ int32_t CursorDrawingInformation::SetMouseIcon(int32_t userId, int32_t pid, int3
         curPixelMap.pixelMap = nullptr;
     }
 
-    SetCustomCursorProperty(pixelMapPtr->GetWidth(), pixelMapPtr->GetHeight(), 0 ,0);
+    SetCustomCursorProperty(pixelMapPtr->GetWidth(), pixelMapPtr->GetHeight(), 0, 0, 0, 0);
     mouseIconUpdate_ = true;
     PointerStyle style;
     style.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
@@ -1228,10 +1228,12 @@ PointerStyle CursorDrawingInformation::GetLastMouseStyle()
 }
 
 void CursorDrawingInformation::SetCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
-    int32_t hotSpotX, int32_t hotSpotY)
+    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY);
 {
     customCursorWidth_ = cursorWidth;
     customCursorHeight_ = cursorHeight;
+    customCursorFocusX_ = focusX;
+    customCursorFoxusY_ = focusY;
     customCursorHotSpotX_ = hotSpotX;
     customCursorHotSpotY_ = hotSpotY;
 }
