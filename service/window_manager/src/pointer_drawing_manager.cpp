@@ -421,14 +421,14 @@ PointerDrawingManager::PointerDrawingManager()
         g_hardwareCanvasSize = GetCanvasSize();
         g_focalPoint = GetFocusCoordinates();
     }
-    int32_t cursoeW = CursorDrawingComponent::GetInstance().GetCustomCursorWidth();
-    int32_t cursoeH = CursorDrawingComponent::GetInstance().GetCustomCursorHeight();
-    int32_t focusX = CursorDrawingComponent::GetInstance().GetCustomCursorFocusX();
-    int32_t focusY = CursorDrawingComponent::GetInstance().GetCustomCursorFocusY();
-    int32_t hotSpotX = CursorDrawingComponent::GetInstance().GetCustomCursorHotSpotX();
-    int32_t hotSpotY = CursorDrawingComponent::GetInstance().GetCustomCursorHotSpotY();
+    int32_t cursorW = CursorDrawingInformation::GetInstance().GetCustomCursorWidth();
+    int32_t cursorH = CursorDrawingInformation::GetInstance().GetCustomCursorHeight();
+    int32_t focusX = CursorDrawingInformation::GetInstance().GetCustomCursorFocusX();
+    int32_t focusY = CursorDrawingInformation::GetInstance().GetCustomCursorFocusY();
+    int32_t hotSpotX = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotX();
+    int32_t hotSpotY = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotY();
     if (cursorW > 0 && cursorH > 0) {
-        RestoreCustomCursorProperty(cursoeW, cursoeH, focusX, focusY, hotSpotX, hotSpotY);
+        RestoreCustomCursorProperty(cursorW, cursorH, focusX, focusY, hotSpotX, hotSpotY);
     }
 }
 
@@ -507,7 +507,7 @@ PointerStyle PointerDrawingManager::GetLastMouseStyle()
 }
 
 void PointerDrawingManager::RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
-    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY);
+    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY)
 {
     cursorWidth_ = cursorWidth;
     cursorHeight_ = cursorHeight;

@@ -5476,8 +5476,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCurso
     pointerDrawingManager.RestoreCustomCursorProperty(cursorWidth, cursorHeight, focusX, focusY, hotSpotX, hotSpotY);
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, cursorWidth);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, cursorHeight);
-    EXPECT_EQ(pointerDrawingManager.focusX_, focusX_);
-    EXPECT_EQ(pointerDrawingManager.focusY_, focusY_);
+    EXPECT_EQ(pointerDrawingManager.focusX_, focusX);
+    EXPECT_EQ(pointerDrawingManager.focusY_, focusY);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, hotSpotX);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, hotSpotY);
 }

@@ -174,13 +174,6 @@ bool CursorDrawingComponent::LoadLibrary()
     POINTER_DEV_MGR.isInitDefaultMouseIconPath = true;
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
     pointerInstance_->SetLastMouseStyle(CursorDrawingInformation::GetInstance().GetLastMouseStyle());
-    int32_t cursorW = CursorDrawingInformation::GetInstance().GetCustomCursorWidth();
-    int32_t cursorH = CursorDrawingInformation::GetInstance().GetCustomCursorHeight();
-    int32_t hotSpotX = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotX();
-    int32_t hotSpotY = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotY();
-    if (cursorW > 0 && cursorH > 0) {
-        pointerInstance_->RestoreCustomCursorProperty(cursorW, cursorH, hotSpotX, hotSpotY);
-    }
 #endif // OHOS_BUILD_ENABLE_POINTER_DRAWING
     return true;
 }
@@ -1228,12 +1221,12 @@ PointerStyle CursorDrawingInformation::GetLastMouseStyle()
 }
 
 void CursorDrawingInformation::SetCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
-    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY);
+    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY)
 {
     customCursorWidth_ = cursorWidth;
     customCursorHeight_ = cursorHeight;
     customCursorFocusX_ = focusX;
-    customCursorFoxusY_ = focusY;
+    customCursorFocusY_ = focusY;
     customCursorHotSpotX_ = hotSpotX;
     customCursorHotSpotY_ = hotSpotY;
 }
