@@ -260,8 +260,9 @@ private:
     bool CreateGroupContext(int32_t groupId, uint64_t rsId);
     void ClearGroupCursorCtxMap();
     bool SetCursorLocation(int32_t physicalX, int32_t physicalY);
-    std::shared_ptr<OHOS::Media::PixelMap> GetUserIconCopy(bool setSurfaceNode = true);
-    void SetSurfaceNodeBounds();
+    std::shared_ptr<OHOS::Media::PixelMap> GetUserIconCopy(bool needUpdateCanvasProperty = true);
+    void ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::PixelMap>& pixelMapPtr);
+    void ExpandCanvasForCustomCursor();
     int32_t DrawNewDpiPointer() override;
     bool SetDynamicHardWareCursorLocation(int32_t physicalX, int32_t physicalY, MOUSE_ICON mouseStyle);
     void RenderThreadLoop();
@@ -360,6 +361,8 @@ private:
     std::vector<sptr<OHOS::Rosen::ScreenInfo>> FilterOutScreensWithDisableCursor(
         const std::vector<sptr<OHOS::Rosen::ScreenInfo>> &screens);
     bool IsDisableCursorScreen(uint64_t rsId);
+    void RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
+        int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY);
 private:
     bool hasDisplay_ { false };
     bool hasPointerDevice_ { false };

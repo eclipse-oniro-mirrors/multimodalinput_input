@@ -2750,7 +2750,7 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_branchCoverage, Test
     pointerDrawingManager.cursorWidth_ = 1;
     pointerDrawingManager.canvasHeight_ = 0;
     pointerDrawingManager.cursorHeight_ = 1;
-    pointerDrawingManager.SetSurfaceNodeBounds();
+    pointerDrawingManager.ExpandCanvasForCustomCursor();
     ret = pointerDrawingManager.DrawNewDpiPointer();
     ASSERT_NE(ret, RET_OK);
 }
@@ -2973,148 +2973,6 @@ HWTEST_F(PointerDrawingManagerTest, InputWindowsManagerTest_AdjustMouseFocusToSo
     pointerDrawingManager->AdjustMouseFocusToSoftRenderOrigin(DIRECTION180, MOUSE_ICON::DEFAULT, physicalX, physicalY);
     EXPECT_NE(physicalX, 200);
     EXPECT_NE(physicalY, 200);
-}
-
-/**
- * @tc.name: PointerDrawingManagerTest_SetSurfaceNodeBounds_001
- * @tc.desc: Test SetSurfaceNodeBounds with soft cursor (hardcursor disabled), null surfaceNode
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_SetSurfaceNodeBounds_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    ASSERT_NE(pointerDrawingManager.hardwareCursorPointerManager_, nullptr);
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnable_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isDeviceChange_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = false;
-    EXPECT_FALSE(pointerDrawingManager.GetHardCursorEnabled());
-
-    pointerDrawingManager.SetSurfaceNode(nullptr);
-    pointerDrawingManager.canvasWidth_ = 0;
-    pointerDrawingManager.canvasHeight_ = 0;
-    pointerDrawingManager.cursorWidth_ = 1;
-    pointerDrawingManager.cursorHeight_ = 1;
-    pointerDrawingManager.lastPhysicalX_ = 100;
-    pointerDrawingManager.lastPhysicalY_ = 100;
-    pointerDrawingManager.displayInfo_.direction = DIRECTION0;
-    pointerDrawingManager.displayInfo_.displayDirection = DIRECTION0;
-    pointerDrawingManager.lastMouseStyle_.id = MOUSE_ICON::DEFAULT;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
-    EXPECT_EQ(pointerDrawingManager.canvasWidth_, (1 / 64 + 1) * 64);
-    EXPECT_EQ(pointerDrawingManager.canvasHeight_, (1 / 64 + 1) * 64);
-
-}
-
-/**
- * @tc.name: PointerDrawingManagerTest_SetSurfaceNodeBounds_002
- * @tc.desc: Test SetSurfaceNodeBounds with various directions (soft cursor)
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_SetSurfaceNodeBounds_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    ASSERT_NE(pointerDrawingManager.hardwareCursorPointerManager_, nullptr);
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnable_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isDeviceChange_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = false;
-    EXPECT_FALSE(pointerDrawingManager.GetHardCursorEnabled());
-
-    pointerDrawingManager.imageWidth_ = 50;
-    pointerDrawingManager.imageHeight_ = 50;
-    pointerDrawingManager.canvasWidth_ = 64;
-    pointerDrawingManager.canvasHeight_ = 64;
-    pointerDrawingManager.cursorWidth_ = 50;
-    pointerDrawingManager.cursorHeight_ = 50;
-    pointerDrawingManager.lastPhysicalX_ = 100;
-    pointerDrawingManager.lastPhysicalY_ = 100;
-    pointerDrawingManager.lastMouseStyle_.id = MOUSE_ICON::DEFAULT;
-
-    pointerDrawingManager.displayInfo_.direction = DIRECTION0;
-    pointerDrawingManager.displayInfo_.displayDirection = DIRECTION0;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
-
-    pointerDrawingManager.displayInfo_.direction = DIRECTION90;
-    pointerDrawingManager.displayInfo_.displayDirection = DIRECTION90;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
-
-    pointerDrawingManager.displayInfo_.direction = DIRECTION180;
-    pointerDrawingManager.displayInfo_.displayDirection = DIRECTION180;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
-
-    pointerDrawingManager.displayInfo_.direction = DIRECTION270;
-    pointerDrawingManager.displayInfo_.displayDirection = DIRECTION270;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
-
-}
-
-/**
- * @tc.name: PointerDrawingManagerTest_SetSurfaceNodeBounds_003
- * @tc.desc: Test SetSurfaceNodeBounds with hard cursor enabled (early return)
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_SetSurfaceNodeBounds_003, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    ASSERT_NE(pointerDrawingManager.hardwareCursorPointerManager_, nullptr);
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnable_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isDeviceChange_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = true;
-    EXPECT_TRUE(pointerDrawingManager.GetHardCursorEnabled());
-
-    pointerDrawingManager.canvasWidth_ = 0;
-    pointerDrawingManager.canvasHeight_ = 0;
-    pointerDrawingManager.cursorWidth_ = 1;
-    pointerDrawingManager.cursorHeight_ = 1;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
-    EXPECT_EQ(pointerDrawingManager.canvasWidth_, 0);
-    EXPECT_EQ(pointerDrawingManager.canvasHeight_, 0);
-
-}
-
-/**
- * @tc.name: PointerDrawingManagerTest_SetSurfaceNodeBounds_004
- * @tc.desc: Test SetSurfaceNodeBounds with non-null surfaceNode under sorftcursor
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_SetSurfaceNodeBounds_004, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-    ASSERT_NE(pointerDrawingManager.hardwareCursorPointerManager_, nullptr);
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnable_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isDeviceChange_ = true;
-    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = false;
-    EXPECT_FALSE(pointerDrawingManager.GetHardCursorEnabled());
-
-    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
-    surfaceNodeConfig.SurfaceNodeName = "pointer window";
-    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::SELF_DRAWING_WINDOW_NODE;
-    auto surfaceNode = Rosen::RSSurfaceNode::Create(
-        surfaceNodeConfig, surfaceNodeType, true, false, rsUIContext_);
-    if (surfaceNode != nullptr) {
-        pointerDrawingManager.SetSurfaceNode(surfaceNode);
-    }
-
-    pointerDrawingManager.imageWidth_ = 50;
-    pointerDrawingManager.imageHeight_ = 50;
-    pointerDrawingManager.canvasWidth_ = 64;
-    pointerDrawingManager.canvasHeight_ = 64;
-    pointerDrawingManager.cursorWidth_ = 50;
-    pointerDrawingManager.cursorHeight_ = 50;
-    pointerDrawingManager.lastPhysicalX_ = 100;
-    pointerDrawingManager.lastPhysicalY_ = 100;
-    pointerDrawingManager.lastMouseStyle_.id = MOUSE_ICON::DEFAULT;
-
-    pointerDrawingManager.displayInfo_.direction = DIRECTION90;
-    pointerDrawingManager.displayInfo_.displayDirection = DIRECTION0;
-    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.SetSurfaceNodeBounds());
 }
 
 /**
@@ -5745,5 +5603,304 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreatePointerWindo
         EXPECT_EQ(result, RET_ERR);
     }
 }
+
+/**
+ * @tc.name: PointerDrawingManagerTest_RestoreCustomCursorProperty_001
+ * @tc.desc: Test RestoreCustomCursorProperty assigns all cursor properties and 焦点坐标
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCursorProperty_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.cursorWidth_ = 0;
+    pointerDrawingManager.cursorHeight_ = 0;
+    pointerDrawingManager.userIconHotSpotX_ = 0;
+    pointerDrawingManager.userIconHotSpotY_ = 0;
+    pointerDrawingManager.focusX_ = 0;
+    pointerDrawingManager.focusY_ = 0;
+    int32_t cursorWidth = 128;
+    int32_t cursorHeight = 64;
+    int32_t focusX = 5;
+    int32_t focusY = 8;
+    int32_t hotSpotX = 10;
+    int32_t hotSpotY = 20;
+    pointerDrawingManager.RestoreCustomCursorProperty(cursorWidth, cursorHeight, focusX, focusY, hotSpotX, hotSpotY);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, cursorWidth);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, cursorHeight);
+    EXPECT_EQ(pointerDrawingManager.focusX_, focusX);
+    EXPECT_EQ(pointerDrawingManager.focusY_, focusY);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, hotSpotX);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, hotSpotY);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_RestoreCustomCursorProperty_002
+ * @tc.desc: Test RestoreCustomCursorProperty with zero values clears previous properties
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_RestoreCustomCursorProperty_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.cursorWidth_ = 100;
+    pointerDrawingManager.cursorHeight_ = 100;
+    pointerDrawingManager.userIconHotSpotX_ = 50;
+    pointerDrawingManager.userIconHotSpotY_ = 50;
+    pointerDrawingManager.focusX_ = 50;
+    pointerDrawingManager.focusY_ = 50;
+    pointerDrawingManager.RestoreCustomCursorProperty(0, 0, 0, 0, 0, 0);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 0);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 0);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 0);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 0);
+    EXPECT_EQ(pointerDrawingManager.focusX_, 0);
+    EXPECT_EQ(pointerDrawingManager.focusY_, 0);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ExpandCanvasForCustomCursor_001
+ * @tc.desc: Test ExpandCanvasForCustomCursor expands canvas when cursor larger than canvas
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCustomCursor_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.canvasWidth_ = 64;
+    pointerDrawingManager.canvasHeight_ = 64;
+    pointerDrawingManager.cursorWidth_ = 100;
+    pointerDrawingManager.cursorHeight_ = 80;
+    pointerDrawingManager.ExpandCanvasForCustomCursor();
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, (100 / 64 + 1) * 64);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, (80 / 64 + 1) * 64);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ExpandCanvasForCustomCursor_002
+ * @tc.desc: Test ExpandCanvasForCustomCursor keeps canvas when cursor fits within canvas
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCustomCursor_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.canvasWidth_ = 128;
+    pointerDrawingManager.canvasHeight_ = 128;
+    pointerDrawingManager.cursorWidth_ = 64;
+    pointerDrawingManager.cursorHeight_ = 64;
+    int32_t prevWidth = pointerDrawingManager.canvasWidth_;
+    int32_t prevHeight = pointerDrawingManager.canvasHeight_;
+
+    pointerDrawingManager.ExpandCanvasForCustomCursor();
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, prevWidth);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, prevHeight);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ExpandCanvasForCustomCursor_003
+ * @tc.desc: Test ExpandCanvasForCustomCursor with zero cursor dimensions keeps canvas unchanged
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCustomCursor_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.canvasWidth_ = 64;
+    pointerDrawingManager.canvasHeight_ = 64;
+    pointerDrawingManager.cursorWidth_ = 0;
+    pointerDrawingManager.cursorHeight_ = 0;
+
+    pointerDrawingManager.ExpandCanvasForCustomCursor();
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, 64);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, 64);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ExpandCanvasForCustomCursor_004
+ * @tc.desc: Test ExpandCanvasForCustomCursor expands canvas when cursorWidth/cursorHeight exactly equal canvas
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCustomCursor_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.canvasWidth_ = 64;
+    pointerDrawingManager.canvasHeight_ = 64;
+    pointerDrawingManager.cursorWidth_ = 64;
+    pointerDrawingManager.cursorHeight_ = 64;
+
+    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.ExpandCanvasForCustomCursor());
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, 64);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, 64);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ExpandCanvasForCustomCursor_005
+ * @tc.desc: Test ExpandCanvasForCustomCursor with negative cursor dimensions keeps canvas unchanged
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCustomCursor_005, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.canvasWidth_ = 128;
+    pointerDrawingManager.canvasHeight_ = 128;
+    pointerDrawingManager.cursorWidth_ = -1;
+    pointerDrawingManager.cursorHeight_ = -1;
+
+    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.ExpandCanvasForCustomCursor());
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, 128);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, 128);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ExpandCanvasForCustomCursor_006
+ * @tc.desc: Test ExpandCanvasForCustomCursor aligns canvas  to POINTER_WINDOW_INIT_SIZE (64) boundary
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ExpandCanvasForCustomCursor_006, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.canvasWidth_ = 0;
+    pointerDrawingManager.canvasHeight_ = 0;
+    pointerDrawingManager.cursorWidth_ = 65;
+    pointerDrawingManager.cursorHeight_ = 129;
+
+    ASSERT_NO_FATAL_FAILURE(pointerDrawingManager.ExpandCanvasForCustomCursor());
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, (65 / 64 + 1) * 64);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, (129 / 64 + 1) * 64);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_001
+ * @tc.desc: Test ScaleUserIconBySystem scales pixelMap and updates cursor dimensions and hotspot
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MIDDLE_PIXEL_MAP_WIDTH, MIDDLE_PIXEL_MAP_HEIGHT);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.focusX_ = 50;
+    pointerDrawingManager.focusY_ = 50;
+    pointerDrawingManager.cursorWidth_ = 0;
+    pointerDrawingManager.cursorHeight_ = 0;
+    pointerDrawingManager.userIconHotSpotX_ = 0;
+    pointerDrawingManager.userIconHotSpotY_ = 0;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 0);
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 0);
+    // 400x400 > MAX_CUSTOM_CURSOR_DIMENSION(256), so axis clamps to 256/400, cursorWidth <= 256
+    EXPECT_LE(pointerDrawingManager.cursorWidth_, 256);
+    EXPECT_LE(pointerDrawingManager.cursorHeight_, 256);
+    EXPECT_GE(pointerDrawingManager.userIconHotSpotX_, 0);
+    EXPECT_GE(pointerDrawingManager.userIconHotSpotY_, 0);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_002
+ * @tc.desc: Test ScaleUserIconBySystem with small image (no MAX clamp, axis from cursor ratio)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(64, 64);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.focusX_ = 10;
+    pointerDrawingManager.focusY_ = 10;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 0);
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 0);
+    EXPECT_GE(pointerDrawingManager.userIconHotSpotX_, 0);
+    EXPECT_GE(pointerDrawingManager.userIconHotSpotY_, 0);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_GetUserIconCopy_001
+ * @tc.desc: Test GetUserIconCopy returns nullptr when user icon is not set
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_GetUserIconCopy_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    CursorDrawingInformation::GetInstance().SetUserIconPixelMap(nullptr);
+    auto result = pointerDrawingManager.GetUserIconCopy();
+    EXPECT_EQ(result, nullptr);
+    result = pointerDrawingManager.GetUserIconCopy(false);
+    EXPECT_EQ(result, nullptr);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_GetUserIconCopy_002
+ * @tc.desc: Test GetUserIconCopy with valid user icon returns non-null and updates canvas
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_GetUserIconCopy_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    CursorDrawingInformation::GetInstance().userIcon_ = pixelMap;
+    pointerDrawingManager.cursorWidth_ = MOUSE_ICON_SIZE;
+    pointerDrawingManager.cursorHeight_ = MOUSE_ICON_SIZE;
+    pointerDrawingManager.canvasWidth_ = 64;
+    pointerDrawingManager.canvasHeight_ = 64;
+    pointerDrawingManager.followSystem_ = false;
+    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = false;
+    auto result = pointerDrawingManager.GetUserIconCopy();
+    EXPECT_NE(result, nullptr);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
+    CursorDrawingInformation::GetInstance().SetUserIconPixelMap(nullptr);
+    CursorDrawingInformation::GetInstance().userIcon_.reset();
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_001
+ * @tc.desc: Test UpdateMouseLayer with DEVELOPER_DEFINED_ICON triggers canvas expansion path
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest,
+    PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.surfaceNode_ = nullptr;
+    pointerDrawingManager.hardwareCursorPointerManager_->SetHdiServiceState(true);
+    pointerDrawingManager.hardwareCursorPointerManager_->isEnableState_ = true;
+    pointerDrawingManager.lastMouseStyle_.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
+    pointerDrawingManager.cursorWidth_ = 100;
+    pointerDrawingManager.cursorHeight_ = 100;
+    pointerDrawingManager.canvasWidth_ = 64;
+    pointerDrawingManager.canvasHeight_ = 64;
+    ASSERT_NE(pointerDrawingManager.UpdateMouseLayer(10, 20), RET_OK);
+    EXPECT_EQ(pointerDrawingManager.canvasWidth_, (100 / 64 + 1) * 64);
+    EXPECT_EQ(pointerDrawingManager.canvasHeight_, (100 / 64 + 1) * 64);
+}
+
 } // namespace MMI
 } // namespace OHOS

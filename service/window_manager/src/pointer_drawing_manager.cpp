@@ -421,6 +421,15 @@ PointerDrawingManager::PointerDrawingManager()
         g_hardwareCanvasSize = GetCanvasSize();
         g_focalPoint = GetFocusCoordinates();
     }
+    int32_t cursorW = CursorDrawingInformation::GetInstance().GetCustomCursorWidth();
+    int32_t cursorH = CursorDrawingInformation::GetInstance().GetCustomCursorHeight();
+    int32_t focusX = CursorDrawingInformation::GetInstance().GetCustomCursorFocusX();
+    int32_t focusY = CursorDrawingInformation::GetInstance().GetCustomCursorFocusY();
+    int32_t hotSpotX = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotX();
+    int32_t hotSpotY = CursorDrawingInformation::GetInstance().GetCustomCursorHotSpotY();
+    if (cursorW > 0 && cursorH > 0) {
+        RestoreCustomCursorProperty(cursorW, cursorH, focusX, focusY, hotSpotX, hotSpotY);
+    }
 }
 
 PointerDrawingManager::~PointerDrawingManager()
@@ -497,6 +506,17 @@ PointerStyle PointerDrawingManager::GetLastMouseStyle()
     return lastMouseStyle_;
 }
 
+void PointerDrawingManager::RestoreCustomCursorProperty(int32_t cursorWidth, int32_t cursorHeight,
+    int32_t focusX, int32_t focusY, int32_t hotSpotX, int32_t hotSpotY)
+{
+    cursorWidth_ = cursorWidth;
+    cursorHeight_ = cursorHeight;
+    focusX_ = focusX;
+    focusY_ = focusY;
+    userIconHotSpotX_ = hotSpotX;
+    userIconHotSpotY_ = hotSpotY;
+}
+
 bool PointerDrawingManager::SetCursorLocation(int32_t physicalX, int32_t physicalY)
 {
     bool magicCursorSetBounds = false;
@@ -554,6 +574,9 @@ void PointerDrawingManager::ForceClearPointerVisibleStatus()
 
 int32_t PointerDrawingManager::UpdateMouseLayer(int32_t physicalX, int32_t physicalY)
 {
+    if (lastMouseStyle_.id == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
+        ExpandCanvasForCustomCursor();
+    }
     if (InitLayer(MOUSE_ICON(lastMouseStyle_.id)) != RET_OK) {
         CursorDrawingInformation::GetInstance().SetMouseIconUpdate(false);
         MMI_HILOGE("Init layer failed");
@@ -1653,7 +1676,7 @@ void PointerDrawingManager::AdjustMouseFocusByDirection0(ICON_TYPE iconType, int
         }
         case ANGLE_NW: {
             if (currentMouseStyle_.id == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
-                if (GetUserIconCopy(false) != nullptr) {
+                if (GetUserIconCopy() != nullptr) {
                     physicalX -= userIconHotSpotX_;
                     physicalY -= userIconHotSpotY_;
                 }
@@ -1692,7 +1715,7 @@ void PointerDrawingManager::AdjustMouseFocusByDirection90(ICON_TYPE iconType, in
         }
         case ANGLE_NW: {
             if (currentMouseStyle_.id == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
-                if (GetUserIconCopy(false) != nullptr) {
+                if (GetUserIconCopy() != nullptr) {
                     physicalX -= userIconHotSpotY_;
                     physicalY += userIconHotSpotX_;
                 }
@@ -1731,7 +1754,7 @@ void PointerDrawingManager::AdjustMouseFocusByDirection180(ICON_TYPE iconType, i
         }
         case ANGLE_NW: {
             if (currentMouseStyle_.id == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
-                if (GetUserIconCopy(false) != nullptr) {
+                if (GetUserIconCopy() != nullptr) {
                     physicalX += userIconHotSpotX_;
                     physicalY += userIconHotSpotY_;
                 }
@@ -1770,7 +1793,7 @@ void PointerDrawingManager::AdjustMouseFocusByDirection270(ICON_TYPE iconType, i
         }
         case ANGLE_NW: {
             if (currentMouseStyle_.id == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
-                if (GetUserIconCopy(false) != nullptr) {
+                if (GetUserIconCopy() != nullptr) {
                     physicalX += userIconHotSpotY_;
                     physicalY -= userIconHotSpotX_;
                 }
@@ -2166,21 +2189,23 @@ void PointerDrawingManager::DrawImage(OHOS::Rosen::Drawing::Canvas &canvas, MOUS
     pen.SetColor(OHOS::Rosen::Drawing::Color::COLOR_BLUE);
     pen.SetWidth(OHOS::Rosen::Drawing::scalar(1));
     canvas.AttachPen(pen);
+    auto surfaceNodePtr = GetSurfaceNode();
+    CHKPV(surfaceNodePtr);
+    int32_t physicalX = lastPhysicalX_;
+    int32_t physicalY = lastPhysicalY_;
+    Direction direction = static_cast<Direction>((
+        ((displayInfo_.direction - displayInfo_.displayDirection) * ANGLE_90 + ANGLE_360) % ANGLE_360) / ANGLE_90);
     std::shared_ptr<Rosen::Drawing::Image> image = nullptr;
     if (mouseStyle == MOUSE_ICON::DEVELOPER_DEFINED_ICON) {
         MMI_HILOGD("Set mouseicon by userIcon_");
         auto userIconCopy = GetUserIconCopy();
+        AdjustMouseFocusToSoftRenderOrigin(direction, mouseStyle, physicalX, physicalY);
+        surfaceNodePtr->SetBounds(physicalX, physicalY, canvasWidth_, canvasHeight_);
         image = ExtractDrawingImage(userIconCopy);
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
         SetPixelMap(userIconCopy);
 #endif // OHOS_BUILD_ENABLE_MAGICCURSOR
     } else {
-        auto surfaceNodePtr = GetSurfaceNode();
-        CHKPV(surfaceNodePtr);
-        int32_t physicalX = lastPhysicalX_;
-        int32_t physicalY = lastPhysicalY_;
-        Direction direction = static_cast<Direction>((
-            ((displayInfo_.direction - displayInfo_.displayDirection) * ANGLE_90 + ANGLE_360) % ANGLE_360) / ANGLE_90);
         AdjustMouseFocusToSoftRenderOrigin(direction, mouseStyle, physicalX, physicalY);
         surfaceNodePtr->SetBounds(physicalX, physicalY, canvasWidth_, canvasHeight_);
         std::shared_ptr<OHOS::Media::PixelMap> pixelmap = nullptr;
@@ -2381,6 +2406,10 @@ int32_t PointerDrawingManager::UpdateCursorProperty(CursorPixelMap curPixelMap,
     CursorDrawingInformation::GetInstance().SetUserIconPixelMap(newPixelMap);
     userIconHotSpotX_ = static_cast<int32_t>((float)newFocusX * xAxis);
     userIconHotSpotY_ = static_cast<int32_t>((float)newFocusY * yAxis);
+    focusX_ = newFocusX;
+    focusY_ = newFocusY;
+    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(cursorWidth_, cursorHeight_,
+        focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     MMI_HILOGI("cursorWidth:%{public}d, cursorHeight:%{public}d, imageWidth:%{public}d, imageHeight:%{public}d,"
         "focusX:%{private}d, focuxY:%{private}d, xAxis:%{public}f, yAxis:%{public}f, userIconHotSpotX_:%{private}d,"
         "userIconHotSpotY_:%{private}d", cursorWidth_, cursorHeight_, imageInfo.size.width, imageInfo.size.height,
@@ -2416,6 +2445,10 @@ int32_t PointerDrawingManager::SetMouseHotSpot(int32_t pid, int32_t windowId, in
     }
     userIconHotSpotX_ = hotSpotX;
     userIconHotSpotY_ = hotSpotY;
+    focusX_ = hotSpotX;
+    focusY_ = hotSpotY;
+    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(cursorWidth_, cursorHeight_,
+        focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     return RET_OK;
 }
 
@@ -4165,7 +4198,7 @@ void PointerDrawingManager::DrawScreenCenterPointer(const PointerStyle& pointerS
     }
 }
 
-std::shared_ptr<OHOS::Media::PixelMap> PointerDrawingManager::GetUserIconCopy(bool setSurfaceNode)
+std::shared_ptr<OHOS::Media::PixelMap> PointerDrawingManager::GetUserIconCopy(bool needUpdateCanvasProperty)
 {
     std::shared_ptr<OHOS::Media::PixelMap> userIcon =
         CursorDrawingInformation::GetInstance().GetUserIconPixelMap();
@@ -4177,21 +4210,30 @@ std::shared_ptr<OHOS::Media::PixelMap> PointerDrawingManager::GetUserIconCopy(bo
     userIcon->Marshalling(data);
     std::shared_ptr<OHOS::Media::PixelMap> pixelMapPtr(OHOS::Media::PixelMap::Unmarshalling(data));
     CHKPP(pixelMapPtr);
+
+    if (followSystem_) {
+        ScaleUserIconBySystem(pixelMapPtr);
+    }
+    if (needUpdateCanvasProperty && !GetHardCursorEnabled()) {
+        ExpandCanvasForCustomCursor();
+    }
+    return pixelMapPtr;
+}
+
+void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::PixelMap>& pixelMapPtr)
+{
     Media::ImageInfo imageInfo;
     pixelMapPtr->GetImageInfo(imageInfo);
-    int32_t cursorSize = 1;
+    int32_t cursorSize = GetPointerSize(GetCurrentUser());
     float axis = 1.0f;
-    if (followSystem_) {
-        cursorSize = GetPointerSize(GetCurrentUser());
-        cursorWidth_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.width;
-        cursorHeight_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.height;
-        int32_t maxValue = imageInfo.size.width > imageInfo.size.height ? cursorWidth_ : cursorHeight_;
-        if (maxValue > MAX_CUSTOM_CURSOR_DIMENSION) {
-            axis = (float)MAX_CUSTOM_CURSOR_DIMENSION / (float)std::max(imageInfo.size.width, imageInfo.size.height);
-        } else {
-            axis = (float)std::max(cursorWidth_, cursorHeight_) /
-                (float)std::max(imageInfo.size.width, imageInfo.size.height);
-        }
+    cursorWidth_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.width;
+    cursorHeight_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.height;
+    int32_t maxValue = imageInfo.size.width > imageInfo.size.height ? cursorWidth_ : cursorHeight_;
+    if (maxValue > MAX_CUSTOM_CURSOR_DIMENSION) {
+        axis = (float)MAX_CUSTOM_CURSOR_DIMENSION / (float)std::max(imageInfo.size.width, imageInfo.size.height);
+    } else {
+        axis = (float)std::max(cursorWidth_, cursorHeight_) /
+            (float)std::max(imageInfo.size.width, imageInfo.size.height);
     }
     ScalePixelMap(pixelMapPtr.get(), axis, axis);
     cursorWidth_ = static_cast<int32_t>((float)imageInfo.size.width * axis);
@@ -4203,31 +4245,16 @@ std::shared_ptr<OHOS::Media::PixelMap> PointerDrawingManager::GetUserIconCopy(bo
         "userIconHotSpotX_:%{private}d, userIconHotSpotY_:%{private}d",
         cursorWidth_, cursorHeight_, imageInfo.size.width, imageInfo.size.height,
         focusX_, focusY_, axis, userIconHotSpotX_, userIconHotSpotY_);
-    if (setSurfaceNode) {
-        SetSurfaceNodeBounds();
-    }
-    return pixelMapPtr;
 }
 
-void PointerDrawingManager::SetSurfaceNodeBounds()
+void PointerDrawingManager::ExpandCanvasForCustomCursor()
 {
-    if (GetHardCursorEnabled()) {
-        return;
-    }
     if (canvasWidth_ < cursorWidth_) {
         canvasWidth_ = (cursorWidth_ / POINTER_WINDOW_INIT_SIZE + 1) * POINTER_WINDOW_INIT_SIZE;
     }
     if (canvasHeight_ < cursorHeight_) {
         canvasHeight_ = (cursorHeight_ / POINTER_WINDOW_INIT_SIZE + 1) * POINTER_WINDOW_INIT_SIZE;
     }
-    auto surfaceNodePtr = GetSurfaceNode();
-    CHKPV(surfaceNodePtr);
-    int32_t x = lastPhysicalX_;
-    int32_t y = lastPhysicalY_;
-    Direction direction = static_cast<Direction>((
-        ((displayInfo_.direction - displayInfo_.displayDirection) * ANGLE_90 + ANGLE_360) % ANGLE_360) / ANGLE_90);
-    AdjustMouseFocusToSoftRenderOrigin(direction, MOUSE_ICON(lastMouseStyle_.id), x, y);
-    surfaceNodePtr->SetBounds(x, y, canvasWidth_, canvasHeight_);
 }
 
 int32_t PointerDrawingManager::SetCustomCursor(int32_t pid, int32_t windowId, CustomCursor cursor,
@@ -4280,6 +4307,8 @@ int32_t PointerDrawingManager::UpdateCursorProperty(CustomCursor cursor)
     focusY_ = cursor.focusY;
     userIconHotSpotX_ = cursor.focusX;
     userIconHotSpotY_ = cursor.focusY;
+    CursorDrawingInformation::GetInstance().SetCustomCursorProperty(cursorWidth_, cursorHeight_,
+        focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     MMI_HILOGI("imageWidth:%{public}d, imageHeight:%{public}d, focusX:%{private}d, focusY:%{private}d",
         imageInfo.size.width, imageInfo.size.height, cursor.focusX, cursor.focusY);
     return RET_OK;
