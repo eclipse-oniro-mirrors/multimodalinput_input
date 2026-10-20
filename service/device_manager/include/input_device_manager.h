@@ -173,6 +173,8 @@ public:
     std::vector<libinput_device*> GetTouchPadDeviceOrigins();
     int32_t SetInputDeviceEnabled(int32_t deviceId, bool enable, int32_t index, int32_t pid, SessionPtr session);
     int32_t DisableInputEventDispatch(bool disabled, int32_t pid);
+    // Publish current policy state during initialization or on the service thread.
+    void PublishEduInputDisabledState() const;
     static std::shared_ptr<InputDeviceManager> GetInstance();
     bool IsEduInputDisabled() const;
     bool IsInputDeviceEnable(int32_t deviceId) const;
