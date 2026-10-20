@@ -45,7 +45,9 @@
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
 #include "display_event_monitor.h"
 #endif // OHOS_BUILD_ENABLE_KEYBOARD
+#ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 #include "input_event_hook_manager.h"
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 #include "event_dump.h"
 #include "event_statistic.h"
 #include "event_log_helper.h"
@@ -5593,6 +5595,10 @@ ErrCode MMIService::GetExternalObject(const std::string &pluginName, sptr<IRemot
 ErrCode MMIService::AddInputEventHook(HookEventType hookEventType)
 {
     CALL_INFO_TRACE;
+#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    MMI_HILOGE("AddInputEventHook is disabled - feature not enabled");
+    return ERROR_UNSUPPORT;
+#else
     if (hookEventType & HOOK_EVENT_TYPE_KEY) {
         if (!PER_HELPER->CheckKeyEventHook()) {
             MMI_HILOGE("CheckKeyEventHook failed");
@@ -5614,11 +5620,16 @@ ErrCode MMIService::AddInputEventHook(HookEventType hookEventType)
     }
     MMI_HILOGI("AddInputEventHook success hookEventType:%{public}u", hookEventType);
     return RET_OK;
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
 ErrCode MMIService::RemoveInputEventHook(HookEventType hookEventType)
 {
     CALL_INFO_TRACE;
+#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    MMI_HILOGE("RemoveInputEventHook is disabled - feature not enabled");
+    return ERROR_UNSUPPORT;
+#else
     int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), this, hookEventType] () -> int32_t {
         auto hookMgr = InputHandler->GetInputEventHook();
         CHKPR(hookMgr, RET_ERR);
@@ -5634,10 +5645,15 @@ ErrCode MMIService::RemoveInputEventHook(HookEventType hookEventType)
     }
     MMI_HILOGI("RemoveInputEventHook success hookEventType:%{public}u", hookEventType);
     return RET_OK;
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
 ErrCode MMIService::DispatchToNextHandler(const KeyEvent &keyEvent)
 {
+#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    MMI_HILOGE("DispatchToNextHandler(KeyEvent) is disabled - feature not enabled");
+    return ERROR_UNSUPPORT;
+#else
     auto keyEventPtr = std::make_shared<KeyEvent>(keyEvent);
     CHKPR(keyEventPtr, ERROR_NULL_POINTER);
     int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), keyEventPtr] () -> int32_t {
@@ -5654,10 +5670,15 @@ ErrCode MMIService::DispatchToNextHandler(const KeyEvent &keyEvent)
         return ret;
     }
     return RET_OK;
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
 ErrCode MMIService::DispatchToNextHandler(const PointerEvent &pointerEvent)
 {
+#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    MMI_HILOGE("DispatchToNextHandler(PointerEvent) is disabled - feature not enabled");
+    return ERROR_UNSUPPORT;
+#else
     auto pointerEventPtr = std::make_shared<PointerEvent>(pointerEvent);
     CHKPR(pointerEventPtr, ERROR_NULL_POINTER);
     int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), pointerEventPtr] () -> int32_t {
@@ -5684,6 +5705,7 @@ ErrCode MMIService::DispatchToNextHandler(const PointerEvent &pointerEvent)
         return ret;
     }
     return RET_OK;
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
 ErrCode MMIService::SetKeyStatusRecord(bool enable, int32_t timeout)
