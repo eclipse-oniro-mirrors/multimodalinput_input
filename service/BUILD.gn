@@ -2451,6 +2451,7 @@ ohos_unittest("ModuleLoaderTest") {
   external_deps = [
     "ability_base:configuration",
     "ability_runtime:app_manager",
+    "access_token:libaccesstoken_sdk",
     "cJSON:cjson",
     "c_utils:utils",
     "data_share:datashare_consumer",
@@ -5383,3 +5384,67 @@ group("EventJoystickTest") {
   testonly = true
   deps = [ "${mmi_path}/service/joystick/test:JoystickLayoutMapTest" ]
 }
+
+ohos_unittest("SetCustomCursorInnerTest") {
+  module_out_path = module_output_path
+
+  include_dirs = [
+    "${mmi_path}/common/event_integrity/include",
+    "${mmi_path}/service/module_loader/include",
+    "${mmi_path}/util/common/include",
+    "${mmi_service_path}/product_property_config/include",
+    "${mmi_service_path}/custom_config_parser/include",
+  ]
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+    "${mmi_path}/service/filter:mmi_event_filter_config",
+    "${mmi_path}/service/connect_manager:mmi_connect_manager_config",
+    "${mmi_path}/common/anco/comm:mmi_anco_channel_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  sources = [
+    "module_loader/test/src/set_custom_cursor_inner_test.cpp",
+  ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+    "${mmi_path}/test/facility/mock:mmi_mock_sources",
+  ]
+
+  external_deps = [
+    "ability_base:configuration",
+    "ability_runtime:app_manager",
+    "access_token:libaccesstoken_sdk",
+    "cJSON:cjson",
+    "c_utils:utils",
+    "data_share:datashare_consumer",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "hisysevent:libhisysevent",
+    "image_framework:image_native",
+    "init:libbegetutil",
+    "ipc:ipc_core",
+    "libinput:libinput-third-mmi",
+    "preferences:native_preferences",
+    "safwk:system_ability_fwk",
+    "samgr:samgr_proxy",
+    "security_component_manager:libsecurity_component_sdk",
+    "window_manager:libwm",
+  ]
+}
+
+
