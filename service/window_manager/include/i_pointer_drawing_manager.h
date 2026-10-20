@@ -108,14 +108,6 @@ public:
     virtual void Dump(int32_t fd, const std::vector<std::string> &args) {}
     virtual void InitPointerCallback() {}
     virtual void InitScreenInfo() {}
-    virtual int32_t EnableHardwareCursorStats(int32_t pid, bool enable)
-    {
-        return 0;
-    }
-    virtual int32_t GetHardwareCursorStats(int32_t pid, uint32_t &frameCount, uint32_t &vsyncCount)
-    {
-        return 0;
-    }
     virtual OLD::DisplayInfo GetCurrentDisplayInfo()
     {
         return {};

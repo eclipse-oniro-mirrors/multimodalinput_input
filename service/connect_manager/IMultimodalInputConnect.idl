@@ -119,8 +119,6 @@ interface OHOS.MMI.IMultimodalInputConnect {
     void GetTouchpadThreeFingersTapSwitch([out] boolean switchFlag);
     void AddVirtualInputDevice([in] InputDevice device, [out] int deviceId);
     void RemoveVirtualInputDevice([in] int deviceId);
-    void EnableHardwareCursorStats([in] boolean enable);
-    void GetHardwareCursorStats([out] unsigned int frameCount, [out] unsigned int vsyncCount);
     void GetAllMmiSubscribedEvents([out] MmiEventMap mmiEventMap);
     void SetDisplayBind([in] int deviceId, [in] int displayId, [out] String msg);
     void BindToDisplay([in] int deviceId, [in] int displayId);

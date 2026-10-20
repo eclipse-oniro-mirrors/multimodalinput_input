@@ -53,12 +53,6 @@ void RemoveVirtualInputDeviceFuzz(FuzzedDataProvider &fdp)
     MULTIMODAL_INPUT_CONNECT_MGR->RemoveVirtualInputDevice(deviceId);
 }
 
-void EnableHardwareCursorStatsFuzz(FuzzedDataProvider &fdp)
-{
-    bool enable = fdp.ConsumeBool();
-    MULTIMODAL_INPUT_CONNECT_MGR->EnableHardwareCursorStats(enable);
-}
-
 void ConnectProxy6FuzzTest(const uint8_t *data, size_t size)
 {
     FuzzedDataProvider fdp(data, size);
@@ -66,7 +60,6 @@ void ConnectProxy6FuzzTest(const uint8_t *data, size_t size)
     GetTouchpadThreeFingersTapSwitchFuzz(fdp);
     AddVirtualInputDeviceFuzz(fdp);
     RemoveVirtualInputDeviceFuzz(fdp);
-    EnableHardwareCursorStatsFuzz(fdp);
 }
 } // MMI
 } // OHOS

@@ -3845,52 +3845,6 @@ HWTEST_F(MMIServerTest, MMIService_RemoveVirtualInputDevice_003, TestSize.Level1
 }
 
 /**
- * @tc.name: MMIService_EnableHardwareCursorStats_001
- * @tc.desc: Normal enable case, expect RET_OK or ETASKS_POST_SYNCTASK_FAIL
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MMIServerTest, MMIService_EnableHardwareCursorStats_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    MMIService mmiService;
-    bool enable = true;
-    ErrCode ret = mmiService.EnableHardwareCursorStats(enable);
-    EXPECT_NE(ret, RET_OK);
-}
-
-/**
- * @tc.name: MMIService_EnableHardwareCursorStats_002
- * @tc.desc: Disable hardware cursor stats, expect RET_OK or ETASKS_POST_SYNCTASK_FAIL
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MMIServerTest, MMIService_EnableHardwareCursorStats_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    MMIService mmiService;
-    bool enable = false;
-    ErrCode ret = mmiService.EnableHardwareCursorStats(enable);
-    EXPECT_NE(ret, RET_OK);
-}
-
-/**
- * @tc.name: MMIService_GetHardwareCursorStats_001
- * @tc.desc: Normal case, expect RET_OK or ETASKS_POST_SYNCTASK_FAIL
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(MMIServerTest, MMIService_GetHardwareCursorStats_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    MMIService mmiService;
-    uint32_t frameCount = 0;
-    uint32_t vsyncCount = 0;
-    ErrCode ret = mmiService.GetHardwareCursorStats(frameCount, vsyncCount);
-    EXPECT_NE(ret, RET_OK);
-}
-
-/**
  * @tc.name: MMIService_SetTouchpadScrollRows_001
  * @tc.desc: Service not running, expect MMISERVICE_NOT_RUNNING
  * @tc.type: FUNC

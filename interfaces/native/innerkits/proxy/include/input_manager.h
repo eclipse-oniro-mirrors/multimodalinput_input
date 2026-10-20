@@ -942,24 +942,6 @@ public:
      */
     int32_t GetTouchpadRightClickType(int32_t &type);
 
-     /**
-     * @brief Turn on or off hard cursor statistics.
-     * @param frameCount Counting the frame rate of continuous mouse movement.
-     * @param frameCount Statistics of mouse continuous movement synchronization frame rate.
-     * @return if success; returns a non-0 value otherwise.
-     * @since 12
-     */
-    int32_t EnableHardwareCursorStats(bool enable);
-
-    /**
-     * @brief Get the mouse hard cursor information.
-     * @param frameCount Counting the frame rate of continuous mouse movement.
-     * @param frameCount Statistics of mouse continuous movement synchronization frame rate.
-     * @return if success; returns a non-0 value otherwise.
-     * @since 12
-     */
-    int32_t GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount);
-
     /**
      * @brief Get the pointer snapshot.
      * @param pixelMapPtr Indicates the image resource for this mouse icon. which realtype must be

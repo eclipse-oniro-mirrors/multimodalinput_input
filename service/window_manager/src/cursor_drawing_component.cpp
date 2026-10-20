@@ -481,18 +481,6 @@ void CursorDrawingComponent::InitScreenInfo()
     pointerInstance_->InitScreenInfo();
 }
 
-int32_t CursorDrawingComponent::EnableHardwareCursorStats(int32_t pid, bool enable)
-{
-    CHK_IS_LOADR(isLoaded_, pointerInstance_)
-    return pointerInstance_->EnableHardwareCursorStats(pid, enable);
-}
-
-int32_t CursorDrawingComponent::GetHardwareCursorStats(int32_t pid, uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    CHK_IS_LOADR(isLoaded_, pointerInstance_)
-    return pointerInstance_->GetHardwareCursorStats(pid, frameCount, vsyncCount);
-}
-
 OLD::DisplayInfo CursorDrawingComponent::GetCurrentDisplayInfo()
 {
     if (!isLoaded_ || (pointerInstance_ == nullptr)) {

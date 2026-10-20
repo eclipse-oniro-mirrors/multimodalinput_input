@@ -3205,32 +3205,6 @@ void PointerDrawingManager::DrawPointerStyle(const PointerStyle& pointerStyle)
     }
 }
 
-int32_t PointerDrawingManager::EnableHardwareCursorStats(int32_t pid, bool enable)
-{
-    CALL_DEBUG_ENTER;
-    if (GetHardCursorEnabled()) {
-        if ((hardwareCursorPointerManager_->EnableStats(enable)) != RET_OK) {
-            MMI_HILOGE("Enable stats failed");
-            return RET_ERR;
-        }
-    }
-    MMI_HILOGI("EnableHardwareCursorStats, enable:%{private}d", enable);
-    return RET_OK;
-}
-
-int32_t PointerDrawingManager::GetHardwareCursorStats(int32_t pid, uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    CALL_DEBUG_ENTER;
-    if (GetHardCursorEnabled()) {
-        if ((hardwareCursorPointerManager_->GetCursorStats(frameCount, vsyncCount)) != RET_OK) {
-            MMI_HILOGE("Query stats failed");
-            return RET_ERR;
-        }
-    }
-    MMI_HILOGI("GetHardwareCursorStats, frameCount:%{private}d, vsyncCount:%{private}d", frameCount, vsyncCount);
-    return RET_OK;
-}
-
 void PointerDrawingManager::SubscribeScreenModeChange(uint64_t tid)
 {
     workerThreadId_.store(tid);

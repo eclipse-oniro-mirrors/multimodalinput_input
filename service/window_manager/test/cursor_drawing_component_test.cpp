@@ -407,35 +407,6 @@ HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_InitScreenInfo_0
 }
 
 /**
- * @tc.name: CursorDrawingComponentTest_EnableHardwareCursorStats_001
- * @tc.desc: Test DrawPointer
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_EnableHardwareCursorStats_001, TestSize.Level1)
-{
-    int32_t pid = 1;
-    bool enable = true;
-    int32_t ret = instance_->EnableHardwareCursorStats(pid, enable);
-    EXPECT_EQ(ret, RET_OK);
-}
-
-/**
- * @tc.name: CursorDrawingComponentTest_GetHardwareCursorStats_001
- * @tc.desc: Test GetHardwareCursorStats
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_GetHardwareCursorStats_001, TestSize.Level1)
-{
-    int32_t pid = 1;
-    uint32_t frameCount = 1;
-    uint32_t vsyncCount = 1;
-    int32_t ret = instance_->GetHardwareCursorStats(pid, frameCount, vsyncCount);
-    EXPECT_EQ(ret, RET_OK);
-}
-
-/**
  * @tc.name: CursorDrawingComponentTest_ForceClearPointerVisibleStatus_001
  * @tc.desc: Test ForceClearPointerVisibleStatus
  * @tc.type: FUNC
@@ -1522,49 +1493,6 @@ HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_GetCursorSurface
     uint64_t surfaceId = 0;
     int32_t ret = instance_->GetCursorSurfaceId(surfaceId);
     EXPECT_TRUE(ret == RET_OK || ret == RET_ERR);
-}
-
-/**
- * @tc.name: CursorDrawingComponentTest_EnableHardwareCursorStats_002
- * @tc.desc: Test EnableHardwareCursorStats with disable
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_EnableHardwareCursorStats_002, TestSize.Level1)
-{
-    int32_t pid = 1;
-    bool enable = false;
-    int32_t ret = instance_->EnableHardwareCursorStats(pid, enable);
-    EXPECT_EQ(ret, RET_OK);
-}
-
-/**
- * @tc.name: CursorDrawingComponentTest_EnableHardwareCursorStats_003
- * @tc.desc: Test EnableHardwareCursorStats with invalid pid
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_EnableHardwareCursorStats_003, TestSize.Level1)
-{
-    int32_t pid = -1;
-    bool enable = true;
-    int32_t ret = instance_->EnableHardwareCursorStats(pid, enable);
-    EXPECT_TRUE(ret == RET_OK || ret == RET_ERR);
-}
-
-/**
- * @tc.name: CursorDrawingComponentTest_GetHardwareCursorStats_002
- * @tc.desc: Test GetHardwareCursorStats with zero counts
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(CursorDrawingComponentTest, CursorDrawingComponentTest_GetHardwareCursorStats_002, TestSize.Level1)
-{
-    int32_t pid = 1;
-    uint32_t frameCount = 0;
-    uint32_t vsyncCount = 0;
-    int32_t ret = instance_->GetHardwareCursorStats(pid, frameCount, vsyncCount);
-    EXPECT_EQ(ret, RET_OK);
 }
 
 /**

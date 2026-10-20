@@ -5084,53 +5084,7 @@ ErrCode MMIService::RemoveVirtualInputDevice(int32_t deviceId)
     return ret;
 }
 
-ErrCode MMIService::EnableHardwareCursorStats(bool enable)
-{
-    CALL_DEBUG_ENTER;
-    if (!PER_HELPER->VerifySystemApp()) {
-        MMI_HILOGE("Verify system APP failed");
-        return ERROR_NOT_SYSAPI;
-    }
-#if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
-    int32_t pid = GetCallingPid();
-    CursorDrawingComponent::GetInstance();
-    int32_t ret = delegateTasks_.PostSyncTask(
-        [pid, enable] {
-            return CursorDrawingComponent::GetInstance().EnableHardwareCursorStats(pid, enable);
-        }
-        );
-    if (ret != RET_OK) {
-        MMI_HILOGE("Enable hardware cursor stats failed, ret:%{public}d", ret);
-        return ret;
-    }
-#endif // OHOS_BUILD_ENABLE_POINTER && OHOS_BUILD_ENABLE_POINTER_DRAWING
-    return RET_OK;
-}
 
-ErrCode MMIService::GetHardwareCursorStats(uint32_t &frameCount, uint32_t &vsyncCount)
-{
-    CALL_DEBUG_ENTER;
-    if (!PER_HELPER->VerifySystemApp()) {
-        MMI_HILOGE("Verify system APP failed");
-        return ERROR_NOT_SYSAPI;
-    }
-    frameCount = 0;
-    vsyncCount = 0;
-#if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
-    int32_t pid = GetCallingPid();
-    CursorDrawingComponent::GetInstance();
-    int32_t ret = delegateTasks_.PostSyncTask(
-        [pid, &frameCount, &vsyncCount] {
-            return CursorDrawingComponent::GetInstance().GetHardwareCursorStats(pid, frameCount, vsyncCount);
-        }
-        );
-    if (ret != RET_OK) {
-        MMI_HILOGE("Get hardware cursor stats failed, ret:%{public}d", ret);
-        return ret;
-    }
-#endif // OHOS_BUILD_ENABLE_POINTER && OHOS_BUILD_ENABLE_POINTER_DRAWING
-    return RET_OK;
-}
 
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
 ErrCode MMIService::GetPointerSnapshot(CursorPixelMap& pixelMapPtr)

@@ -32,8 +32,6 @@ public:
     void SetHdiServiceState(bool hdiServiceState);
     bool IsSupported();
     int32_t SetPosition(uint32_t devId, int32_t x, int32_t y, BufferHandle* buffer);
-    int32_t EnableStats(bool enable);
-    int32_t GetCursorStats(uint32_t &frameCount, uint32_t &vsyncCount);
 private:
     sptr<OHOS::HDI::Display::Composer::V1_2::IDisplayComposerInterface> GetPowerInterface();
     bool isEnableState_ { false };
