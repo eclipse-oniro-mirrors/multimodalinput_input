@@ -1900,7 +1900,6 @@ int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid
 
     if (eduInputDisabled_ == disabled) {
         MMI_HILOGI("EduInput already in state: %{public}d", disabled);
-        PublishEduInputDisabledState();
         return RET_OK;
     }
 
@@ -1914,6 +1913,7 @@ int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid
         InitSessionLostCallback();
         eduInputDisabled_ = true;
         eduInputDisabledPid_ = pid;
+        PublishEduInputDisabledState();
 
         for (auto& [deviceId, deviceInfo] : inputDevice_) {
             if (deviceInfo.enable) {
@@ -1921,13 +1921,13 @@ int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid
                 NotifyDeviceDisabled(deviceId);
             }
         }
-        PublishEduInputDisabledState();
         return RET_OK;
     }
 
     MMI_HILOGI("Enable overall input by session[%{private}d]", pid);
     eduInputDisabled_ = false;
     eduInputDisabledPid_ = -1;
+    PublishEduInputDisabledState();
 
     for (auto& [deviceId, deviceInfo] : inputDevice_) {
         DEVICE_STATE_MGR->EnableDevice(deviceId,
@@ -1936,7 +1936,6 @@ int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid
                 return RET_OK;
             });
     }
-    PublishEduInputDisabledState();
     return RET_OK;
 }
 
@@ -1952,6 +1951,7 @@ void InputDeviceManager::RecoverInputEnabled(SessionPtr session)
     MMI_HILOGI("Recover input enabled for session[%{private}d]", session->GetPid());
     eduInputDisabled_ = false;
     eduInputDisabledPid_ = -1;
+    PublishEduInputDisabledState();
 
     for (auto& [deviceId, deviceInfo] : inputDevice_) {
         DEVICE_STATE_MGR->EnableDevice(deviceId,
@@ -1960,7 +1960,6 @@ void InputDeviceManager::RecoverInputEnabled(SessionPtr session)
                 return RET_OK;
             });
     }
-    PublishEduInputDisabledState();
 }
 
 void InputDeviceManager::RecoverInputDeviceEnabled(SessionPtr session)
