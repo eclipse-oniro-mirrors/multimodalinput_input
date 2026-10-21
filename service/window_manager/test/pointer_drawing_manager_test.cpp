@@ -5919,7 +5919,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -5928,8 +5928,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 51);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 51);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 51);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 51);
 }
 
 /**
@@ -5946,7 +5946,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 7)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -5955,8 +5955,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 111);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 111);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 111);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 111);
 }
 
 /**
@@ -5973,7 +5973,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -5982,8 +5982,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 25);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 25);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_007
@@ -5999,7 +5999,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6008,8 +6008,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 25);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 25);
 }
 
 /**
@@ -6026,7 +6026,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6035,8 +6035,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 17);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 17);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
 
 /**
@@ -6053,7 +6053,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6062,8 +6062,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
 }
 
 /**
@@ -6080,7 +6080,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6089,8 +6089,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 116);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 116);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 116);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 116);
 }
 
 /**
@@ -6107,7 +6107,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6116,8 +6116,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 32);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 32);
 }
 
 /**
@@ -6134,12 +6134,12 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1);
+    pointerDrawingManager.SetPointerSize(100, 1);
     pointerDrawingManager.clear();
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
 
 /**
@@ -6156,7 +6156,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6165,8 +6165,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
 
 /**
@@ -6183,7 +6183,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6192,8 +6192,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 256);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 27);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 256);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 27);
 }
 
 /**
@@ -6210,7 +6210,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6219,8 +6219,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
 
 /**
@@ -6237,7 +6237,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6246,8 +6246,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 27);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 27);
 }
 
 /**
@@ -6264,7 +6264,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6273,8 +6273,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 217);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 26);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 217);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 26);
 }
 
 /**
@@ -6291,7 +6291,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6300,8 +6300,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 40);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 40);
 }
 
 /**
@@ -6318,7 +6318,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
@@ -6327,8 +6327,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
 }
 
 /**
@@ -6345,7 +6345,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.setPointerSize(100, 1);
+    pointerDrawingManager.SetPointerSize(100, 1);
     pointerDrawingManager.focusX_ = 30;
     pointerDrawingManager.focusY_ = 40;
     OLD::DisplayInfo di;
@@ -6356,10 +6356,70 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     pointerDrawingManager.screenPointers_[0] = sp;
 
     pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
-    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
-    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 15);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 21);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_021
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_021, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.SetPointerSize(100, 1);
+    pointerDrawingManager.focusX_ = 30;
+    pointerDrawingManager.focusY_ = 40;
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(3.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_EQ(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 30);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 40);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_022
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_022, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.SetPointerSize(100, 1);
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_EQ(pixelMap->GetWidth(), pointerDrawingManager.cursorWidth_);
+    EXPECT_EQ(pixelMap->GetHeight(), pointerDrawingManager.cursorHeight_);
+    EXPECT_EQ(pixelMap->GetWidth(), 34);
+    EXPECT_EQ(pixelMap->GetHeight(), 34);
 }
 
 /**
