@@ -3745,13 +3745,16 @@ void PointerDrawingManager::CreateRenderConfig(RenderConfig& cfg, std::shared_pt
         MMI_HILOGD("Set mouseIcon by userIcon_");
         cfg.userIconPixelMap = GetUserIconCopy();
         CHKPV(cfg.userIconPixelMap);
+        // 窗口级缩放系数 W 可大于、等于或小于 1.0（规格约束 W > 0）。
+        // effectiveScale = S × W；渲染尺寸超 MAX_CUSTOM_CURSOR_DIMENSION 上限时截断尺寸，
+        // 窗口系数 W 不被改写（与 spec.md AC-1.3 / design.md ADR-4 一致）。
         float effectiveScale = scale * windowScaleFactor_;
-        if (effectiveScale > scale) {
+        {
             Media::ImageInfo imageInfo;
             cfg.userIconPixelMap->GetImageInfo(imageInfo);
             float maxDimension = static_cast<float>(std::max(imageInfo.size.width, imageInfo.size.height));
-            if (maxDimension > 0.0f) {
-                effectiveScale = std::min(effectiveScale, MAX_CUSTOM_CURSOR_DIMENSION / maxDimension);
+            if (maxDimension > 0.0f && maxDimension * effectiveScale > MAX_CUSTOM_CURSOR_DIMENSION) {
+                effectiveScale = MAX_CUSTOM_CURSOR_DIMENSION / maxDimension;
             }
         }
         cfg.userIconHotSpotX = userIconHotSpotX_ * effectiveScale;

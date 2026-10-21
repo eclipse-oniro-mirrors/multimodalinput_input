@@ -6036,5 +6036,101 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig
     EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
     CursorDrawingInformation::GetInstance().userIcon_ = nullptr;
 }
+/**
+ * @tc.name: PointerDrawingManagerTest_OnWindowInfo_WindowScaleFactor_002
+ * @tc.desc: Test OnWindowInfo records window scale factor less than 1.0 (sub-screen low DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_OnWindowInfo_WindowScaleFactor_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+
+    // W < 1.0：副屏低 DPI 场景（规格约束 W > 0，W 可小于 1.0）
+    WinInfo info = { .windowPid = 100, .windowId = 200, .windowScaleFactor = 0.5f };
+    pointerDrawingManager.OnWindowInfo(info);
+    EXPECT_EQ(pointerDrawingManager.pid_, 100);
+    EXPECT_EQ(pointerDrawingManager.windowId_, 200);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 0.5f);
+
+    // 切回默认窗口（W=1.0）应刷新记录
+    WinInfo defaultInfo = { .windowPid = 100, .windowId = 200, .windowScaleFactor = 1.0f };
+    pointerDrawingManager.OnWindowInfo(defaultInfo);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_004
+ * @tc.desc: Test CreateRenderConfig scales custom cursor down when W < 1.0
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_004,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    CursorDrawingInformation::GetInstance().userIcon_ = PointerDrawingManagerTest::CreatePixelMap(100, 100);
+    ASSERT_NE(CursorDrawingInformation::GetInstance().userIcon_, nullptr);
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.focusX_ = 10;
+    pointerDrawingManager.focusY_ = 20;
+    // W < 1.0：副屏低 DPI，渲染尺寸缩小，W 不被改写
+    WinInfo info = { .windowPid = 1, .windowId = 2, .windowScaleFactor = 0.5f };
+    pointerDrawingManager.OnWindowInfo(info);
+    ASSERT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 0.5f);
+
+    RenderConfig cfg;
+    OLD::DisplayInfo displayInfo;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(nullptr, nullptr, displayInfo);
+    pointerDrawingManager.CreateRenderConfig(cfg, screenpointer, MOUSE_ICON::DEVELOPER_DEFINED_ICON,
+        false, 0, 0, 0);
+    ASSERT_NE(cfg.userIconPixelMap, nullptr);
+    // 焦点按 effectiveScale = scale × 0.5 缩小（scale=1.0，故 0.5）
+    EXPECT_EQ(cfg.userIconHotSpotX, 5);
+    EXPECT_EQ(cfg.userIconHotSpotY, 10);
+    Media::ImageInfo imageInfo;
+    cfg.userIconPixelMap->GetImageInfo(imageInfo);
+    EXPECT_EQ(imageInfo.size.width, 50);
+    EXPECT_EQ(imageInfo.size.height, 50);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 0.5f);
+    CursorDrawingInformation::GetInstance().userIcon_ = nullptr;
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_005
+ * @tc.desc: Test CreateRenderConfig clamps overscaled size regardless of W magnitude, W unchanged
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig_WindowScaleFactor_005,
+    TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // 构造基础尺寸已接近上限，叠加 W=2.0 后必然超 MAX_CUSTOM_CURSOR_DIMENSION(256)
+    CursorDrawingInformation::GetInstance().userIcon_ = PointerDrawingManagerTest::CreatePixelMap(200, 200);
+    ASSERT_NE(CursorDrawingInformation::GetInstance().userIcon_, nullptr);
+    PointerDrawingManager pointerDrawingManager;
+    pointerDrawingManager.focusX_ = 100;
+    pointerDrawingManager.focusY_ = 100;
+    WinInfo info = { .windowPid = 1, .windowId = 2, .windowScaleFactor = 2.0f };
+    pointerDrawingManager.OnWindowInfo(info);
+    ASSERT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 2.0f);
+
+    RenderConfig cfg;
+    OLD::DisplayInfo displayInfo;
+    std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(nullptr, nullptr, displayInfo);
+    pointerDrawingManager.CreateRenderConfig(cfg, screenpointer, MOUSE_ICON::DEVELOPER_DEFINED_ICON,
+        false, 0, 0, 0);
+    ASSERT_NE(cfg.userIconPixelMap, nullptr);
+    Media::ImageInfo imageInfo;
+    cfg.userIconPixelMap->GetImageInfo(imageInfo);
+    // 200×2=400 超过 256，截断到上限 256；不再依赖 W>1 判断分支
+    EXPECT_EQ(imageInfo.size.width, 256);
+    EXPECT_EQ(imageInfo.size.height, 256);
+    EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 2.0f);
+    CursorDrawingInformation::GetInstance().userIcon_ = nullptr;
+}
 } // namespace MMI
 } // namespace OHOS
