@@ -4230,13 +4230,13 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
     cursorHeight_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.height;
     auto sp = GetScreenPointer(displayId_);
     float densityRatio = (sp != nullptr) ? sp->GetDPI() : 1.0f;
-    if (densityRatio < 0) {
+    if (densityRatio <= 0) {
         densityRatio = 1.0f;
     }
-    RenderConfig tempCfg;
-    tempCfg.dpi = densityRatio;
-    tempCfg.size = static_cast<uint32_t>(cursorSize);
-    int32_t systemCursorWidth = tempCfg.GetImageSize();
+    RenderConfig tmpCfg;
+    tmpCfg.dpi = densityRatio;
+    tmpCfg.size = static_cast<uint32_t>(cursorSize);
+    int32_t systemCursorWidth = tmpCfg.GetImageSize();
     int32_t systemCursorHeight = systemCursorWidth;
     if(systemCursorHeight < cursorHeight_) {
         cursorHeight_ = systemCursorHeight;
@@ -4249,7 +4249,7 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
         axis = (float)std::max(cursorWidth_, cursorHeight_) /
             (float)std::max(imageInfo.size.width, imageInfo.size.height);
     }
-    if(systemCursorWidth == cursorWidth_) {
+    if (systemCursorWidth == cursorWidth_) {
         axis = axis * 0.85f;
     }
     ScalePixelMap(pixelMapPtr.get(), axis, axis);
