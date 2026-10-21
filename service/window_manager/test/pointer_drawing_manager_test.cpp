@@ -5879,6 +5879,490 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_GetUserIconCopy_00
 }
 
 /**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_003
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_004
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.5f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 51);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 51);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_005
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_005, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 7)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 111);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 111);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_006
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_006, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(48, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 25);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+}
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_007
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_007, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, 48);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 25);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_008
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_008, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(32, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 17);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_009
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_009, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(3.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_010
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_010, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(2.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 116);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 116);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_011
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_011, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, 32);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 32);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_012
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_012, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1);
+    pointerDrawingManager.clear();
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_013
+ * @tc.desc: Test ScaleUserIconBySystem with negative DPI
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_013, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(-1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_014
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_014, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(300, 32);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 256);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 27);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_015
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_015, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MIDDLE_PIXEL_MAP_WIDTH, MIDDLE_PIXEL_MAP_HEIGHT);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_016
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_016, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(40, 32);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 27);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_017
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_017, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(260, 32);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(6.5f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 217);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 26);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_018
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_018, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, 40);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 40);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_019
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_019, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1)
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.93f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, MOUSE_ICON_SIZE);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
+}
+
+/**
+ * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_020
+ * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySystem_020, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerDrawingManager pointerDrawingManager;
+    auto pixelMap = PointerDrawingManagerTest::CreatePixelMap(MOUSE_ICON_SIZE, MOUSE_ICON_SIZE);
+    ASSERT_NE(pixelMap, nullptr);
+    pointerDrawingManager.followSystem_ = true;
+    pointerDrawingManager.displayId_ = 0;
+    pointerDrawingManager.setPointerSize(100, 1);
+    pointerDrawingManager.focusX_ = 30;
+    pointerDrawingManager.focusY_ = 40;
+    OLD::DisplayInfo di;
+    di.rsId = 0;
+    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
+    ASSERT_NE(sp, nullptr);
+    sp->SetDPI(1.0f);
+    pointerDrawingManager.screenPointers_[0] = sp;
+
+    pointerDrawingManager.ScaleUserIconBySystem(pixelMap);
+    EXPECT_GT(pointerDrawingManager.cursorWidth_, 34);   
+    EXPECT_GT(pointerDrawingManager.cursorHeight_, 34);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 15);
+    EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 21);
+}
+
+/**
  * @tc.name: PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_001
  * @tc.desc: Test UpdateMouseLayer with DEVELOPER_DEFINED_ICON triggers canvas expansion path
  * @tc.type: FUNC
