@@ -4238,7 +4238,7 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
     tmpCfg.size = static_cast<uint32_t>(cursorSize);
     int32_t systemCursorWidth = tmpCfg.GetImageSize();
     int32_t systemCursorHeight = systemCursorWidth;
-    if(systemCursorHeight < cursorHeight_) {
+    if (systemCursorHeight < cursorHeight_) {
         cursorHeight_ = systemCursorHeight;
         cursorWidth_ = systemCursorWidth;
     }
