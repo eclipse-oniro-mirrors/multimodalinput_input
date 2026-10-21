@@ -495,8 +495,8 @@ ohos_unittest("TabletToolTransformTest") {
     "window_manager:libdm_lite",
     "window_manager:libwm",
     "window_manager:libwsutils",
-    "openhitls:openhitls_bsl",
-    "openhitls:openhitls_crypto"
+    "openssl:libcrypto_shared",
+    "openssl:libssl_shared"
   ]
 
   if (hitrace_enabled) {
