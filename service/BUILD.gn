@@ -627,8 +627,8 @@ ohos_shared_library("libmmi-server") {
       "init:libbegetutil",
       "ipc:ipc_single",
       "safwk:system_ability_fwk",
-      "openhitls:openhitls_bsl",
-      "openhitls:openhitls_crypto",
+      "openssl:libcrypto_shared",
+      "openssl:libssl_shared",
       "os_account:os_account_innerkits",
     ]
   }
@@ -3324,8 +3324,8 @@ ohos_unittest("EventDispatchTest") {
     "samgr:samgr_proxy",
     "window_manager:libwm",
     "window_manager:libwsutils",
-    "openhitls:openhitls_bsl",
-    "openhitls:openhitls_crypto"
+    "openssl:libcrypto_shared",
+    "openssl:libssl_shared"
   ]
   if (security_component_enable) {
     external_deps += [ "security_component_manager:libsecurity_component_sdk" ]
@@ -5109,8 +5109,8 @@ ohos_unittest("DragSecurityManagerTest") {
     "googletest:gmock_main",
     "hilog:libhilog",
     "ipc:ipc_core",
-    "openhitls:openhitls_bsl",
-    "openhitls:openhitls_crypto"
+    "openssl:libcrypto_shared",
+    "openssl:libssl_shared"
   ]
 }
 

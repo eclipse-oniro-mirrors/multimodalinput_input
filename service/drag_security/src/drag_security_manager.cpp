@@ -105,27 +105,14 @@ std::vector<uint8_t> DragSecurityManager::GenerateSignature(const std::vector<ui
         MMI_HILOGE("Failed to serialize event data");
         return {};
     }
-    CRYPT_EAL_MacCtx *ctx = CRYPT_EAL_MacNewCtx(CRYPT_MAC_HMAC_SHA384);
-    if (ctx == nullptr) {
-        MMI_HILOGE("CRYPT_EAL_MacNewCtx failed");
-        return {};
-    }
-    constexpr uint32_t HMAC_SHA384_DIGEST_LEN = 48;
-    uint8_t digest[HMAC_SHA384_DIGEST_LEN] = {0};
-    uint32_t len = sizeof(digest);
-    int32_t ret = CRYPT_EAL_MacInit(ctx, nonce.data(), static_cast<uint32_t>(nonce.size()));
-    if (ret == CRYPT_SUCCESS) {
-        ret = CRYPT_EAL_MacUpdate(ctx, reinterpret_cast<const uint8_t*>(dataStr.data()),
-            static_cast<uint32_t>(dataStr.size()));
-    }
-    if (ret == CRYPT_SUCCESS) {
-        ret = CRYPT_EAL_MacFinal(ctx, digest, &len);
-    }
-    CRYPT_EAL_MacFreeCtx(ctx);
-    if (ret != CRYPT_SUCCESS) {
-        MMI_HILOGE("HMAC-SHA384 calculation failed, ret:%{public}d", ret);
-        return {};
-    }
+    unsigned char digest[EVP_MAX_MD_SIZE] = {0};
+    unsigned int len = 0;
+    HMAC(EVP_sha384(),
+        nonce.data(),
+        static_cast<int>(nonce.size()),
+        reinterpret_cast<const unsigned char*>(dataStr.data()), dataStr.size(),
+        digest,
+        &len);
     return std::vector<uint8_t>(digest, digest + len);
 }
 
@@ -143,19 +130,20 @@ std::string DragSecurityManager::Base64Encode(const uint8_t* data, size_t len)
         MMI_HILOGE("data or len error");
         return "";
     }
-    // CHECK Base64encode formula for calculating length, BSL_BASE64_Encode uses uint32_t length
-    if (len > static_cast<size_t>((UINT32_MAX - 4) / 4 * 3)) {
+    // CHECK Base64encode formula for calculating length
+    if (len > (SIZE_MAX - 2) / 4 * 3) {
         MMI_HILOGE("Len too large");
         return "";
     }
-    // Base64encode formula for calculating length, openhitls needs one more byte than encoded length
-    uint32_t outLen = static_cast<uint32_t>(4 * ((len + 2) / 3)) + 1;
-    std::vector<char> outBuf(outLen);
-    if (BSL_BASE64_Encode(data, static_cast<uint32_t>(len), outBuf.data(), &outLen) != BSL_SUCCESS) {
-        MMI_HILOGE("BSL_BASE64_Encode failed");
+    // Base64encode formula for calculating length
+    size_t outLen = 4 * ((len + 2) / 3);
+    std::vector<unsigned char> outBuf(outLen + 1);
+    int encodedLen = EVP_EncodeBlock(outBuf.data(), data, static_cast<int>(len));
+    if (encodedLen <= 0) {
+        MMI_HILOGE("Base64Encode error");
         return "";
     }
-    return std::string(outBuf.data(), outLen);
+    return std::string(reinterpret_cast<char*>(outBuf.data()), encodedLen);
 }
  
 std::string DragSecurityManager::Base64Encode(const std::vector<uint8_t>& vec)
@@ -170,15 +158,30 @@ std::vector<uint8_t> DragSecurityManager::Base64Decode(const std::string& b64)
         return {};
     }
     
-    // Base64decode formula for calculating length, openhitls requires dst buffer >= (srcLen+3)/4*3
-    uint32_t srcLen = static_cast<uint32_t>(b64.size());
-    uint32_t outLen = (srcLen + 3) / 4 * 3;
-    std::vector<uint8_t> result(outLen);
-    if (BSL_BASE64_Decode(b64.data(), srcLen, result.data(), &outLen) != BSL_SUCCESS) {
-        MMI_HILOGE("BSL_BASE64_Decode failed");
+    BIO* b64Bio = BIO_new(BIO_f_base64());
+    if (!b64Bio) {
+        MMI_HILOGE("Failed to create base64 BIO");
         return {};
     }
-    result.resize(outLen);
+    
+    BIO* memBio = BIO_new_mem_buf(b64.data(), static_cast<int>(b64.size()));
+    if (!memBio) {
+        BIO_free(b64Bio);
+        MMI_HILOGE("Failed to create memory BIO");
+        return {};
+    }
+    BIO_push(b64Bio, memBio);
+    BIO_set_flags(b64Bio, BIO_FLAGS_BASE64_NO_NL);
+ 
+    std::vector<uint8_t> result;
+    uint8_t buf[256];
+    int bytesRead = 0;
+ 
+    while ((bytesRead = BIO_read(b64Bio, buf, sizeof(buf))) > 0) {
+        result.insert(result.end(), buf, buf + bytesRead);
+    }
+ 
+    BIO_free_all(b64Bio);
     return result;
 }
 #endif // OHOS_BUILD_ENABLE_DRAG_SECURITY
