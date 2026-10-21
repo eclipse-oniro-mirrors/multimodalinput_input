@@ -5892,7 +5892,7 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     ASSERT_NE(pixelMap, nullptr);
     pointerDrawingManager.followSystem_ = true;
     pointerDrawingManager.displayId_ = 0;
-    pointerDrawingManager.SetPointerSize(100, 1)
+    pointerDrawingManager.SetPointerSize(100, 1);
     OLD::DisplayInfo di;
     di.rsId = 0;
     auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, di);
