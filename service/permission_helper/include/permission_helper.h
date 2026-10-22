@@ -37,6 +37,8 @@ public:
     PermissionHelper& operator=(const PermissionHelper&) = delete;
 
     bool CheckMonitor();
+    bool CheckInputRecording();
+    bool CheckMonitorWithRecording();
     bool CheckInterceptor();
     int32_t GetTokenType();
     bool CheckDispatchControl();

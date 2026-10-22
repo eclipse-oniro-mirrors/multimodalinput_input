@@ -1909,10 +1909,11 @@ int32_t MMIService::CheckAddInput(int32_t pid, InputHandlerType handlerType, Han
 
 #endif // OHOS_BUILD_ENABLE_INTERCEPTOR || OHOS_BUILD_ENABLE_MONITOR
 
-int32_t MMIService::CheckInputHandlerVaild(InputHandlerType handlerType)
+int32_t MMIService::CheckInputHandlerVaild(InputHandlerType handlerType, bool isCapi)
 {
+    bool capiMonitor = (handlerType == InputHandlerType::MONITOR) && isCapi;
     if (!PER_HELPER->VerifySystemApp()) {
-        if (handlerType == InputHandlerType::MONITOR) {
+        if (handlerType == InputHandlerType::MONITOR && !capiMonitor) {
 #ifdef PLAYER_FRAMEWORK_EXISTS
             int32_t pid = GetCallingPid();
             bool ret = InputScreenCaptureAgent::GetInstance().IsScreenCaptureWorking(pid);
@@ -1923,7 +1924,7 @@ int32_t MMIService::CheckInputHandlerVaild(InputHandlerType handlerType)
 #else
             return ERROR_NOT_SYSAPI;
 #endif
-        } else if (handlerType != InputHandlerType::INTERCEPTOR) {
+        } else if (handlerType != InputHandlerType::INTERCEPTOR && !capiMonitor) {
             MMI_HILOGE("Verify system APP failed");
             return ERROR_NOT_SYSAPI;
         }
@@ -1937,7 +1938,12 @@ int32_t MMIService::CheckInputHandlerVaild(InputHandlerType handlerType)
         MMI_HILOGE("Interceptor permission check failed");
         return ERROR_NO_PERMISSION;
     }
-    if ((handlerType == InputHandlerType::MONITOR) && (!PER_HELPER->CheckMonitor())) {
+    if (capiMonitor) {
+        if (!PER_HELPER->CheckMonitorWithRecording()) {
+            MMI_HILOGE("Monitor with recording permission check failed");
+            return ERROR_NO_PERMISSION;
+        }
+    } else if ((handlerType == InputHandlerType::MONITOR) && (!PER_HELPER->CheckMonitor())) {
         MMI_HILOGE("Monitor permission check failed");
         return ERROR_NO_PERMISSION;
     }
@@ -1945,19 +1951,19 @@ int32_t MMIService::CheckInputHandlerVaild(InputHandlerType handlerType)
 }
 
 ErrCode MMIService::AddInputHandler(int32_t handlerType, uint32_t eventType, int32_t priority,
-    uint32_t deviceTags, const std::vector<int32_t>& actionsType)
+    uint32_t deviceTags, const std::vector<int32_t>& actionsType, bool isCapi)
 {
     CALL_DEBUG_ENTER;
     bool isRegisterCaptureCb = false;
     InputHandlerType hType = static_cast<InputHandlerType>(handlerType);
     HandleEventType eType = static_cast<HandleEventType>(eventType);
-    int32_t res = CheckInputHandlerVaild(hType);
+    int32_t res = CheckInputHandlerVaild(hType, isCapi);
     if (res != RET_OK) {
         MMI_HILOGE("CheckInputHandlerVaild failed, ret:%{public}d", res);
         return res;
     }
 #if defined(OHOS_BUILD_ENABLE_MONITOR) && defined(PLAYER_FRAMEWORK_EXISTS)
-    if (!PER_HELPER->VerifySystemApp() && hType == InputHandlerType::MONITOR) {
+    if (!PER_HELPER->VerifySystemApp() && hType == InputHandlerType::MONITOR && !isCapi) {
         isRegisterCaptureCb = true;
     }
 #endif // OHOS_BUILD_ENABLE_MONITOR && PLAYER_FRAMEWORK_EXISTS
@@ -1970,7 +1976,16 @@ ErrCode MMIService::AddInputHandler(int32_t handlerType, uint32_t eventType, int
                 RegisterScreenCaptureCallback();
 #endif // OHOS_BUILD_ENABLE_MONITOR && PLAYER_FRAMEWORK_EXISTS
             }
-            return this->CheckAddInput(pid, hType, eType, priority, deviceTags);
+            int32_t ret = this->CheckAddInput(pid, hType, eType, priority, deviceTags);
+            if (ret == RET_OK && isRegisterCaptureCb) {
+#if defined(OHOS_BUILD_ENABLE_MONITOR)
+                auto monitorHandler = InputHandler->GetMonitorHandler();
+                if (monitorHandler != nullptr) {
+                    monitorHandler->MarkCaptureException(pid);
+                }
+#endif
+            }
+            return ret;
         });
     if (ret != RET_OK) {
         MMI_HILOGE("Add input handler failed, ret:%{public}d", ret);
@@ -2079,7 +2094,7 @@ int32_t MMIService::ObserverAddInputHandler(int32_t pid)
 }
 #endif // OHOS_BUILD_ENABLE_INTERCEPTOR || OHOS_BUILD_ENABLE_MONITOR
 
-int32_t MMIService::CheckRemoveInputHandlerVaild(InputHandlerType handlerType)
+int32_t MMIService::CheckRemoveInputHandlerVaild(InputHandlerType handlerType, bool isCapi)
 {
     if (!PER_HELPER->VerifySystemApp()) {
         if (handlerType != InputHandlerType::MONITOR && handlerType != InputHandlerType::INTERCEPTOR) {
@@ -2095,7 +2110,7 @@ int32_t MMIService::CheckRemoveInputHandlerVaild(InputHandlerType handlerType)
         MMI_HILOGE("Interceptor permission check failed");
         return ERROR_NO_PERMISSION;
     }
-    if ((handlerType == InputHandlerType::MONITOR) && (!PER_HELPER->CheckMonitor())) {
+    if ((handlerType == InputHandlerType::MONITOR) && !isCapi && (!PER_HELPER->CheckMonitor())) {
         MMI_HILOGE("Monitor permission check failed");
         return ERROR_NO_PERMISSION;
     }
@@ -2103,12 +2118,12 @@ int32_t MMIService::CheckRemoveInputHandlerVaild(InputHandlerType handlerType)
 }
 
 ErrCode MMIService::RemoveInputHandler(int32_t handlerType, uint32_t eventType, int32_t priority,
-    uint32_t deviceTags, const std::vector<int32_t>& actionsType)
+    uint32_t deviceTags, const std::vector<int32_t>& actionsType, bool isCapi)
 {
     CALL_DEBUG_ENTER;
     InputHandlerType hType = static_cast<InputHandlerType>(handlerType);
     HandleEventType eType = static_cast<HandleEventType>(eventType);
-    int32_t res = CheckRemoveInputHandlerVaild(hType);
+    int32_t res = CheckRemoveInputHandlerVaild(hType, isCapi);
     if (res != RET_OK) {
         MMI_HILOGE("CheckRemoveInputHandlerVaild failed, ret:%{public}d", res);
         return res;

@@ -82,9 +82,9 @@ interface OHOS.MMI.IMultimodalInputConnect {
     void GetKeyboardRepeatDelay([out] int delay);
     void GetKeyboardRepeatRate([out] int rate);
     void AddInputHandler([in] int handlerType, [in] unsigned int eventType,
-        [in] int priority, [in] unsigned int deviceTags, [in] int[] actionsType);
+        [in] int priority, [in] unsigned int deviceTags, [in] int[] actionsType, [in] boolean isCapi);
     void RemoveInputHandler([in] int handlerType, [in] unsigned int eventType,
-        [in] int priority, [in] unsigned int deviceTags, [in] int[] actionsType);
+        [in] int priority, [in] unsigned int deviceTags, [in] int[] actionsType, [in] boolean isCapi);
     void AddPreInputHandler([in] int handlerId, [in] unsigned int eventType, [in] int[] keys);
     void RemovePreInputHandler([in] int handlerId);
     void AddGestureMonitor([in] int handlerType, [in] unsigned int eventType,

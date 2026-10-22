@@ -29,10 +29,13 @@ InputMonitorManager &InputMonitorManager::GetInstance()
     return instance;
 }
 
-int32_t InputMonitorManager::AddMonitor(std::shared_ptr<IInputEventConsumer> monitor, HandleEventType eventType)
+int32_t InputMonitorManager::AddMonitor(std::shared_ptr<IInputEventConsumer> monitor, HandleEventType eventType,
+    bool isCapi)
 {
     CHKPR(monitor, INVALID_HANDLER_ID);
-    return AddHandler(InputHandlerType::MONITOR, monitor, eventType);
+    return AddHandler(InputHandlerType::MONITOR, monitor, eventType,
+        DEFUALT_INTERCEPTOR_PRIORITY,
+        CapabilityToTags(InputDeviceCapability::INPUT_DEV_CAP_MAX), isCapi);
 }
 
 #ifdef OHOS_BUILD_ENABLE_TOUCH_GESTURE
@@ -52,9 +55,9 @@ int32_t InputMonitorManager::RemoveGestureMonitor(int32_t monitorId)
 
 #endif // OHOS_BUILD_ENABLE_TOUCH_GESTURE
 
-int32_t InputMonitorManager::RemoveMonitor(int32_t monitorId)
+int32_t InputMonitorManager::RemoveMonitor(int32_t monitorId, bool isCapi)
 {
-    return RemoveHandler(monitorId, InputHandlerType::MONITOR);
+    return RemoveHandler(monitorId, InputHandlerType::MONITOR, isCapi);
 }
 
 int32_t InputMonitorManager::AddMonitor(std::shared_ptr<IInputEventConsumer> monitor,

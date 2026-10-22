@@ -106,16 +106,16 @@ public:
 #endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH
     int32_t PackDisplayData(NetPacket &pkt, const UserScreenInfo &userScreenInfo);
 
-    int32_t AddMonitor(std::function<void(std::shared_ptr<KeyEvent>)> monitor);
-    int32_t AddMonitor(std::function<void(std::shared_ptr<PointerEvent>)> monitor);
+    int32_t AddMonitor(std::function<void(std::shared_ptr<KeyEvent>)> monitor, bool isCapi = false);
+    int32_t AddMonitor(std::function<void(std::shared_ptr<PointerEvent>)> monitor, bool isCapi = false);
     int32_t AddMonitor(std::shared_ptr<IInputEventConsumer> consumer,
-        HandleEventType eventType = HANDLE_EVENT_TYPE_KP);
+        HandleEventType eventType = HANDLE_EVENT_TYPE_KP, bool isCapi = false);
     int32_t AddGestureMonitor(std::shared_ptr<IInputEventConsumer> consumer,
         TouchGestureType type, int32_t fingers);
     int32_t RemoveGestureMonitor(int32_t monitorId);
     int32_t AddMonitor(std::shared_ptr<IInputEventConsumer> monitor, std::vector<int32_t> actionsType);
 
-    int32_t RemoveMonitor(int32_t monitorId);
+    int32_t RemoveMonitor(int32_t monitorId, bool isCapi = false);
     void MarkConsumed(int32_t monitorId, int32_t eventId);
     void MoveMouse(int32_t offsetX, int32_t offsetY);
 

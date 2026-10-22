@@ -58,8 +58,8 @@ protected:
 #endif // OHOS_BUILD_ENABLE_TOUCH_GESTURE
     int32_t AddHandler(InputHandlerType handlerType, std::shared_ptr<IInputEventConsumer> consumer,
         HandleEventType eventType = HANDLE_EVENT_TYPE_KP, int32_t priority = DEFUALT_INTERCEPTOR_PRIORITY,
-        uint32_t deviceTags = CapabilityToTags(InputDeviceCapability::INPUT_DEV_CAP_MAX));
-    int32_t RemoveHandler(int32_t handlerId, InputHandlerType IsValidHandlerType);
+        uint32_t deviceTags = CapabilityToTags(InputDeviceCapability::INPUT_DEV_CAP_MAX), bool isCapi = false);
+    int32_t RemoveHandler(int32_t handlerId, InputHandlerType IsValidHandlerType, bool isCapi = false);
     int32_t AddHandler(InputHandlerType handlerType, std::shared_ptr<IInputEventConsumer> consumer,
         std::vector<int32_t> actions);
 
@@ -97,13 +97,13 @@ private:
     int32_t AddLocal(int32_t handlerId, InputHandlerType handlerType, std::vector<int32_t> actionsType,
         std::shared_ptr<IInputEventConsumer> monitor);
     int32_t AddToServer(InputHandlerType handlerType, HandleEventType eventType, int32_t priority,
-        uint32_t deviceTags, std::vector<int32_t> actionsType = std::vector<int32_t>());
+        uint32_t deviceTags, std::vector<int32_t> actionsType = std::vector<int32_t>(), bool isCapi = false);
     bool IsNeedAddToServer(std::vector<int32_t> actionsType);
     int32_t RemoveLocal(int32_t handlerId, InputHandlerType handlerType, uint32_t &deviceTags);
     void UpdateAddToServerActions();
     int32_t RemoveLocalActions(int32_t handlerId, InputHandlerType handlerType);
     int32_t RemoveFromServer(InputHandlerType handlerType, HandleEventType eventType, int32_t priority,
-        uint32_t deviceTags, std::vector<int32_t> actionsType = std::vector<int32_t>());
+        uint32_t deviceTags, std::vector<int32_t> actionsType = std::vector<int32_t>(), bool isCapi = false);
 
     std::shared_ptr<IInputEventConsumer> FindHandler(int32_t handlerId);
     void OnDispatchEventProcessed(int32_t eventId, int64_t actionTime);

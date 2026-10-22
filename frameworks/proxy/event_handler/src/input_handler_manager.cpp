@@ -44,7 +44,7 @@ InputHandlerManager::InputHandlerManager()
 }
 
 int32_t InputHandlerManager::AddHandler(InputHandlerType handlerType, std::shared_ptr<IInputEventConsumer> consumer,
-    HandleEventType eventType, int32_t priority, uint32_t deviceTags)
+    HandleEventType eventType, int32_t priority, uint32_t deviceTags, bool isCapi)
 {
     CALL_DEBUG_ENTER;
     CHKPR(consumer, INVALID_HANDLER_ID);
@@ -75,7 +75,7 @@ int32_t InputHandlerManager::AddHandler(InputHandlerType handlerType, std::share
             uint32_t allDeviceTags = GetDeviceTags();
             MMI_HILOGI("The handlerType:%{public}d, newType:%{public}d, deviceTags:%{public}d, priority:%{public}d",
                 handlerType, newType, allDeviceTags, priority);
-            int32_t ret = AddToServer(handlerType, newType, priority, allDeviceTags);
+            int32_t ret = AddToServer(handlerType, newType, priority, allDeviceTags, std::vector<int32_t>(), isCapi);
             if (ret != RET_OK) {
                 MMI_HILOGE("Add Handler:%{public}d:%{public}d to server failed, (eventType,deviceTag) current: "
                            "(%{public}d, %{public}d), new: (%{public}d, %{public}d), priority:%{public}d",
@@ -207,7 +207,7 @@ bool InputHandlerManager::IsNeedAddToServer(std::vector<int32_t> actionsType)
     return isNeedAddToServer;
 }
 
-int32_t InputHandlerManager::RemoveHandler(int32_t handlerId, InputHandlerType handlerType)
+int32_t InputHandlerManager::RemoveHandler(int32_t handlerId, InputHandlerType handlerType, bool isCapi)
 {
     CALL_DEBUG_ENTER;
     MMI_HILOGD("Unregister handler:%{public}d,type:%{public}d", handlerId, handlerType);
@@ -229,7 +229,7 @@ int32_t InputHandlerManager::RemoveHandler(int32_t handlerId, InputHandlerType h
         const int32_t newLevel = GetPriority();
         const uint64_t newTags = GetDeviceTags();
         if (ret == RET_OK && (currentType != newType || ((currentTags & deviceTags) != 0))) {
-            ret = RemoveFromServer(handlerType, newType, newLevel, newTags);
+            ret = RemoveFromServer(handlerType, newType, newLevel, newTags, std::vector<int32_t>(), isCapi);
             if (ret != RET_OK) {
                 return ret;
             }
@@ -366,10 +366,10 @@ int32_t InputHandlerManager::AddLocal(int32_t handlerId, InputHandlerType handle
 }
 
 int32_t InputHandlerManager::AddToServer(InputHandlerType handlerType, HandleEventType eventType, int32_t priority,
-    uint32_t deviceTags, std::vector<int32_t> actionsType)
+    uint32_t deviceTags, std::vector<int32_t> actionsType, bool isCapi)
 {
     int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->AddInputHandler(handlerType,
-        eventType, priority, deviceTags, actionsType);
+        eventType, priority, deviceTags, actionsType, isCapi);
     if (ret != RET_OK) {
         MMI_HILOGE("Send to server failed, ret:%{public}d", ret);
     }
@@ -438,10 +438,10 @@ int32_t InputHandlerManager::RemoveLocalActions(int32_t handlerId, InputHandlerT
 }
 
 int32_t InputHandlerManager::RemoveFromServer(InputHandlerType handlerType, HandleEventType eventType, int32_t priority,
-    uint32_t deviceTags, std::vector<int32_t> actionsType)
+    uint32_t deviceTags, std::vector<int32_t> actionsType, bool isCapi)
 {
     int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->RemoveInputHandler(handlerType, eventType,
-        priority, deviceTags, actionsType);
+        priority, deviceTags, actionsType, isCapi);
     if (ret != 0) {
         MMI_HILOGE("Send to server failed, ret:%{public}d", ret);
     }

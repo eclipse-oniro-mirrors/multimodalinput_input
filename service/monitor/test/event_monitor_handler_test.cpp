@@ -1773,5 +1773,279 @@ HWTEST_F(EventMonitorHandlerTest, EventMonitorHandlerTest_SendToClient_004, Test
     sessionHandler.SendToClient(pointerEvent);
     EXPECT_NE(sessionHandler.session_, nullptr);
 }
+
+/**
+ * @tc.name: EventMonitorHandlerTest_RemoveInputHandler_ProcessIsolation_001
+ * @tc.desc: Process A removes its monitor, process B's monitor is unaffected
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_RemoveInputHandler_ProcessIsolation_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    InputHandlerType handlerType = InputHandlerType::MONITOR;
+    HandleEventType eventType = HANDLE_EVENT_TYPE_KEY;
+    TouchGestureType gestureType = TOUCH_GESTURE_TYPE_NONE;
+    int32_t fingers = 0;
+
+    SessionPtr sessionA = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid);
+    SessionPtr sessionB = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 1);
+
+    int32_t retA = eventMonitorHandler.AddInputHandler(handlerType, eventType, sessionA, gestureType, fingers);
+    int32_t retB = eventMonitorHandler.AddInputHandler(handlerType, eventType, sessionB, gestureType, fingers);
+    EXPECT_EQ(retA, RET_OK);
+    EXPECT_EQ(retB, RET_OK);
+
+    eventMonitorHandler.RemoveInputHandler(handlerType, eventType, sessionA, gestureType, fingers);
+
+    EXPECT_TRUE(eventMonitorHandler.CheckHasInputHandler(eventType));
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_RemoveInputHandler_ProcessIsolation_002
+ * @tc.desc: Remove unregistered session has no side effect
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_RemoveInputHandler_ProcessIsolation_002, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    InputHandlerType handlerType = InputHandlerType::MONITOR;
+    HandleEventType eventType = HANDLE_EVENT_TYPE_KEY;
+    TouchGestureType gestureType = TOUCH_GESTURE_TYPE_NONE;
+    int32_t fingers = 0;
+
+    SessionPtr sessionA = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid);
+    SessionPtr sessionB = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 1);
+
+    eventMonitorHandler.AddInputHandler(handlerType, eventType, sessionA, gestureType, fingers);
+
+    eventMonitorHandler.RemoveInputHandler(handlerType, eventType, sessionB, gestureType, fingers);
+
+    EXPECT_TRUE(eventMonitorHandler.CheckHasInputHandler(eventType));
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_MarkCaptureException_ServerNull_001
+ * @tc.desc: Test MarkCaptureException when uds server is not initialized, no mark is added
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_MarkCaptureException_ServerNull_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    InputHandler->udsServer_ = nullptr;
+    eventMonitorHandler.MarkCaptureException(g_pid + 100);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_MarkCaptureException_SessionNull_001
+ * @tc.desc: Test MarkCaptureException when pid is not registered in server, no mark is added
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_MarkCaptureException_SessionNull_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    UDSServer udsServer;
+    InputHandler->udsServer_ = &udsServer;
+    eventMonitorHandler.MarkCaptureException(g_pid + 101);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
+    InputHandler->udsServer_ = nullptr;
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_MarkCaptureException_Normal_001
+ * @tc.desc: Test MarkCaptureException marks the registered session
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_MarkCaptureException_Normal_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    UDSServer udsServer;
+    InputHandler->udsServer_ = &udsServer;
+    int32_t pid = g_pid + 102;
+    int32_t fd = 102;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, fd, UID_ROOT, pid);
+    udsServer.idxPidMap_.insert(std::make_pair(pid, fd));
+    udsServer.sessionsMap_.insert(std::make_pair(fd, session));
+
+    eventMonitorHandler.MarkCaptureException(pid);
+    EXPECT_EQ(eventMonitorHandler.monitors_.captureExceptionSessions_.size(), 1);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.IsCaptureException(session));
+    InputHandler->udsServer_ = nullptr;
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_MonitorCollection_MarkCaptureException_Null_001
+ * @tc.desc: Test MonitorCollection MarkCaptureException with null session, no mark is added
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_MonitorCollection_MarkCaptureException_Null_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    eventMonitorHandler.monitors_.MarkCaptureException(nullptr);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_IsCaptureException_Branches_001
+ * @tc.desc: Test IsCaptureException returns false for null session and unmarked session, true for marked
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_IsCaptureException_Branches_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    EXPECT_FALSE(eventMonitorHandler.monitors_.IsCaptureException(nullptr));
+
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 103);
+    EXPECT_FALSE(eventMonitorHandler.monitors_.IsCaptureException(session));
+
+    eventMonitorHandler.monitors_.MarkCaptureException(session);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.IsCaptureException(session));
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_Sweep_UnmarkedSession_001
+ * @tc.desc: Test unmarked session monitor is not removed by screen capture sweep
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_Sweep_UnmarkedSession_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 104);
+    session->SetTokenType(TokenType::TOKEN_HAP);
+    int32_t ret = eventMonitorHandler.AddInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_KEY, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_EQ(ret, RET_OK);
+
+    eventMonitorHandler.monitors_.RemoveScreenCaptureMonitor(session);
+    EXPECT_TRUE(eventMonitorHandler.CheckHasInputHandler(HANDLE_EVENT_TYPE_KEY));
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_Sweep_MarkedSession_001
+ * @tc.desc: Test marked session monitor is removed by screen capture sweep
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_Sweep_MarkedSession_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 105);
+    session->SetTokenType(TokenType::TOKEN_HAP);
+    int32_t ret = eventMonitorHandler.AddInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_KEY, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_EQ(ret, RET_OK);
+
+    eventMonitorHandler.monitors_.MarkCaptureException(session);
+    eventMonitorHandler.monitors_.RemoveScreenCaptureMonitor(session);
+    EXPECT_FALSE(eventMonitorHandler.CheckHasInputHandler(HANDLE_EVENT_TYPE_KEY));
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_Recovery_MarkedSession_001
+ * @tc.desc: Test marked session monitor is restored by screen capture recovery
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_Recovery_MarkedSession_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 106);
+    session->SetTokenType(TokenType::TOKEN_HAP);
+    int32_t ret = eventMonitorHandler.AddInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_KEY, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_EQ(ret, RET_OK);
+
+    eventMonitorHandler.monitors_.MarkCaptureException(session);
+    eventMonitorHandler.monitors_.RemoveScreenCaptureMonitor(session);
+    EXPECT_FALSE(eventMonitorHandler.CheckHasInputHandler(HANDLE_EVENT_TYPE_KEY));
+
+    eventMonitorHandler.monitors_.RecoveryScreenCaptureMonitor(session);
+    EXPECT_TRUE(eventMonitorHandler.CheckHasInputHandler(HANDLE_EVENT_TYPE_KEY));
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_RemoveMonitor_ClearMark_001
+ * @tc.desc: Test complete removal (eventType NONE) clears the capture exception mark
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_RemoveMonitor_ClearMark_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 107);
+    int32_t ret = eventMonitorHandler.AddInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_KEY, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_EQ(ret, RET_OK);
+
+    eventMonitorHandler.monitors_.MarkCaptureException(session);
+    EXPECT_EQ(eventMonitorHandler.monitors_.captureExceptionSessions_.size(), 1);
+
+    eventMonitorHandler.RemoveInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_NONE, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_RemoveMonitor_PartialKeepsMark_001
+ * @tc.desc: Test partial removal (remaining aggregate type) keeps the mark, complete removal clears it
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_RemoveMonitor_PartialKeepsMark_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 108);
+    int32_t ret = eventMonitorHandler.AddInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_KEY | HANDLE_EVENT_TYPE_POINTER, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_EQ(ret, RET_OK);
+
+    eventMonitorHandler.monitors_.MarkCaptureException(session);
+    eventMonitorHandler.RemoveInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_POINTER, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_TRUE(eventMonitorHandler.CheckHasInputHandler(HANDLE_EVENT_TYPE_POINTER));
+    EXPECT_EQ(eventMonitorHandler.monitors_.captureExceptionSessions_.size(), 1);
+
+    eventMonitorHandler.RemoveInputHandler(InputHandlerType::MONITOR,
+        HANDLE_EVENT_TYPE_NONE, session, TOUCH_GESTURE_TYPE_NONE, 0);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
+}
+
+/**
+ * @tc.name: EventMonitorHandlerTest_OnSessionLost_ClearMark_001
+ * @tc.desc: Test session lost clears the capture exception mark
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(EventMonitorHandlerTest,
+    EventMonitorHandlerTest_OnSessionLost_ClearMark_001, TestSize.Level1)
+{
+    EventMonitorHandler eventMonitorHandler;
+    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, g_writeFd, UID_ROOT, g_pid + 109);
+    eventMonitorHandler.monitors_.MarkCaptureException(session);
+    EXPECT_EQ(eventMonitorHandler.monitors_.captureExceptionSessions_.size(), 1);
+
+    eventMonitorHandler.OnSessionLost(session);
+    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
+}
 } // namespace MMI
 } // namespace OHOS

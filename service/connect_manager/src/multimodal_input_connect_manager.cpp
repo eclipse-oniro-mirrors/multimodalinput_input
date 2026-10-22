@@ -438,20 +438,21 @@ int32_t MultimodalInputConnectManager::GetKeyboardRepeatRate(int32_t &rate)
 }
 
 int32_t MultimodalInputConnectManager::AddInputHandler(InputHandlerType handlerType, HandleEventType eventType,
-    int32_t priority, uint32_t deviceTags, std::vector<int32_t> actionsType)
+    int32_t priority, uint32_t deviceTags, std::vector<int32_t> actionsType, bool isCapi)
 {
     std::lock_guard<std::mutex> guard(lock_);
     CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->AddInputHandler(handlerType, eventType, priority, deviceTags, actionsType);
+    return multimodalInputConnectService_->AddInputHandler(handlerType, eventType, priority, deviceTags, actionsType,
+        isCapi);
 }
 
 int32_t MultimodalInputConnectManager::RemoveInputHandler(InputHandlerType handlerType, HandleEventType eventType,
-    int32_t priority, uint32_t deviceTags, std::vector<int32_t> actionsType)
+    int32_t priority, uint32_t deviceTags, std::vector<int32_t> actionsType, bool isCapi)
 {
     std::lock_guard<std::mutex> guard(lock_);
     CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
     return multimodalInputConnectService_->RemoveInputHandler(handlerType, eventType, priority, deviceTags,
-        actionsType);
+        actionsType, isCapi);
 }
 
 int32_t MultimodalInputConnectManager::AddPreInputHandler(int32_t handlerId, HandleEventType eventType,
