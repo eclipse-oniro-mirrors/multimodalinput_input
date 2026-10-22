@@ -445,7 +445,9 @@ napi_value JsKeyCode::Export(napi_env env, napi_value exports)
         DECLARE_NAPI_STATIC_PROPERTY("KEYCODE_PTZ_APERTURE_LEFT",
             GetNapiInt32(env, KeyEvent::KEYCODE_PTZ_APERTURE_LEFT)),
         DECLARE_NAPI_STATIC_PROPERTY("KEYCODE_PTZ_APERTURE_RIGHT",
-            GetNapiInt32(env, KeyEvent::KEYCODE_PTZ_APERTURE_RIGHT))
+            GetNapiInt32(env, KeyEvent::KEYCODE_PTZ_APERTURE_RIGHT)),
+        DECLARE_NAPI_STATIC_PROPERTY("KEYCODE_DESKTOP",
+            GetNapiInt32(env, KeyEvent::KEYCODE_DESKTOP))
     };
 
     napi_value result = nullptr;

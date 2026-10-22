@@ -1730,6 +1730,11 @@ typedef enum {
      */
     OH_INPUT_KEYCODE_PTZ_APERTURE_RIGHT = 3243,
     /**
+     * Return to desktop
+     * @since 26.2.0
+     */
+    OH_INPUT_KEYCODE_DESKTOP = 3245,
+    /**
      * Wrist Turn key
      * @since 26.0.0
      */

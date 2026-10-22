@@ -3300,6 +3300,12 @@ public:
     static const int32_t KEYCODE_PTZ_APERTURE_RIGHT;
 
     /**
+     * DESKTOP
+     * @since 26.2.0
+     */
+    static const int32_t KEYCODE_DESKTOP;
+
+    /**
      * Long press the writing button of pen in mouse mode
      * @since 26.0.0
      */

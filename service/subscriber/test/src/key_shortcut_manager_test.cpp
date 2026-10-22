@@ -34,6 +34,18 @@ constexpr int32_t TWICE_LONG_PRESS_TIME { DEFAULT_LONG_PRESS_TIME + DEFAULT_LONG
 constexpr int32_t BASE_SHORTCUT_ID { 1 };
 constexpr int32_t DEFAULT_SAMPLING_PERIOD { 8 }; // 8ms
 constexpr int32_t MAXIMUM_LONG_PRESS_TIME { 60000 };
+constexpr int32_t KEYCODE_DESKTOP_VALUE { 3245 };
+
+void AddDesktopExceptionalRule(KeyShortcutManager &mgr,
+    KeyShortcutManager::ShortcutTriggerType triggerType)
+{
+    mgr.AddExceptionalSystemKey(KeyShortcutManager::ExceptionalSystemKey {
+        .preKeys = {},
+        .finalKey = KeyEvent::KEYCODE_DESKTOP,
+        .longPressTime = NO_LONG_PRESS,
+        .triggerType = triggerType,
+    });
+}
 }
 using namespace testing;
 using namespace testing::ext;
@@ -3056,5 +3068,93 @@ HWTEST_F(KeyShortcutManagerTest, KeyShortcutManagerTest_HandleKeyUp_008, TestSiz
     EXPECT_FALSE(result);
     KEY_SHORTCUT_MGR->shortcuts_.clear();
 }
+
+/**
+ * @tc.name: KeyShortcutManagerTest_DesktopKey_001
+ * @tc.desc: Virtual desktop key code is defined as 3245.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyShortcutManagerTest, KeyShortcutManagerTest_DesktopKey_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(KeyEvent::KEYCODE_DESKTOP, KEYCODE_DESKTOP_VALUE);
+}
+
+/**
+ * @tc.name: KeyShortcutManagerTest_DesktopKey_002
+ * @tc.desc: Desktop key in exceptional system key rules can be registered,
+ *           both trigger-down and trigger-up.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyShortcutManagerTest, KeyShortcutManagerTest_DesktopKey_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyShortcutManager mgr;
+    AddDesktopExceptionalRule(mgr, KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_DOWN);
+    AddDesktopExceptionalRule(mgr, KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_UP);
+
+    KeyShortcutManager::SystemShortcutKey sysKey {
+        .modifiers = {},
+        .finalKey = KeyEvent::KEYCODE_DESKTOP,
+        .longPressTime = NO_LONG_PRESS,
+        .triggerType = KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_DOWN,
+    };
+    int32_t shortcutId = mgr.RegisterSystemKey(sysKey);
+    EXPECT_GE(shortcutId, BASE_SHORTCUT_ID);
+
+    sysKey.triggerType = KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_UP;
+    shortcutId = mgr.RegisterSystemKey(sysKey);
+    EXPECT_GE(shortcutId, BASE_SHORTCUT_ID);
+}
+
+/**
+ * @tc.name: KeyShortcutManagerTest_DesktopKey_003
+ * @tc.desc: Desktop key subscription fails when long press time does not match
+ *           the exceptional rule exactly.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyShortcutManagerTest, KeyShortcutManagerTest_DesktopKey_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyShortcutManager mgr;
+    AddDesktopExceptionalRule(mgr, KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_DOWN);
+
+    KeyShortcutManager::SystemShortcutKey sysKey {
+        .modifiers = {},
+        .finalKey = KeyEvent::KEYCODE_DESKTOP,
+        .longPressTime = DEFAULT_LONG_PRESS_TIME,
+        .triggerType = KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_DOWN,
+    };
+    int32_t shortcutId = mgr.RegisterSystemKey(sysKey);
+    EXPECT_LT(shortcutId, BASE_SHORTCUT_ID);
+}
+
+/**
+ * @tc.name: KeyShortcutManagerTest_DesktopKey_004
+ * @tc.desc: Register desktop key with trigger-up and the returned shortcut id
+ *           is not the invalid base error value.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyShortcutManagerTest, KeyShortcutManagerTest_DesktopKey_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyShortcutManager mgr;
+    AddDesktopExceptionalRule(mgr, KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_DOWN);
+
+    KeyShortcutManager::SystemShortcutKey sysKey {
+        .modifiers = {},
+        .finalKey = KeyEvent::KEYCODE_DESKTOP,
+        .longPressTime = NO_LONG_PRESS,
+        .triggerType = KeyShortcutManager::SHORTCUT_TRIGGER_TYPE_UP,
+    };
+    int32_t shortcutId = mgr.RegisterSystemKey(sysKey);
+    int32_t invalidId = -1;
+    EXPECT_NE(shortcutId, invalidId);
+}
+
 } // namespace MMI
 } // namespace OHOS

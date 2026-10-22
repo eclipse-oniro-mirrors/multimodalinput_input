@@ -51,6 +51,8 @@ private:
     std::shared_ptr<KeyEvent> TriggerSystemKey0102();
     std::shared_ptr<KeyEvent> TriggerSystemKey0301();
     std::shared_ptr<KeyEvent> TriggerSystemKey0302();
+    std::shared_ptr<KeyEvent> TriggerDesktopKeyDown();
+    std::shared_ptr<KeyEvent> TriggerDesktopKeyUp();
 };
 
 std::shared_ptr<KeyEvent> KeyShortcutRulesTest::TriggerSystemKey0101()
@@ -309,6 +311,84 @@ HWTEST_F(KeyShortcutRulesTest, KeyShortcutRulesTest_TriggerSystemKey_03, TestSiz
 
     InputManager::GetInstance()->UnsubscribeKeyEvent(subscribe1);
     InputManager::GetInstance()->UnsubscribeKeyEvent(subscribe2);
+}
+
+std::shared_ptr<KeyEvent> KeyShortcutRulesTest::TriggerDesktopKeyDown()
+{
+    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
+    CHKPP(keyEvent);
+    int64_t now = GetSysClockTime();
+    KeyEvent::KeyItem keyItem {};
+    keyItem.SetKeyCode(KeyEvent::KEYCODE_DESKTOP);
+    keyItem.SetDownTime(now);
+    keyItem.SetPressed(true);
+    keyEvent->AddKeyItem(keyItem);
+
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_DESKTOP);
+    keyEvent->SetActionTime(now);
+    return keyEvent;
+}
+
+std::shared_ptr<KeyEvent> KeyShortcutRulesTest::TriggerDesktopKeyUp()
+{
+    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
+    CHKPP(keyEvent);
+    int64_t now = GetSysClockTime();
+    KeyEvent::KeyItem keyItem {};
+    keyItem.SetKeyCode(KeyEvent::KEYCODE_DESKTOP);
+    keyItem.SetDownTime(now - MS2US(DEFAULT_SAMPLING_PERIOD));
+    keyItem.SetPressed(true);
+    keyEvent->AddKeyItem(keyItem);
+
+    keyItem.SetKeyCode(KeyEvent::KEYCODE_DESKTOP);
+    keyItem.SetDownTime(now);
+    keyItem.SetPressed(false);
+    keyEvent->AddKeyItem(keyItem);
+
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_UP);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_DESKTOP);
+    keyEvent->SetActionTime(now);
+    return keyEvent;
+}
+
+/**
+ * @tc.name: KeyShortcutRulesTest_DesktopKey_01
+ * @tc.desc: Desktop key subscription is rejected for non-system application and
+ *           simulated desktop key events are dispatched without crash.
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyShortcutRulesTest, KeyShortcutRulesTest_DesktopKey_01, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t keyCode = KeyEvent::KEYCODE_UNKNOWN;
+    auto keyOption = std::make_shared<KeyOption>();
+    ASSERT_NE(keyOption, nullptr);
+    keyOption->SetPreKeys(std::set<int32_t> {});
+    keyOption->SetFinalKey(KeyEvent::KEYCODE_DESKTOP);
+    keyOption->SetFinalKeyDown(true);
+    keyOption->SetFinalKeyDownDuration(NO_LONG_PRESS);
+
+    auto subscribeId = InputManager::GetInstance()->SubscribeKeyEvent(keyOption,
+        [&keyCode](std::shared_ptr<KeyEvent> keyEvent) {
+            keyCode = keyEvent->GetKeyCode();
+        });
+    // The UT process is not a system application, subscription must be rejected.
+    EXPECT_TRUE(subscribeId <= 0);
+
+    auto keyEventDown = TriggerDesktopKeyDown();
+    ASSERT_TRUE(keyEventDown != nullptr);
+    InputManager::GetInstance()->SimulateInputEvent(keyEventDown);
+
+    auto keyEventUp = TriggerDesktopKeyUp();
+    ASSERT_TRUE(keyEventUp != nullptr);
+    InputManager::GetInstance()->SimulateInputEvent(keyEventUp);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(DEFAULT_LONG_PRESS_TIME));
+    EXPECT_EQ(keyCode, KeyEvent::KEYCODE_UNKNOWN);
+
+    InputManager::GetInstance()->UnsubscribeKeyEvent(subscribeId);
 }
 } // namespace MMI
 } // namespace OHOS
