@@ -491,7 +491,7 @@ struct WindowInfo {
     bool isDisplayCoord { false };
 
     bool isSkipSelfWhenShowOnVirtualScreen { false };
-	
+
     int32_t windowNameType;
 
     /**
@@ -502,6 +502,8 @@ struct WindowInfo {
     int32_t agentPid { -1 };
 
     std::vector<Rect> dragDisabledAreas;
+
+    float scaleByWindow { 1.0 };
 };
 
 /**
