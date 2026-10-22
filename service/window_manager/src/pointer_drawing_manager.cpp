@@ -4228,6 +4228,7 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
     float axis = 1.0f;
     cursorWidth_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.width;
     cursorHeight_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.height;
+#ifdef OHOS_BUILD_PC_PRIORITY
     auto sp = GetScreenPointer(displayId_);
     float densityRatio = (sp != nullptr) ? sp->GetDPI() : 1.0f;
     if (densityRatio <= 0) {
@@ -4242,6 +4243,7 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
         cursorHeight_ = systemCursorHeight;
         cursorWidth_ = systemCursorWidth;
     }
+#endif // OHOS_BUILD_PC_PRIORITY
     int32_t maxValue = imageInfo.size.width > imageInfo.size.height ? cursorWidth_ : cursorHeight_;
     if (maxValue > MAX_CUSTOM_CURSOR_DIMENSION) {
         axis = (float)MAX_CUSTOM_CURSOR_DIMENSION / (float)std::max(imageInfo.size.width, imageInfo.size.height);
@@ -4249,9 +4251,11 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
         axis = (float)std::max(cursorWidth_, cursorHeight_) /
             (float)std::max(imageInfo.size.width, imageInfo.size.height);
     }
+#ifdef OHOS_BUILD_PC_PRIORITY
     if (systemCursorWidth == cursorWidth_) {
         axis = axis * 0.85f;
     }
+#endif // OHOS_BUILD_PC_PRIORITY
     ScalePixelMap(pixelMapPtr.get(), axis, axis);
     cursorWidth_ = static_cast<int32_t>((float)imageInfo.size.width * axis);
     cursorHeight_ = static_cast<int32_t>((float)imageInfo.size.height * axis);
