@@ -196,6 +196,13 @@ public:
     static constexpr uint32_t EVENT_FLAG_INJECT_UNDER_LOCK = 0x00800000;
 
     /**
+     * Flag indicating an injected event that should refresh the last input time,
+     * so that GetIntervalSinceLastInput reflects it. Used by cross-device input
+     * sharing to mark injected events as real user activity.
+     */
+    static constexpr uint32_t EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME = 0x04000000;
+
+    /**
      * The multimodal input event for the device to enable the intercom mode flag.
      *
      * @since 21

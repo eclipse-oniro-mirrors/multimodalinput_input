@@ -488,6 +488,11 @@ void InputEventHandler::UpdateLastInputEventTime(int32_t displayId)
     lastInputEventTimes_[groupId][displayId] = GetSysClockTime();
 }
 
+void InputEventHandler::UpdateLastInputTime()
+{
+    lastEventBeginTime_ = GetSysClockTime();
+}
+
 int32_t InputEventHandler::GetLastInputEventTimeByDisplay(int32_t displayId, int64_t &lastInputEventTime)
 {
     if (displayId < 0) {
