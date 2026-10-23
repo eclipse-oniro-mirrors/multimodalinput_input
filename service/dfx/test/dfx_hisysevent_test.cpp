@@ -15,6 +15,7 @@
 
 #include <gtest/gtest.h>
 
+#include "bundle_name_parser.h"
 #include "define_multimodal.h"
 #include "dfx_hisysevent.h"
 #include "mmi_log.h"
@@ -2348,6 +2349,52 @@ HWTEST_F(DfxHisysEventTest, DfxHisysEventTest_ReportKeyEventTest_009, TestSize.L
     std::string name = "dispatch";
     DfxHisysevent::ReportKeyEvent(name);
     EXPECT_EQ(name, "dispatch");
+}
+
+/**
+ * @tc.name: DfxHisysEventTest_ReportKeyEventTest_010
+ * @tc.desc: ReportKeyEvent with wallet new bundle name
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(DfxHisysEventTest, DfxHisysEventTest_ReportKeyEventTest_010, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    std::string name = "com.huawei.hmos.wallet";
+    // Expected type depends on whether bundle_name_config.json exists on the device
+    DfxHisysevent::KEY_CONSUMPTION_TYPE expectedType = DfxHisysevent::DISPATCH_KEY;
+    if (name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME") ||
+        name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME")) {
+        expectedType = DfxHisysevent::OPEN_WALLET;
+    }
+    int32_t countBefore = DfxHisysevent::keyEventCount_;
+    int32_t typeBefore = DfxHisysevent::calKeyEventTime_[expectedType];
+    DfxHisysevent::ReportKeyEvent(name);
+    EXPECT_EQ(DfxHisysevent::keyEventCount_, countBefore + 1);
+    EXPECT_EQ(DfxHisysevent::calKeyEventTime_[expectedType], typeBefore + 1);
+}
+
+/**
+ * @tc.name: DfxHisysEventTest_ReportKeyEventTest_011
+ * @tc.desc: ReportKeyEvent with wallet old bundle name
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(DfxHisysEventTest, DfxHisysEventTest_ReportKeyEventTest_011, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    std::string name = "com.huawei.hmos.walletservice";
+    // Expected type depends on whether bundle_name_config.json exists on the device
+    DfxHisysevent::KEY_CONSUMPTION_TYPE expectedType = DfxHisysevent::DISPATCH_KEY;
+    if (name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME") ||
+        name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME")) {
+        expectedType = DfxHisysevent::OPEN_WALLET;
+    }
+    int32_t countBefore = DfxHisysevent::keyEventCount_;
+    int32_t typeBefore = DfxHisysevent::calKeyEventTime_[expectedType];
+    DfxHisysevent::ReportKeyEvent(name);
+    EXPECT_EQ(DfxHisysevent::keyEventCount_, countBefore + 1);
+    EXPECT_EQ(DfxHisysevent::calKeyEventTime_[expectedType], typeBefore + 1);
 }
 
 /**
