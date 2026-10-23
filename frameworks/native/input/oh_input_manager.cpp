@@ -1573,7 +1573,8 @@ Input_Result OH_Input_AddKeyEventMonitor(Input_KeyEventCallback callback)
     Input_Result retCode = INPUT_SUCCESS;
     std::lock_guard guard(g_mutex);
     if (g_keyMonitorId == INVALID_MONITOR_ID) {
-        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().AddMonitor(KeyEventMonitorCallback, true);
+        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().AddMonitor(
+            KeyEventMonitorCallback, true);
         retCode = NormalizeResult(ret);
         if (retCode != INPUT_SUCCESS) {
             MMI_HISTOGRAM_ERROR("InputKit.OH_Input_AddKeyEventMonitor.Error", retCode);
@@ -1933,7 +1934,8 @@ static Input_Result RemovePointerEventMonitor()
 {
     Input_Result retCode = INPUT_SUCCESS;
     if (IsNeedRemoveMonitor()) {
-        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().RemoveMonitor(g_pointerMonitorId, true);
+        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().RemoveMonitor(
+            g_pointerMonitorId, true);
         retCode = NormalizeResult(ret);
         if (retCode != INPUT_SUCCESS) {
             return retCode;
