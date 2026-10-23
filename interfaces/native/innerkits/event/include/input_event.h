@@ -200,7 +200,7 @@ public:
      * so that GetIntervalSinceLastInput reflects it. Used by cross-device input
      * sharing to mark injected events as real user operations.
      */
-    static constexpr uint32_t EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME = 0x04000000;
+    static constexpr uint32_t EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME = 0x08000000;
 
     /**
      * The multimodal input event for the device to enable the intercom mode flag.
