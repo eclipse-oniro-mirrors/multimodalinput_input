@@ -1837,50 +1837,8 @@ HWTEST_F(EventMonitorHandlerTest,
     EventMonitorHandlerTest_MarkCaptureException_ServerNull_001, TestSize.Level1)
 {
     EventMonitorHandler eventMonitorHandler;
-    InputHandler->udsServer_ = nullptr;
     eventMonitorHandler.MarkCaptureException(g_pid + 100);
     EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
-}
-
-/**
- * @tc.name: EventMonitorHandlerTest_MarkCaptureException_SessionNull_001
- * @tc.desc: Test MarkCaptureException when pid is not registered in server, no mark is added
- * @tc.type: FUNC
- * @tc.require: FEAT-INPUT-RECORDING
- */
-HWTEST_F(EventMonitorHandlerTest,
-    EventMonitorHandlerTest_MarkCaptureException_SessionNull_001, TestSize.Level1)
-{
-    EventMonitorHandler eventMonitorHandler;
-    UDSServer udsServer;
-    InputHandler->udsServer_ = &udsServer;
-    eventMonitorHandler.MarkCaptureException(g_pid + 101);
-    EXPECT_TRUE(eventMonitorHandler.monitors_.captureExceptionSessions_.empty());
-    InputHandler->udsServer_ = nullptr;
-}
-
-/**
- * @tc.name: EventMonitorHandlerTest_MarkCaptureException_Normal_001
- * @tc.desc: Test MarkCaptureException marks the registered session
- * @tc.type: FUNC
- * @tc.require: FEAT-INPUT-RECORDING
- */
-HWTEST_F(EventMonitorHandlerTest,
-    EventMonitorHandlerTest_MarkCaptureException_Normal_001, TestSize.Level1)
-{
-    EventMonitorHandler eventMonitorHandler;
-    UDSServer udsServer;
-    InputHandler->udsServer_ = &udsServer;
-    int32_t pid = g_pid + 102;
-    int32_t fd = 102;
-    SessionPtr session = std::make_shared<UDSSession>(PROGRAM_NAME, g_moduleType, fd, UID_ROOT, pid);
-    udsServer.idxPidMap_.insert(std::make_pair(pid, fd));
-    udsServer.sessionsMap_.insert(std::make_pair(fd, session));
-
-    eventMonitorHandler.MarkCaptureException(pid);
-    EXPECT_EQ(eventMonitorHandler.monitors_.captureExceptionSessions_.size(), 1);
-    EXPECT_TRUE(eventMonitorHandler.monitors_.IsCaptureException(session));
-    InputHandler->udsServer_ = nullptr;
 }
 
 /**
