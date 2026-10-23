@@ -304,6 +304,7 @@ struct Threshold {
 struct WinInfo {
     int32_t windowPid {};
     int32_t windowId {};
+    float windowScaleFactor { 1.0f };
 };
 
 struct RegisteredEvent {
