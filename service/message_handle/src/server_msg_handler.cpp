@@ -163,6 +163,9 @@ int32_t ServerMsgHandler::OnInjectKeyEvent(const std::shared_ptr<KeyEvent> keyEv
             keyEvent->AddFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
         }
     }
+    if (keyEvent->HasFlag(InputEvent::EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME)) {
+        InputHandler->UpdateLastInputTime();
+    }
     keyEvent->SetKeyIntention(KeyItemsTransKeyIntention(keyEvent->GetKeyItems()));
     auto inputEventNormalizeHandler = InputHandler->GetEventNormalizeHandler();
     CHKPR(inputEventNormalizeHandler, ERROR_NULL_POINTER);
@@ -274,6 +277,9 @@ int32_t ServerMsgHandler::OnInjectPointerEvent(int32_t userId, const std::shared
             pointerEvent->AddFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
         }
     }
+    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME)) {
+        InputHandler->UpdateLastInputTime();
+    }
     return OnInjectPointerEventExt(userId, pointerEvent, isShell, useCoordinate);
 }
 
@@ -292,6 +298,9 @@ int32_t ServerMsgHandler::OnInjectTouchPadEvent(int32_t userId, const std::share
         if (DISPLAY_MONITOR->GetScreenLocked()) {
             pointerEvent->AddFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
         }
+    }
+    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME)) {
+        InputHandler->UpdateLastInputTime();
     }
     return OnInjectTouchPadEventExt(userId, pointerEvent, touchpadCDG, isShell);
 }

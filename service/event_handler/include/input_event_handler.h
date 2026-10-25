@@ -55,6 +55,7 @@ public:
     int32_t GetIntervalSinceLastInput(int64_t &timeInterval);
     int32_t GetLastInputEventTimeByDisplay(int32_t displayId, int64_t &lastInputEventTime);
     void UpdateLastInputEventTime(int32_t displayId);
+    void UpdateLastInputTime();
     void DumpLastInputTime(int32_t fd);
 
     std::shared_ptr<EventNormalizeHandler> GetEventNormalizeHandler() const;
