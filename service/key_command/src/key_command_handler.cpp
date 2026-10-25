@@ -444,6 +444,7 @@ void KeyCommandHandler::ParseRepeatKeyMaxCount()
     }
     int32_t tempCount = 0;
     int32_t tempDelay = 0;
+    auto walletNewBundleName = BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME");
     auto walletBundleName = BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME");
     for (RepeatKey& item : repeatKeys_) {
         if (item.times > tempCount) {
@@ -452,7 +453,8 @@ void KeyCommandHandler::ParseRepeatKeyMaxCount()
         if (item.delay > tempDelay) {
             tempDelay = item.delay;
         }
-        if (item.ability.bundleName == walletBundleName) {
+        if (item.ability.bundleName == walletNewBundleName ||
+            item.ability.bundleName == walletBundleName) {
             context_.walletLaunchDelayTimes_ = item.delay;
         }
     }

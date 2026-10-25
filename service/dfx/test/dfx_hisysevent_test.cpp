@@ -15,6 +15,7 @@
 
 #include <gtest/gtest.h>
 
+#include "bundle_name_parser.h"
 #include "define_multimodal.h"
 #include "dfx_hisysevent.h"
 #include "mmi_log.h"
@@ -2348,6 +2349,36 @@ HWTEST_F(DfxHisysEventTest, DfxHisysEventTest_ReportKeyEventTest_009, TestSize.L
     std::string name = "dispatch";
     DfxHisysevent::ReportKeyEvent(name);
     EXPECT_EQ(name, "dispatch");
+}
+
+/**
+ * @tc.name: DfxHisysEventTest_ReportKeyEventTest_010
+ * @tc.desc: ReportKeyEvent with wallet new bundle name
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(DfxHisysEventTest, DfxHisysEventTest_ReportKeyEventTest_010, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // Wallet bundle name comes from device config to avoid hardcoding it in open source code
+    std::string name = BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME");
+    DfxHisysevent::ReportKeyEvent(name);
+    EXPECT_NE(DfxHisysevent::keyEventCount_, -1);
+}
+
+/**
+ * @tc.name: DfxHisysEventTest_ReportKeyEventTest_011
+ * @tc.desc: ReportKeyEvent with wallet old bundle name
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(DfxHisysEventTest, DfxHisysEventTest_ReportKeyEventTest_011, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // Wallet bundle name comes from device config to avoid hardcoding it in open source code
+    std::string name = BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME");
+    DfxHisysevent::ReportKeyEvent(name);
+    EXPECT_NE(DfxHisysevent::keyEventCount_, -1);
 }
 
 /**

@@ -1568,6 +1568,108 @@ HWTEST_F(KeyCommandHandlerTest, KeyCommandHandlerTest_HandleKeyEvent_030, TestSi
 }
 
 /**
+ * @tc.name: KeyCommandHandlerTest_ParseRepeatKeyMaxCount_001
+ * @tc.desc: Test ParseRepeatKeyMaxCount with wallet bundle name matched
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyCommandHandlerTest, KeyCommandHandlerTest_ParseRepeatKeyMaxCount_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyCommandHandler handler;
+    RepeatKey item;
+    item.keyCode = KeyEvent::KEYCODE_POWER;
+    item.times = 2;
+    item.delay = 800;
+    // Wallet bundle name comes from device config, empty if bundle_name_config.json is absent
+    std::string walletName = BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME");
+    if (walletName.empty()) {
+        walletName = BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME");
+    }
+    item.ability.bundleName = walletName;
+    handler.repeatKeys_.push_back(item);
+    handler.context_.walletLaunchDelayTimes_ = 0;
+    handler.ParseRepeatKeyMaxCount();
+    EXPECT_EQ(handler.context_.walletLaunchDelayTimes_, 800);
+    EXPECT_EQ(handler.context_.maxCount_, 2);
+    EXPECT_EQ(handler.context_.intervalTime_, 800);
+}
+
+/**
+ * @tc.name: KeyCommandHandlerTest_ParseRepeatKeyMaxCount_002
+ * @tc.desc: Test ParseRepeatKeyMaxCount with non-wallet bundle name not matched
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyCommandHandlerTest, KeyCommandHandlerTest_ParseRepeatKeyMaxCount_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyCommandHandler handler;
+    RepeatKey item;
+    item.keyCode = KeyEvent::KEYCODE_POWER;
+    item.times = 5;
+    item.delay = 500;
+    item.ability.bundleName = "com.ohos.emergencycommunication";
+    handler.repeatKeys_.push_back(item);
+    handler.context_.walletLaunchDelayTimes_ = 0;
+    handler.ParseRepeatKeyMaxCount();
+    EXPECT_EQ(handler.context_.walletLaunchDelayTimes_, 0);
+    EXPECT_EQ(handler.context_.maxCount_, 5);
+    EXPECT_EQ(handler.context_.intervalTime_, 500);
+}
+
+/**
+ * @tc.name: KeyCommandHandlerTest_ParseRepeatKeyMaxCount_003
+ * @tc.desc: Test ParseRepeatKeyMaxCount with wallet and non-wallet items together
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyCommandHandlerTest, KeyCommandHandlerTest_ParseRepeatKeyMaxCount_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyCommandHandler handler;
+    RepeatKey otherItem;
+    otherItem.keyCode = KeyEvent::KEYCODE_POWER;
+    otherItem.times = 5;
+    otherItem.delay = 900;
+    otherItem.ability.bundleName = "com.ohos.emergencycommunication";
+    RepeatKey walletItem;
+    walletItem.keyCode = KeyEvent::KEYCODE_POWER;
+    walletItem.times = 2;
+    walletItem.delay = 400;
+    // Wallet bundle name comes from device config, empty if bundle_name_config.json is absent
+    std::string walletName = BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME");
+    if (walletName.empty()) {
+        walletName = BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME");
+    }
+    walletItem.ability.bundleName = walletName;
+    handler.repeatKeys_.push_back(otherItem);
+    handler.repeatKeys_.push_back(walletItem);
+    handler.context_.walletLaunchDelayTimes_ = 0;
+    handler.ParseRepeatKeyMaxCount();
+    EXPECT_EQ(handler.context_.walletLaunchDelayTimes_, 400);
+    EXPECT_EQ(handler.context_.maxCount_, 5);
+    EXPECT_EQ(handler.context_.intervalTime_, 900);
+}
+
+/**
+ * @tc.name: KeyCommandHandlerTest_ParseRepeatKeyMaxCount_004
+ * @tc.desc: Test ParseRepeatKeyMaxCount with empty repeatKeys
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(KeyCommandHandlerTest, KeyCommandHandlerTest_ParseRepeatKeyMaxCount_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    KeyCommandHandler handler;
+    handler.context_.walletLaunchDelayTimes_ = 300;
+    handler.ParseRepeatKeyMaxCount();
+    EXPECT_EQ(handler.context_.walletLaunchDelayTimes_, 300);
+    EXPECT_EQ(handler.context_.maxCount_, 0);
+    EXPECT_EQ(handler.context_.intervalTime_, 0);
+}
+
+/**
  * @tc.name: KeyCommandHandlerTest_HandleKeyEvent_031
  * @tc.desc: Test UnregisterProximitySensor
  * @tc.type: FUNC

@@ -1184,7 +1184,8 @@ void DfxHisysevent::ReportKeyEvent(std::string name)
         ReportKeyEventTimes(SCREEN_SHOT);
     } else if (name == BUNDLE_NAME_PARSER.GetBundleName("SCREENRECORDER_BUNDLE_NAME")) {
         ReportKeyEventTimes(SCREEN_RECORDING);
-    } else if (name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME")) {
+    } else if (name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_NEW_BUNDLE_NAME") ||
+               name == BUNDLE_NAME_PARSER.GetBundleName("WALLET_BUNDLE_NAME")) {
         ReportKeyEventTimes(OPEN_WALLET);
     } else if (name == BUNDLE_NAME_PARSER.GetBundleName("SOS_BUNDLE_NAME")) {
         ReportKeyEventTimes(OPEN_SOS);
