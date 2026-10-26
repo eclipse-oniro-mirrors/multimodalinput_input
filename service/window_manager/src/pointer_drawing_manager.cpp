@@ -4229,16 +4229,10 @@ void PointerDrawingManager::ScaleUserIconBySystem(std::shared_ptr<OHOS::Media::P
     cursorWidth_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.width;
     cursorHeight_ = pow(INCREASE_RATIO, cursorSize - 1) * imageInfo.size.height;
 #ifdef OHOS_BUILD_PC_PRIORITY
-    auto sp = GetScreenPointer(displayId_);
-    float densityRatio = (sp != nullptr) ? sp->GetDPI() : 1.0f;
-    if (densityRatio <= 0) {
-        densityRatio = 1.0f;
-    }
-    RenderConfig tmpCfg;
-    tmpCfg.dpi = densityRatio;
-    tmpCfg.size = static_cast<uint32_t>(cursorSize);
-    int32_t systemCursorWidth = tmpCfg.GetImageSize();
-    int32_t systemCursorHeight = systemCursorWidth;
+    int32_t systemCursorWidth =
+        pow(INCREASE_RATIO, cursorSize - 1) * displayInfo_.dpi * GetIndependentPixels() / BASELINE_DENSITY;
+    int32_t systemCursorHeight =
+        pow(INCREASE_RATIO, cursorSize - 1) * displayInfo_.dpi * GetIndependentPixels() / BASELINE_DENSITY;
     if (systemCursorHeight < cursorHeight_) {
         cursorHeight_ = systemCursorHeight;
         cursorWidth_ = systemCursorWidth;
