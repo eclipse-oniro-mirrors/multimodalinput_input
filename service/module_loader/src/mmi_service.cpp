@@ -816,7 +816,15 @@ void MMIService::OnDisconnected(SessionPtr s)
     }
 #endif // OHOS_BUILD_ENABLE_POINTER
 #if defined(OHOS_BUILD_ENABLE_POINTER) && defined(OHOS_BUILD_ENABLE_POINTER_DRAWING)
-    CursorDrawingComponent::GetInstance().OnSessionLost(s->GetPid());
+    int32_t lostPid = s->GetPid();
+    int32_t sessionLostRet = delegateTasks_.PostSyncTask(std::bind(
+        [lostPid] {
+            CursorDrawingComponent::GetInstance().OnSessionLost(lostPid);
+            return RET_OK;
+        }));
+    if (sessionLostRet != RET_OK) {
+        MMI_HILOGE("OnSessionLost via delegate thread failed, pid:%{public}d, ret:%{public}d", lostPid, sessionLostRet);
+    }
 #endif // OHOS_BUILD_ENABLE_POINTER && OHOS_BUILD_ENABLE_POINTER_DRAWING
 }
 
