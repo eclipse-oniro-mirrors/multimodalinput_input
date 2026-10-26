@@ -1,0 +1,43 @@
+/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef GLOBAL_PRIORITY_CURSOR_PERSISTENCE_H
+#define GLOBAL_PRIORITY_CURSOR_PERSISTENCE_H
+
+#include "global_priority_cursor.h"
+
+namespace OHOS {
+namespace MMI {
+class GlobalPriorityCursorPersistence {
+public:
+    static int32_t Save(const GlobalPriorityCursor &globalCursor);
+    static int32_t Load(GlobalPriorityCursor &globalCursor);
+    static int32_t Remove();
+
+private:
+    struct FileHeader {
+        int32_t pid = -1;
+        int32_t width = 0;
+        int32_t height = 0;
+        int32_t focusX = 0;
+        int32_t focusY = 0;
+    };
+    static int32_t LoadHeader(std::ifstream &ifs, FileHeader &fileHeader);
+    static int32_t LoadPixelData(std::ifstream &ifs, const FileHeader &fileHeader,
+        GlobalPriorityCursor &globalCursor);
+};
+} // namespace MMI
+} // namespace OHOS
+#endif // GLOBAL_PRIORITY_CURSOR_PERSISTENCE_H

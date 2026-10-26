@@ -1290,6 +1290,22 @@ int32_t MultimodalInputConnectManager::SetCustomCursor(int32_t windowId, CustomC
     }
 }
 
+int32_t MultimodalInputConnectManager::SetGlobalPriorityCursor(const CustomCursor &cursor)
+{
+    std::lock_guard<std::mutex> guard(lock_);
+    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
+    CHKPR(cursor.pixelMap, RET_ERR);
+    CustomCursorParcel curParcel(cursor.pixelMap, cursor.focusX, cursor.focusY);
+    return multimodalInputConnectService_->SetGlobalPriorityCursor(curParcel);
+}
+
+int32_t MultimodalInputConnectManager::UnsetGlobalPriorityCursor()
+{
+    std::lock_guard<std::mutex> guard(lock_);
+    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
+    return multimodalInputConnectService_->UnsetGlobalPriorityCursor();
+}
+
 int32_t MultimodalInputConnectManager::SetMultiWindowScreenId(uint64_t screenId, uint64_t displayNodeScreenId)
 {
     std::lock_guard<std::mutex> guard(lock_);

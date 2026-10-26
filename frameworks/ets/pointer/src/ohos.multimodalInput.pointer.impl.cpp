@@ -489,6 +489,61 @@ void SetCustomCursorAsync(int32_t windowId, ::ohos::multimodalInput::pointer::Cu
     }
 }
 
+void SetGlobalPriorityCursorAsync(::ohos::multimodalInput::pointer::CustomCursor const& cursor)
+{
+    CALL_DEBUG_ENTER;
+    MMI_HISTOGRAM_BOOLEAN("InputKit.pointer.setGlobalPriorityCursor.Call", true);
+    auto newCursor = TaihePointerUtils::ConvertToCustomCursor(cursor);
+    if (!CheckCustomCursor(newCursor)) {
+        MMI_HILOGE("cursor is invalid");
+        taihe::set_business_error(COMMON_PARAMETER_ERROR, "cursor is invalid");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.setGlobalPriorityCursor.Error", COMMON_PARAMETER_ERROR);
+        return;
+    }
+    auto errorCode = InputManager::GetInstance()->SetGlobalPriorityCursor(newCursor);
+    if (errorCode == COMMON_USE_SYSAPI_ERROR) {
+        MMI_HILOGE("Non system applications use system API");
+        taihe::set_business_error(COMMON_USE_SYSAPI_ERROR, "Non system applications use system API");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.setGlobalPriorityCursor.Error", COMMON_USE_SYSAPI_ERROR);
+    } else if (errorCode == -COMMON_PERMISSION_CHECK_ERROR) {
+        MMI_HILOGE("Permission denied");
+        taihe::set_business_error(COMMON_PERMISSION_CHECK_ERROR, "Permission denied");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.setGlobalPriorityCursor.Error", COMMON_PERMISSION_CHECK_ERROR);
+    } else if (errorCode == -INPUT_SERVICE_EXCEPTION) {
+        MMI_HILOGE("Input service exception");
+        taihe::set_business_error(INPUT_SERVICE_EXCEPTION, "Input service exception.");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.setGlobalPriorityCursor.Error", INPUT_SERVICE_EXCEPTION);
+    } else if (errorCode != RET_OK) {
+        MMI_HILOGE("SetGlobalPriorityCursor failed, errorCode:%{public}d", errorCode);
+        taihe::set_business_error(COMMON_PARAMETER_ERROR, "Parameter error.");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.setGlobalPriorityCursor.Error", COMMON_PARAMETER_ERROR);
+    }
+}
+
+void UnsetGlobalPriorityCursorAsync()
+{
+    CALL_DEBUG_ENTER;
+    MMI_HISTOGRAM_BOOLEAN("InputKit.pointer.unsetGlobalPriorityCursor.Call", true);
+    auto errorCode = InputManager::GetInstance()->UnsetGlobalPriorityCursor();
+    if (errorCode == COMMON_USE_SYSAPI_ERROR) {
+        MMI_HILOGE("Non system applications use system API");
+        taihe::set_business_error(COMMON_USE_SYSAPI_ERROR, "Non system applications use system API");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.unsetGlobalPriorityCursor.Error", COMMON_USE_SYSAPI_ERROR);
+    } else if (errorCode == -COMMON_PERMISSION_CHECK_ERROR) {
+        MMI_HILOGE("Permission denied");
+        taihe::set_business_error(COMMON_PERMISSION_CHECK_ERROR, "Permission denied");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.unsetGlobalPriorityCursor.Error", COMMON_PERMISSION_CHECK_ERROR);
+    } else if (errorCode == -INPUT_SERVICE_EXCEPTION) {
+        MMI_HILOGE("Input service exception");
+        taihe::set_business_error(INPUT_SERVICE_EXCEPTION, "Input service exception.");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.unsetGlobalPriorityCursor.Error", INPUT_SERVICE_EXCEPTION);
+    } else if (errorCode != RET_OK) {
+        MMI_HILOGE("UnsetGlobalPriorityCursor failed, errorCode:%{public}d", errorCode);
+        taihe::set_business_error(COMMON_PARAMETER_ERROR, "Parameter error.");
+        MMI_HISTOGRAM_ERROR("InputKit.pointer.unsetGlobalPriorityCursor.Error", COMMON_PARAMETER_ERROR);
+    }
+}
+
 int32_t GetPointerSpeedSyncImpl()
 {
     CALL_DEBUG_ENTER;
@@ -1086,6 +1141,8 @@ TH_EXPORT_CPP_API_SetTouchpadDoubleTapAndDragStateAsync(SetTouchpadDoubleTapAndD
 TH_EXPORT_CPP_API_SetCustomCursorSyncImpl(SetCustomCursorSyncImpl);
 TH_EXPORT_CPP_API_SetCustomCursorPixelMapAsync(SetCustomCursorPixelMapAsync);
 TH_EXPORT_CPP_API_SetCustomCursorAsync(SetCustomCursorAsync);
+TH_EXPORT_CPP_API_SetGlobalPriorityCursorAsync(SetGlobalPriorityCursorAsync);
+TH_EXPORT_CPP_API_UnsetGlobalPriorityCursorAsync(UnsetGlobalPriorityCursorAsync);
 TH_EXPORT_CPP_API_GetPointerSpeedSyncImpl(GetPointerSpeedSyncImpl);
 TH_EXPORT_CPP_API_GetTouchpadRightClickTypeAsync(GetTouchpadRightClickTypeAsync);
 TH_EXPORT_CPP_API_SetTouchpadRightClickTypeAsync(SetTouchpadRightClickTypeAsync);

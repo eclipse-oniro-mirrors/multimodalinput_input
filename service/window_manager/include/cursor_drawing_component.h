@@ -69,6 +69,11 @@ public:
     int32_t SetCustomCursor(CursorPixelMap curPixelMap, int32_t pid, int32_t windowId, int32_t focusX, int32_t focusY);
     int32_t SetCustomCursor(int32_t pid, int32_t windowId, CustomCursor cursor, CursorOptions options,
         const sptr<IRemoteObject> &token = nullptr);
+    int32_t SetGlobalPriorityCursor(const CustomCursor &cursor, int32_t pid);
+    int32_t UnsetGlobalPriorityCursor(int32_t pid);
+    bool HasGlobalPriorityCursor();
+    GlobalPriorityCursor GetGlobalPriorityCursor();
+    int32_t RestoreOnServiceStart();
     int32_t SetMouseIcon(int32_t userId, int32_t pid, int32_t windowId, CursorPixelMap curPixelMap);
     int32_t SetMouseHotSpot(int32_t pid, int32_t windowId, int32_t hotSpotX, int32_t hotSpotY);
     int32_t SetPointerSize(int32_t userId, int32_t size);

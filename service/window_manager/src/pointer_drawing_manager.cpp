@@ -34,6 +34,7 @@
 #include "bytrace_adapter.h"
 #include "cursor_drawing_component.h"
 #include "define_multimodal.h"
+#include "global_priority_cursor_persistence.h"
 #include "input_device_manager.h"
 #include "i_input_windows_manager.h"
 #include "ipc_skeleton.h"
@@ -692,12 +693,14 @@ void PointerDrawingManager::DrawMovePointer(uint64_t rsId, int32_t physicalX, in
     }
 }
 
-void PointerDrawingManager::DrawPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
-    const PointerStyle pointerStyle, Direction direction)
+PointerStyle PointerDrawingManager::PrepareDrawStyle(uint64_t rsId, int32_t physicalX, int32_t physicalY,
+    Direction direction, PointerStyle drawStyle)
 {
-    CALL_DEBUG_ENTER;
+    if (hasGlobalPriorityCursor_.load() && CursorDrawingInformation::GetInstance().IsPointerVisible()) {
+        drawStyle.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
+    }
     MMI_HILOGD("rsId:%{public}" PRIu64 ", physicalX:%{private}d, physicalY:%{private}d, pointerStyle:%{public}d",
-        rsId, physicalX, physicalY, pointerStyle.id);
+        rsId, physicalX, physicalY, drawStyle.id);
     if (GetHardCursorEnabled() && !initEventHandlerFlag_.load()) {
         MMI_HILOGI("draw pointer but pointer thread has not start, start now");
         InitRsCallback();
@@ -707,19 +710,27 @@ void PointerDrawingManager::DrawPointer(uint64_t rsId, int32_t physicalX, int32_
     lastPhysicalX_ = physicalX;
     lastPhysicalY_ = physicalY;
     resample_.AddPoint(physicalX, physicalY, rsId);
-    currentMouseStyle_ = pointerStyle;
+    currentMouseStyle_ = drawStyle;
     currentDirection_ = direction;
     if (moveFinished_.load()) {
         UpdateCursorBlurEnabled();
         moveFinished_.store(false);
     }
-    AdjustMouseFocusToSoftRenderOrigin(direction, MOUSE_ICON(pointerStyle.id), physicalX, physicalY);
+    AdjustMouseFocusToSoftRenderOrigin(direction, MOUSE_ICON(drawStyle.id), physicalX, physicalY);
     // Log printing only occurs when the mouse style changes
     if (currentMouseStyle_.id != lastMouseStyle_.id) {
         MMI_HILOGD("MagicCursor AdjustMouseFocus:%{public}d",
-            CursorDrawingInformation::GetInstance().MouseIcon2IconType(MOUSE_ICON(pointerStyle.id)));
+            CursorDrawingInformation::GetInstance().MouseIcon2IconType(MOUSE_ICON(drawStyle.id)));
     }
-    if (DrawMovePointer(rsId, physicalX, physicalY, pointerStyle, direction) == RET_OK) {
+    return drawStyle;
+}
+
+void PointerDrawingManager::DrawPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY,
+    const PointerStyle pointerStyle, Direction direction)
+{
+    CALL_DEBUG_ENTER;
+    PointerStyle drawStyle = PrepareDrawStyle(rsId, physicalX, physicalY, direction, pointerStyle);
+    if (DrawMovePointer(rsId, physicalX, physicalY, drawStyle, direction) == RET_OK) {
         return;
     }
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
@@ -3217,6 +3228,10 @@ int32_t PointerDrawingManager::ClearWindowPointerStyle(int32_t pid, int32_t wind
 void PointerDrawingManager::DrawPointerStyle(const PointerStyle& pointerStyle)
 {
     CALL_DEBUG_ENTER;
+    if (hasGlobalPriorityCursor_.load() && CursorDrawingInformation::GetInstance().IsPointerVisible()) {
+        DrawGlobalPriorityCursor();
+        return;
+    }
     bool simulate = WIN_MGR->IsMouseSimulate();
     if (hasDisplay_ && (hasPointerDevice_ || simulate)) {
         if (GetSurfaceNode() != nullptr) {
@@ -4329,6 +4344,95 @@ int32_t PointerDrawingManager::UpdateCursorProperty(CustomCursor cursor)
         focusX_, focusY_, userIconHotSpotX_, userIconHotSpotY_);
     MMI_HILOGI("imageWidth:%{public}d, imageHeight:%{public}d, focusX:%{private}d, focusY:%{private}d",
         imageInfo.size.width, imageInfo.size.height, cursor.focusX, cursor.focusY);
+    return RET_OK;
+}
+
+int32_t PointerDrawingManager::SetGlobalPriorityCursor(const CustomCursor &cursor, int32_t pid)
+{
+    CALL_DEBUG_ENTER;
+    CHKPR(cursor.pixelMap, RET_ERR);
+    int32_t ret = UpdateCursorProperty(cursor);
+    if (ret != RET_OK) {
+        MMI_HILOGE("UpdateCursorProperty is failed");
+        return ret;
+    }
+    globalPriorityCursor_.cursor = cursor;
+    globalPriorityCursor_.pid = pid;
+    hasGlobalPriorityCursor_.store(true);
+    globalPriorityCursor_.persisted = true;
+    if (GlobalPriorityCursorPersistence::Save(globalPriorityCursor_) != RET_OK) {
+        MMI_HILOGE("Persist global priority cursor failed, pid:%{private}d", pid);
+    }
+    MMI_HILOGD("Set global priority cursor, pid:%{private}d", pid);
+    return RET_OK;
+}
+
+int32_t PointerDrawingManager::UnsetGlobalPriorityCursor(int32_t pid)
+{
+    CALL_DEBUG_ENTER;
+    if (!hasGlobalPriorityCursor_.load()) {
+        MMI_HILOGD("Global priority cursor does not exist, unset directly");
+        return RET_OK;
+    }
+    if (globalPriorityCursor_.pid != pid) {
+        MMI_HILOGE("Global priority cursor is not set by this caller, pid:%{private}d", pid);
+        return ERROR_NO_PERMISSION;
+    }
+    globalPriorityCursor_ = {};
+    hasGlobalPriorityCursor_.store(false);
+    if (GlobalPriorityCursorPersistence::Remove() != RET_OK) {
+        MMI_HILOGE("Remove persisted global priority cursor failed");
+    }
+    PointerStyle style = lastMouseStyle_;
+    DrawPointerStyle(style);
+    MMI_HILOGD("Unset global priority cursor, pid:%{private}d", pid);
+    return RET_OK;
+}
+
+bool PointerDrawingManager::HasGlobalPriorityCursor() const
+{
+    return hasGlobalPriorityCursor_.load();
+}
+
+GlobalPriorityCursor PointerDrawingManager::GetGlobalPriorityCursor() const
+{
+    return globalPriorityCursor_;
+}
+
+int32_t PointerDrawingManager::RestoreOnServiceStart()
+{
+    CALL_DEBUG_ENTER;
+    GlobalPriorityCursor globalCursor;
+    if (GlobalPriorityCursorPersistence::Load(globalCursor) != RET_OK) {
+        MMI_HILOGD("No global priority cursor record, skip restore");
+        return RET_OK;
+    }
+    if (globalCursor.cursor.pixelMap == nullptr) {
+        MMI_HILOGE("Global priority cursor pixel map is invalid, remove record");
+        GlobalPriorityCursorPersistence::Remove();
+        return RET_ERR;
+    }
+    globalPriorityCursor_ = globalCursor;
+    hasGlobalPriorityCursor_.store(true);
+    int32_t ret = UpdateCursorProperty(globalCursor.cursor);
+    if (ret != RET_OK) {
+        MMI_HILOGE("Restore global priority cursor property failed, clear record");
+        globalPriorityCursor_ = {};
+        hasGlobalPriorityCursor_.store(false);
+        GlobalPriorityCursorPersistence::Remove();
+        return ret;
+    }
+    MMI_HILOGI("Restore global priority cursor succeeded, pid:%{public}d", globalCursor.pid);
+    return RET_OK;
+}
+
+int32_t PointerDrawingManager::DrawGlobalPriorityCursor()
+{
+    CALL_DEBUG_ENTER;
+    PointerStyle style;
+    style.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
+    Direction direction = GetDisplayDirection(&displayInfo_);
+    DrawPointer(displayInfo_.rsId, lastPhysicalX_, lastPhysicalY_, style, direction);
     return RET_OK;
 }
 

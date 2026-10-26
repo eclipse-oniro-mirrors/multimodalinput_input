@@ -1227,6 +1227,33 @@ public:
         const sptr<IRemoteObject> &token = nullptr);
 
     /**
+     * @brief Sets the global priority cursor, which takes effect across all windows and displays.
+     * @param cursor Custom cursor, including the custom cursor resource and focus position.
+     * @return Returns <b>0</b> if success; returns a non-0 value otherwise.
+     * @throws {BusinessError} 201 - Permission denied.
+     * @throws {BusinessError} 202 - Permission denied, non-system application called system api.
+     * @throws {BusinessError} 401 - Parameter error.
+     * @throws {BusinessError} 3800001 - Input service exception.
+     * @syscap SystemCapability.MultimodalInput.Input.Pointer
+     * @systemapi Hide this for inner system use.
+     * @since 25
+     */
+    int32_t SetGlobalPriorityCursor(const CustomCursor &cursor);
+
+    /**
+     * @brief Clears the global priority cursor set by the current caller.
+     * @return Returns <b>0</b> if success; returns a non-0 value otherwise.
+     * @throws {BusinessError} 201 - Permission denied.
+     * @throws {BusinessError} 202 - Permission denied, non-system application called system api.
+     * @throws {BusinessError} 401 - Parameter error.
+     * @throws {BusinessError} 3800001 - Input service exception.
+     * @syscap SystemCapability.MultimodalInput.Input.Pointer
+     * @systemapi Hide this for inner system use.
+     * @since 25
+     */
+    int32_t UnsetGlobalPriorityCursor();
+
+    /**
      * @brief Check whether the touch position is a knuckle event.
      * @param pointX X coordinate of the touch position
      * @param pointY Y coordinate of the touch position
