@@ -199,7 +199,7 @@ public:
     void UpdateDisplayInfoExt(const OLD::DisplayGroupInfo &displayGroupInfo);
     bool GetAncoState(const std::map<int32_t, std::map<int32_t, bool>>& states,
           int32_t deviceId, int32_t pointerId) const;
-    bool IsInAncoWindow(const WindowInfo &window, int32_t x, int32_t y,
+    bool IsInAncoWindow(const WindowInfo &window, int32_t x, int32_t y, std::string& msg,
         int32_t sourceType = PointerEvent::SOURCE_TYPE_UNKNOWN) const;
     bool IsAncoWindow(const WindowInfo &window) const;
     bool IsAncoWindowFocus(const WindowInfo &window) const;
@@ -211,7 +211,7 @@ public:
     bool IsKnuckleOnAncoWindow(std::shared_ptr<PointerEvent> pointerEvent);
     void SendOneHandData(const OLD::DisplayInfo &displayInfo, std::shared_ptr<PointerEvent> &pointerEvent);
     bool IsAncoGameActive();
-    bool IsShouldSendToAnco(std::shared_ptr<PointerEvent> pointerEvent, bool isFirstSpecialWindow);
+    bool IsShouldSendToAnco(std::shared_ptr<PointerEvent> pointerEvent, bool isFirstSpecialWindow, std::string& msg);
     bool ShouldUseNonDirectPath();
     bool NeedSendToAnco(int32_t deviceId);
 #endif // OHOS_BUILD_ENABLE_ANCO

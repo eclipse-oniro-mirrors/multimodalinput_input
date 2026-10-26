@@ -5149,15 +5149,31 @@ bool MouseTargetIsInAnco(int32_t windowX, int32_t windowY, const std::shared_ptr
         return false;
     }
 
+    static int32_t lastWindowId { -1 };
     if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_BUTTON_DOWN) {
-        isInAnco = inputWindowsManager.IsInAncoWindow(*touchWindow, windowX, windowY, pointerEvent->GetSourceType());
+        std::string msg {};
+        isInAnco = inputWindowsManager.IsInAncoWindow(*touchWindow, windowX, windowY, msg,
+            pointerEvent->GetSourceType());
+        MMI_HILOGI("MouseTargetIsInAnco result:%{public}d, msg:%{public}s", isInAnco, msg.c_str());
     }
 
     if (pointerItem.IsPressed() || pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_BUTTON_UP) {
         return isInAnco;
     }
 
-    return inputWindowsManager.IsInAncoWindow(*touchWindow, windowX, windowY, pointerEvent->GetSourceType());
+    std::string msg {};
+    static int32_t lastWinId { -1 };
+    bool isInAncoRet = inputWindowsManager.IsInAncoWindow(*touchWindow, windowX, windowY, msg,
+        pointerEvent->GetSourceType());
+    int32_t action = pointerEvent->GetPointerAction();
+    if ((lastWinId != touchWindow->id) && (action == PointerEvent::POINTER_ACTION_DOWN ||
+        action == PointerEvent::POINTER_ACTION_BUTTON_DOWN ||
+        action == PointerEvent::POINTER_ACTION_HOVER_ENTER)) {
+        MMI_HILOGI("MouseTargetIsInAnco result:%{public}d, msg:%{public}s", isInAncoRet, msg.c_str());
+    }
+    lastWinId = touchWindow->id;
+
+    return isInAncoRet;
 }
 #endif // OHOS_BUILD_ENABLE_ANCO
 
@@ -6465,8 +6481,10 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
     if ((isHoverEvent && (pointerAction == PointerEvent::POINTER_ACTION_HOVER_ENTER ||
             NeedTouchTracking(*pointerEvent))) ||
         (!isHoverEvent && (pointerAction == PointerEvent::POINTER_ACTION_DOWN || isExtraData))) {
-        ancoStates[deviceId][pointerId] =
-            touchWindow && IsInAncoWindow(*touchWindow, windowX, windowY);
+        std::string msg {};
+        ancoStates[deviceId][pointerId] = touchWindow && IsInAncoWindow(*touchWindow, windowX, windowY, msg);
+         MMI_HILOGI("TouchAncoWindowInAnco result:%{public}d, msg:%{public}s", ancoStates[deviceId][pointerId],
+            msg.c_str());
     }
     bool isInAnco = GetAncoState(ancoStates, deviceId, pointerId);
     if ((isHoverEvent && pointerAction == PointerEvent::POINTER_ACTION_HOVER_EXIT) ||
@@ -6495,7 +6513,21 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
             }
         }
         pointerEvent->UpdatePointerItem(pointerId, pointerItem);
-        if (IsShouldSendToAnco(pointerEvent, isFirstSpecialWindow)) {
+
+        std::string msg {};
+        static int32_t lastWinId { -1 };
+        bool isSendToAnco = IsShouldSendToAnco(pointerEvent, isFirstSpecialWindow, msg);
+        int32_t action = pointerEvent->GetPointerAction();
+        if ((touchWindow->id != lastWinId) &&
+            (action == PointerEvent::POINTER_ACTION_DOWN ||
+            action == PointerEvent::POINTER_ACTION_BUTTON_DOWN ||
+            action == PointerEvent::POINTER_ACTION_HOVER_ENTER)) {
+            MMI_HILOGI("The current pointerEvent needs sent to anco as follows result:%s, msg:%s",
+                isSendToAnco ? "true":"false", msg.c_str());
+        }
+        lastWinId = touchWindow->id;
+
+        if (isSendToAnco) {
             SimulatePointerExt(pointerEvent);
             isFirstSpecialWindow = false;
         }
