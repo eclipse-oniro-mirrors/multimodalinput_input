@@ -107,9 +107,9 @@ public:
     ErrCode GetKeyboardRepeatDelay(int32_t &delay) override;
     ErrCode GetKeyboardRepeatRate(int32_t &rate) override;
     ErrCode AddInputHandler(int32_t handlerType, uint32_t eventType, int32_t priority, uint32_t deviceTags,
-        const std::vector<int32_t>& actionsType = std::vector<int32_t>()) override;
+        const std::vector<int32_t>& actionsType = std::vector<int32_t>(), bool isCapi = false) override;
     ErrCode RemoveInputHandler(int32_t handlerType, uint32_t eventType, int32_t priority, uint32_t deviceTags,
-        const std::vector<int32_t>& actionsType = std::vector<int32_t>()) override;
+        const std::vector<int32_t>& actionsType = std::vector<int32_t>(), bool isCapi = false) override;
     ErrCode AddPreInputHandler(int32_t handlerId, uint32_t eventType, const std::vector<int32_t>& keys) override;
     ErrCode RemovePreInputHandler(int32_t handlerId) override;
     ErrCode AddGestureMonitor(int32_t handlerType, uint32_t eventType, uint32_t gestureType, int32_t fingers) override;
@@ -376,8 +376,8 @@ private:
     void PrintLog(const std::string &flag, int32_t duration, int32_t pid, int32_t tid);
     void OnSessionDelete(SessionPtr session);
     bool IsValidType(int32_t type);
-    int32_t CheckInputHandlerVaild(InputHandlerType handlerType);
-    int32_t CheckRemoveInputHandlerVaild(InputHandlerType handlerType);
+    int32_t CheckInputHandlerVaild(InputHandlerType handlerType, bool isCapi = false);
+    int32_t CheckRemoveInputHandlerVaild(InputHandlerType handlerType, bool isCapi = false);
     void DealConsumers(std::vector<std::string>& filterNames, const DeviceConsumer &consumer);
     std::vector<std::string> FilterConsumers(const std::vector<std::string> &deviceNames);
     void UpdateConsumers(const cJSON* consumer);

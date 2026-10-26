@@ -42,6 +42,7 @@ namespace {
     const std::string KEY_EVENT_HOOK_PERMISSION_CODE = "ohos.permission.HOOK_KEY_EVENT";
     const std::string MANAGE_EDM_POLICY_PERMISSION_CODE = "ohos.permission.MANAGE_EDM_POLICY";
     const std::string INPUT_DEVICE_PERMISSION_CODE = "ohos.permission.INPUT_DEVICE_CONFIGURATOR";
+    const std::string INPUT_RECORDING_PERMISSION_CODE = "ohos.permission.INPUT_RECORDING";
 } // namespace
 bool PermissionHelper::VerifySystemApp()
 {
@@ -84,6 +85,18 @@ bool PermissionHelper::CheckMonitor()
 {
     CALL_DEBUG_ENTER;
     return CheckHapPermission(MONITOR_PERMISSION_CODE);
+}
+
+bool PermissionHelper::CheckInputRecording()
+{
+    CALL_DEBUG_ENTER;
+    return CheckHapPermission(INPUT_RECORDING_PERMISSION_CODE);
+}
+
+bool PermissionHelper::CheckMonitorWithRecording()
+{
+    CALL_DEBUG_ENTER;
+    return CheckMonitor() || CheckInputRecording();
 }
 
 bool PermissionHelper::CheckInterceptor()

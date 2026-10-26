@@ -254,6 +254,22 @@ void EventMonitorHandler::InitSessionLostCallback()
     MMI_HILOGD("The callback on session deleted is registered successfully");
 }
 
+void EventMonitorHandler::MarkCaptureException(int32_t pid)
+{
+    CALL_DEBUG_ENTER;
+    auto udsServerPtr = InputHandler->GetUDSServer();
+    if (udsServerPtr == nullptr) {
+        MMI_HILOGE("udsServerPtr is null");
+        return;
+    }
+    SessionPtr session = udsServerPtr->GetSessionByPid(pid);
+    if (session == nullptr) {
+        MMI_HILOGE("session not found, pid:%{public}d", pid);
+        return;
+    }
+    monitors_.MarkCaptureException(session);
+}
+
 void EventMonitorHandler::OnSessionLost(SessionPtr session)
 {
     monitors_.OnSessionLost(session);
@@ -459,6 +475,9 @@ void EventMonitorHandler::MonitorCollection::RemoveMonitor(const SessionHandler&
         }
     }
     if (monitor.eventType_ == HANDLE_EVENT_TYPE_NONE) {
+        if (monitor.session_) {
+            captureExceptionSessions_.erase(monitor.session_);
+        }
         MMI_HILOGD("Unregister monitor successfully");
         return;
     }
@@ -576,9 +595,30 @@ bool EventMonitorHandler::MonitorCollection::HasScreenCaptureMonitor(SessionPtr 
     return (endScreenCaptureMonitors_.find(pid) != endScreenCaptureMonitors_.end());
 }
 
+void EventMonitorHandler::MonitorCollection::MarkCaptureException(SessionPtr session)
+{
+    if (session == nullptr) {
+        MMI_HILOGE("session is null");
+        return;
+    }
+    captureExceptionSessions_.insert(session);
+}
+
+bool EventMonitorHandler::MonitorCollection::IsCaptureException(SessionPtr session)
+{
+    if (session == nullptr) {
+        MMI_HILOGE("session is null");
+        return false;
+    }
+    return captureExceptionSessions_.find(session) != captureExceptionSessions_.end();
+}
+
 void EventMonitorHandler::MonitorCollection::RemoveScreenCaptureMonitor(SessionPtr session)
 {
     if (session->GetTokenType() != TokenType::TOKEN_HAP) {
+        return;
+    }
+    if (!IsCaptureException(session)) {
         return;
     }
     int32_t pid = session->GetPid();
@@ -601,6 +641,9 @@ void EventMonitorHandler::MonitorCollection::RemoveScreenCaptureMonitor(SessionP
 void EventMonitorHandler::MonitorCollection::RecoveryScreenCaptureMonitor(SessionPtr session)
 {
     if (session->GetTokenType() != TokenType::TOKEN_HAP) {
+        return;
+    }
+    if (!IsCaptureException(session)) {
         return;
     }
     int32_t pid = session->GetPid();
@@ -857,6 +900,7 @@ bool EventMonitorHandler::MonitorCollection::CheckIfNeedSendToClient(
 void EventMonitorHandler::MonitorCollection::OnSessionLost(SessionPtr session)
 {
     CALL_DEBUG_ENTER;
+    captureExceptionSessions_.erase(session);
     std::set<SessionHandler>::const_iterator cItr = monitors_.cbegin();
     while (cItr != monitors_.cend()) {
         if (cItr->session_ != session) {

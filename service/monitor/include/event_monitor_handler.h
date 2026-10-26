@@ -64,6 +64,7 @@ public:
 #ifdef PLAYER_FRAMEWORK_EXISTS
     void ProcessScreenCapture(int32_t pid, bool isStart);
 #endif
+    void MarkCaptureException(int32_t pid);
     const ISessionHandlerCollection *GetMonitorCollection() const;
 
 private:
@@ -157,6 +158,8 @@ private:
         bool HasScreenCaptureMonitor(SessionPtr session);
         void RemoveScreenCaptureMonitor(SessionPtr session);
         void RecoveryScreenCaptureMonitor(SessionPtr session);
+        void MarkCaptureException(SessionPtr session);
+        bool IsCaptureException(SessionPtr session);
 #ifdef OHOS_BUILD_ENABLE_TOUCH
         void UpdateConsumptionState(std::shared_ptr<PointerEvent> pointerEvent);
 #endif // OHOS_BUILD_ENABLE_TOUCH
@@ -183,6 +186,7 @@ private:
     private:
         std::set<SessionHandler> monitors_;
         std::map<int32_t, std::set<SessionHandler>> endScreenCaptureMonitors_;
+        std::set<SessionPtr> captureExceptionSessions_;
         std::unordered_map<int32_t, ConsumptionState> states_;
         std::vector<int32_t> insertToMonitorsActions_;
     };

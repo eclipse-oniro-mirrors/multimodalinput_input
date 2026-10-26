@@ -1120,7 +1120,7 @@ void InputManagerImpl::PrintEnhanceConfig()
 }
 #endif // OHOS_BUILD_ENABLE_SECURITY_COMPONENT
 
-int32_t InputManagerImpl::AddMonitor(std::function<void(std::shared_ptr<KeyEvent>)> monitor)
+int32_t InputManagerImpl::AddMonitor(std::function<void(std::shared_ptr<KeyEvent>)> monitor, bool isCapi)
 {
     CALL_DEBUG_ENTER;
     std::string msg = "AddMonitorKeyEvent";
@@ -1133,7 +1133,7 @@ int32_t InputManagerImpl::AddMonitor(std::function<void(std::shared_ptr<KeyEvent
     }
     auto consumer = std::make_shared<MonitorEventConsumer>(monitor);
     MMI_HILOGI("Support key event monitor function");
-    int32_t ret = AddMonitor(consumer, HANDLE_EVENT_TYPE_KEY);
+    int32_t ret = AddMonitor(consumer, HANDLE_EVENT_TYPE_KEY, isCapi);
     BytraceAdapter::MMIClientTraceStop();
     return ret;
 #else
@@ -1143,20 +1143,21 @@ int32_t InputManagerImpl::AddMonitor(std::function<void(std::shared_ptr<KeyEvent
 #endif // OHOS_BUILD_ENABLE_KEYBOARD || OHOS_BUILD_ENABLE_MONITOR
 }
 
-int32_t InputManagerImpl::AddMonitor(std::function<void(std::shared_ptr<PointerEvent>)> monitor)
+int32_t InputManagerImpl::AddMonitor(std::function<void(std::shared_ptr<PointerEvent>)> monitor, bool isCapi)
 {
     CALL_DEBUG_ENTER;
 #if (defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)) && defined(OHOS_BUILD_ENABLE_MONITOR)
     CHKPR(monitor, INVALID_HANDLER_ID);
     auto consumer = std::make_shared<MonitorEventConsumer>(monitor);
-    return AddMonitor(consumer, HANDLE_EVENT_TYPE_POINTER);
+    return AddMonitor(consumer, HANDLE_EVENT_TYPE_POINTER, isCapi);
 #else
     MMI_HILOGW("Pointer/touchscreen device or monitor function does not support");
     return ERROR_UNSUPPORT;
 #endif // OHOS_BUILD_ENABLE_MONITOR || OHOS_BUILD_ENABLE_TOUCH && OHOS_BUILD_ENABLE_MONITOR
 }
 
-int32_t InputManagerImpl::AddMonitor(std::shared_ptr<IInputEventConsumer> consumer, HandleEventType eventType)
+int32_t InputManagerImpl::AddMonitor(std::shared_ptr<IInputEventConsumer> consumer, HandleEventType eventType,
+    bool isCapi)
 {
     CALL_DEBUG_ENTER;
 #ifdef OHOS_BUILD_ENABLE_MONITOR
@@ -1165,7 +1166,7 @@ int32_t InputManagerImpl::AddMonitor(std::shared_ptr<IInputEventConsumer> consum
         MMI_HILOGE("Client init failed");
         return RET_ERR;
     }
-    return IMonitorMgr.AddMonitor(consumer, eventType);
+    return IMonitorMgr.AddMonitor(consumer, eventType, isCapi);
 #else
     MMI_HILOGI("Monitor function does not support");
     return ERROR_UNSUPPORT;
@@ -1188,7 +1189,7 @@ int32_t InputManagerImpl::AddMonitor(std::shared_ptr<IInputEventConsumer> consum
 #endif // OHOS_BUILD_ENABLE_MONITOR
 }
 
-int32_t InputManagerImpl::RemoveMonitor(int32_t monitorId)
+int32_t InputManagerImpl::RemoveMonitor(int32_t monitorId, bool isCapi)
 {
     CALL_DEBUG_ENTER;
 #ifdef OHOS_BUILD_ENABLE_MONITOR
@@ -1196,7 +1197,7 @@ int32_t InputManagerImpl::RemoveMonitor(int32_t monitorId)
         MMI_HILOGE("Client init failed");
         return RET_ERR;
     }
-    return IMonitorMgr.RemoveMonitor(monitorId);
+    return IMonitorMgr.RemoveMonitor(monitorId, isCapi);
 #else
     MMI_HILOGI("Monitor function does not support");
     return ERROR_UNSUPPORT;

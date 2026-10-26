@@ -851,5 +851,55 @@ HWTEST_F(PermissionHelperTest, PermissionHelperTest_CheckInputDeviceCfg005, Test
     bool shellResult = PER_HELPER->CheckInputDeviceCfg();
     EXPECT_TRUE(hapResult || nativeResult || shellResult);
 }
+
+/**
+ * @tc.name: PermissionHelperTest_CheckInputRecording_001
+ * @tc.desc: Test CheckInputRecording method exists and returns bool
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(PermissionHelperTest, PermissionHelperTest_CheckInputRecording_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    MMI_HILOGI("CheckInputRecording test start");
+    bool result = PER_HELPER->CheckInputRecording();
+    EXPECT_TRUE(result);
+}
+
+/**
+ * @tc.name: PermissionHelperTest_CheckMonitorWithRecording_001
+ * @tc.desc: Test CheckMonitorWithRecording returns CheckMonitor||CheckInputRecording
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(PermissionHelperTest, PermissionHelperTest_CheckMonitorWithRecording_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    MMI_HILOGI("CheckMonitorWithRecording test start");
+    bool monitorResult = PER_HELPER->CheckMonitor();
+    bool recordingResult = PER_HELPER->CheckInputRecording();
+    bool compositeResult = PER_HELPER->CheckMonitorWithRecording();
+    EXPECT_EQ(compositeResult, monitorResult || recordingResult);
+}
+
+/**
+ * @tc.name: PermissionHelperTest_CheckMonitorWithRecording_002
+ * @tc.desc: Test CheckMonitorWithRecording short-circuit semantics
+ * @tc.type: FUNC
+ * @tc.require: FEAT-INPUT-RECORDING
+ */
+HWTEST_F(PermissionHelperTest, PermissionHelperTest_CheckMonitorWithRecording_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    MMI_HILOGI("CheckMonitorWithRecording short-circuit test");
+    bool monitorResult = PER_HELPER->CheckMonitor();
+    bool recordingResult = PER_HELPER->CheckInputRecording();
+    bool compositeResult = PER_HELPER->CheckMonitorWithRecording();
+    if (monitorResult || recordingResult) {
+        EXPECT_TRUE(compositeResult);
+    } else {
+        EXPECT_FALSE(compositeResult);
+    }
+}
 } // namespace MMI
 } // namespace OHOS
