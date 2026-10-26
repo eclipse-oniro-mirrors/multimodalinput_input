@@ -6483,7 +6483,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         (!isHoverEvent && (pointerAction == PointerEvent::POINTER_ACTION_DOWN || isExtraData))) {
         std::string msg {};
         ancoStates[deviceId][pointerId] = touchWindow && IsInAncoWindow(*touchWindow, windowX, windowY, msg);
-         MMI_HILOGI("TouchAncoWindowInAnco result:%{public}d, msg:%{public}s", ancoStates[deviceId][pointerId],
+        MMI_HILOGI("TouchAncoWindowInAnco result:%{public}d, msg:%{public}s", ancoStates[deviceId][pointerId],
             msg.c_str());
     }
     bool isInAnco = GetAncoState(ancoStates, deviceId, pointerId);
