@@ -89,11 +89,16 @@ int32_t MouseScrollCommand::Execute(const std::vector<std::string> &args)
         .minValue = -MAX_SCROLL_CLICKS,
         .maxValue = MAX_SCROLL_CLICKS,
     };
-    if (!ParseMouseOptions(ALLOWED_OPTIONS, args, options, modifiers, error) ||
-        !ParseNumber(options, clicksRule, clicks, error) ||
-        !ValidateScrollClicks(clicks, error)) {
-        return ParameterError(error.empty() ? "options must use documented --name value once" : error,
-            "Please provide clicks in [-100,-1] or [1,100]");
+    if (!ParseOptionPairs(args, ALLOWED_OPTIONS, options, error)) {
+        return ParameterError(error, "Please use ohos-input mouse-scroll --help");
+    }
+    const auto modifier = options.find("--modifier");
+    if (modifier != options.end() && !ParseModifiers(modifier->second, modifiers, error)) {
+        return ParameterError(error, "Please use modifier keys [ctrl, alt, shift, meta], "
+            "pipe-separated with |, in press order, no duplicates");
+    }
+    if (!ParseNumber(options, clicksRule, clicks, error) || !ValidateScrollClicks(clicks, error)) {
+        return ParameterError(error, "Please provide --clicks in [-100,-1] or [1,100]");
     }
     MouseSession session;
     int32_t ret = CreateControllers(modifiers, session);
