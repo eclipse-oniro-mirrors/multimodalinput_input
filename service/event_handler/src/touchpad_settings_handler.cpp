@@ -173,7 +173,7 @@ sptr<SettingObserver> TouchpadSettingsObserver::RegisterSwipeInwardObserver()
     SettingObserver::UpdateFunc updateFunc = [this, datashareUri](const std::string& key) {
         std::string defaultSwitch = DEFAULT_SWIPE_INWARD_SWITCH_VALUE;
         if (IsNumeric(TOUCHPAD_TYPE) &&
-            (std::stoul(TOUCHPAD_TYPE) & TOUCHPAD_FEATURE_VERTICAL) != TOUCHPAD_FEATURE_VERTICAL) {
+            (std::stoul(TOUCHPAD_TYPE) & TOUCHPAD_FEATURE_VERTICAL) == TOUCHPAD_FEATURE_VERTICAL) {
             defaultSwitch = "0";
         }
         std::string value = defaultSwitch;
