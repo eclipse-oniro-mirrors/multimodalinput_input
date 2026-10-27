@@ -275,9 +275,6 @@ void PointerDrawingManager::DestroyPointerWindow()
 void PointerDrawingManager::DestroyPointerWindowOfHardCursor()
 {
     std::unique_lock<std::shared_mutex> lock(screenPointersMtx_);
-    if (screenPointers_.empty()) {
-        return;
-    }
     for (auto [screenId, sp] : screenPointers_) {
         if (sp == nullptr) {
             continue;
@@ -377,9 +374,6 @@ bool PointerDrawingManager::CreateGroupContext(int32_t groupId, uint64_t rsId)
 void PointerDrawingManager::ClearGroupCursorCtxMap()
 {
     std::unique_lock<std::mutex> lockGuard(surfaceNodeMutex_);
-    if (groupCursorCtxMap_.empty()) {
-        return;
-    }
     for (auto &kv : groupCursorCtxMap_) {
         kv.second.canvasNode.reset();
         kv.second.surfaceNode.reset();
