@@ -1,0 +1,27 @@
+# metadata_tracking.yaml —— 交付跟踪
+#
+# 记录本需求在各代码仓的实现 PR / Issue 链接，建立
+# proposal → spec → design → execution-plan → 实现 PR/issue 的闭环追溯。
+#
+# 约定
+#   - repo 字段写 GitCode 完整路径 org/repo。
+#   - 所有 url 字段填完整 https 链接，便于脚本批量抓取。
+#   - 实现提交见 repos.pull_requests；需求 Issue 见 repos.issues。
+
+proposal_id: "20260806903969"              # 必填，反向引用需求目录（14 位 Proposal ID）
+target_release: "OpenHarmony-7.1-Release"  # 必填，与 proposal.md frontmatter 一致，便于按版本聚合
+
+repos:
+  - repo: "openharmony/multimodalinput_input"
+
+    pull_requests:
+      - url: "https://gitcode.com/openharmony/multimodalinput_input/merge_requests/10062"
+        title: "Feat:Redispatch For Tablet-Pen and Mouse."
+        state: "open"                     # open | merged | closed
+        commit: "da4ead8ef50c90c764094e772f5a4fd48233ad57"  # 编写本文件时该 PR 分支上的 commit SHA（快照，分支 feat_redispatch_pen）
+    issues:
+      - issue: 7894
+        url: "https://gitcode.com/openharmony/multimodalinput_input/issues/7894"
+        title: "[新需求]:Feat:Redispatch For Tablet-Pen and Mouse."
+        type: "requirement"               # requirement | bug | task | epic
+        state: "open"                     # open | closed
