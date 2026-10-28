@@ -146,7 +146,7 @@ public:
         const sptr<IRemoteObject> &token = nullptr) const;
     int32_t GetPointerStyleInfo(int32_t pid, int32_t windowId, PointerStyle &pointerStyle) const;
     void DispatchPointer(int32_t pointerAction, int32_t windowId = -1);
-    void DispatchPointerRedispatch(int32_t pointerAction, const WindowInfo& windowInfo);
+    void DispatchPointerRedispatch(int32_t pointerAction, const WindowInfo& windowInfo, float zOrder);
     void DispatchTouchRedispatch(int32_t pointerAction, float zOrder,
         int32_t deviceId, int32_t pointerId, int32_t toolType, const WindowInfo& windowInfo);
     void SendPointerEvent(int32_t pointerAction);
@@ -360,6 +360,7 @@ private:
     void GetOriginalTouchScreenCoordinates(Direction direction, int32_t width, int32_t height,
         int32_t &physicalX, int32_t &physicalY);
     int32_t UpdateMouseTarget(std::shared_ptr<PointerEvent> pointerEvent);
+    void SynthesizeHoverEnterLeave(const std::shared_ptr<PointerEvent>& pointerEvent, const WindowInfo& touchWindow);
     void UpdatePointerEvent(int32_t logicalX, int32_t logicalY,
         const std::shared_ptr<PointerEvent>& pointerEvent, const WindowInfo& touchWindow);
     void NotifyPointerToWindow(int32_t groupId = DEFAULT_GROUP_ID);

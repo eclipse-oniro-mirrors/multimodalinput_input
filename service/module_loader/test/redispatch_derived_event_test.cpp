@@ -61,15 +61,15 @@ protected:
 };
 
 /**
- * @tc.name: RedispatchDerivedEventTest_DiscardHoverEnter_001
- * @tc.desc: HOVER_ENTER derived event shall be discarded on redispatch (AC-4.1)
+ * @tc.name: RedispatchDerivedEventTest_DiscardLevitateInWindow_001
+ * @tc.desc: LEVITATE_IN_WINDOW derived event shall be discarded on redispatch (AC-4.1)
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardHoverEnter_001, TestSize.Level1)
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardLevitateInWindow_001, TestSize.Level1)
 {
     MMIService mmiService;
-    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_HOVER_ENTER,
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_LEVITATE_IN_WINDOW,
         PointerEvent::TOOL_TYPE_PEN, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
     ASSERT_NE(pointerEvent, nullptr);
 
@@ -80,15 +80,15 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardHoverEnte
 }
 
 /**
- * @tc.name: RedispatchDerivedEventTest_DiscardHoverLeave_001
- * @tc.desc: HOVER_EXIT (hover leave) derived event shall be discarded on redispatch (AC-4.2)
+ * @tc.name: RedispatchDerivedEventTest_DiscardLevitateOutWindow_001
+ * @tc.desc: LEVITATE_OUT_WINDOW derived event shall be discarded on redispatch (AC-4.2)
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardHoverLeave_001, TestSize.Level1)
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardLevitateOutWindow_001, TestSize.Level1)
 {
     MMIService mmiService;
-    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_HOVER_EXIT,
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_LEVITATE_OUT_WINDOW,
         PointerEvent::TOOL_TYPE_PEN, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
     ASSERT_NE(pointerEvent, nullptr);
 
@@ -99,12 +99,12 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardHoverLeav
 }
 
 /**
- * @tc.name: RedispatchDerivedEventTest_DiscardHoverEnterKeepStoreState_001
- * @tc.desc: Discarding HOVER_ENTER shall not touch active stylus/finger states (BR-2, EX-2)
+ * @tc.name: RedispatchDerivedEventTest_DiscardLevitateInKeepStoreState_001
+ * @tc.desc: Discarding LEVITATE_IN_WINDOW shall not touch active stylus/finger states (BR-2, EX-2)
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardHoverEnterKeepStoreState_001,
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardLevitateInKeepStoreState_001,
     TestSize.Level1)
 {
     MMIService mmiService;
@@ -115,10 +115,10 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardHoverEnte
     store.SetFingerActive(TEST_Z_ORDER, TEST_DEVICE_ID, TEST_POINTER_ID,
         PointerEvent::TOOL_TYPE_PEN, penEvent);
 
-    auto hoverEnter = CreateTouchEvent(PointerEvent::POINTER_ACTION_HOVER_ENTER,
+    auto levitateIn = CreateTouchEvent(PointerEvent::POINTER_ACTION_LEVITATE_IN_WINDOW,
         PointerEvent::TOOL_TYPE_PEN, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    ASSERT_NE(hoverEnter, nullptr);
-    EXPECT_EQ(mmiService.RedispatchInputEventInner(hoverEnter), RET_OK);
+    ASSERT_NE(levitateIn, nullptr);
+    EXPECT_EQ(mmiService.RedispatchInputEventInner(levitateIn), RET_OK);
 
     EXPECT_TRUE(store.IsFingerActive(TEST_Z_ORDER, TEST_DEVICE_ID, TEST_POINTER_ID,
         PointerEvent::TOOL_TYPE_PEN));
@@ -148,7 +148,7 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_StylusDownNotDis
 
 /**
  * @tc.name: RedispatchDerivedEventTest_StylusHoverMoveNotDiscarded_001
- * @tc.desc: Stylus HOVER_MOVE is not a derived event and shall not be discarded by the gate (AC-3.1)
+ * @tc.desc: Stylus LEVITATE_MOVE is not a derived event and shall not be discarded by the gate (AC-3.1)
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -156,7 +156,7 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_StylusHoverMoveN
     TestSize.Level1)
 {
     MMIService mmiService;
-    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_HOVER_MOVE,
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_LEVITATE_MOVE,
         PointerEvent::TOOL_TYPE_PEN, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
     ASSERT_NE(pointerEvent, nullptr);
 

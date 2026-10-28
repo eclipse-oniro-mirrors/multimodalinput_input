@@ -61,7 +61,8 @@ protected:
 
 /**
  * @tc.name: MouseRedispatchRegressionTest_MouseAbandonUnchanged_001
- * @tc.desc: Mouse redispatch abandon flow shall keep existing behavior (AC-7.1, AC-7.3)
+ * @tc.desc: Unpressed mouse redispatch shall always pass admission, axis session keeps
+ *           AXIS_BEGIN/AXIS_END lifecycle (DD-5, AC-8.4)
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -73,15 +74,21 @@ HWTEST_F(MouseRedispatchRegressionTest, MouseRedispatchRegressionTest_MouseAband
         PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_FINGER);
     ASSERT_NE(moveEvent, nullptr);
 
-    EXPECT_TRUE(store.Abandon(moveEvent));
-    store.SetWindowActive(TEST_WINDOW_ID);
     EXPECT_FALSE(store.Abandon(moveEvent));
 
+    auto axisBeginEvent = CreatePointerEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN,
+        PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_FINGER);
     auto axisEndEvent = CreatePointerEvent(PointerEvent::POINTER_ACTION_AXIS_END,
         PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_FINGER);
+    ASSERT_NE(axisBeginEvent, nullptr);
     ASSERT_NE(axisEndEvent, nullptr);
+
+    EXPECT_TRUE(store.Abandon(axisBeginEvent));
+    store.SetWindowActive(TEST_WINDOW_ID);
+    EXPECT_FALSE(store.Abandon(axisBeginEvent));
+
     EXPECT_FALSE(store.Abandon(axisEndEvent));
-    EXPECT_TRUE(store.Abandon(moveEvent));
+    EXPECT_TRUE(store.Abandon(axisBeginEvent));
 }
 
 /**

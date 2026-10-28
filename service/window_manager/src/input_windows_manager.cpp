@@ -3215,10 +3215,10 @@ void InputWindowsManager::DispatchPointer(int32_t pointerAction, int32_t windowI
 #endif // OHOS_BUILD_ENABLE_POINTER
 }
 
-void InputWindowsManager::DispatchPointerRedispatch(int32_t pointerAction, const WindowInfo& windowInfo)
+void InputWindowsManager::DispatchPointerRedispatch(int32_t pointerAction, const WindowInfo& windowInfo, float zOrder)
 {
     CALL_DEBUG_ENTER;
-    auto lastPointerEvent = mouseRedispatchStore_.GetLastEvent();
+    auto lastPointerEvent = mouseRedispatchStore_.GetLastEvent(zOrder);
     if (lastPointerEvent == nullptr) {
         return;
     }
@@ -5003,6 +5003,59 @@ void InputWindowsManager::HandlePullEvent(std::shared_ptr<PointerEvent> pointerE
 #endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH
 
 #ifdef OHOS_BUILD_ENABLE_POINTER
+void InputWindowsManager::SynthesizeHoverEnterLeave(const std::shared_ptr<PointerEvent>& pointerEvent,
+    const WindowInfo& touchWindow)
+{
+    CHKPV(pointerEvent);
+    if (pointerEvent->GetSourceType() != PointerEvent::SOURCE_TYPE_MOUSE ||
+        pointerEvent->GetPointerAction() != PointerEvent::POINTER_ACTION_MOVE ||
+        !pointerEvent->GetPressedButtons().empty()) {
+        return;
+    }
+    auto& store = mouseRedispatchStore_;
+    float zOrder = store.GetZOrder();
+    int32_t lastWindowId = store.GetLastHoverWindow(zOrder);
+    int32_t currentWindowId = touchWindow.id;
+    if (currentWindowId <= 0 || currentWindowId == lastWindowId) {
+        return;
+    }
+    auto dispatchSynthetic = [this](const std::shared_ptr<PointerEvent>& source, int32_t windowId,
+        int32_t pointerAction) {
+        auto syntheticEvent = std::make_shared<PointerEvent>(*source);
+        if (syntheticEvent == nullptr) {
+            MMI_HILOGE("syntheticEvent is null");
+            return;
+        }
+        syntheticEvent->UpdateId();
+        syntheticEvent->ClearFlag(InputEvent::EVENT_FLAG_REDISPATCH);
+        syntheticEvent->SetPointerAction(pointerAction);
+        syntheticEvent->SetTargetWindowId(windowId);
+        PointerEvent::PointerItem pointerItem;
+        if (syntheticEvent->GetPointerItem(syntheticEvent->GetPointerId(), pointerItem)) {
+            pointerItem.SetTargetWindowId(windowId);
+            syntheticEvent->UpdatePointerItem(syntheticEvent->GetPointerId(), pointerItem);
+        }
+        auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
+        if (eventDispatchHandler == nullptr) {
+            MMI_HILOGE("eventDispatchHandler is null");
+            return;
+        }
+        eventDispatchHandler->HandlePointerEvent(syntheticEvent);
+    };
+    if (lastWindowId > 0) {
+        int32_t lastAgentPid = GetAgentPidByDisplayIdAndWindowId(pointerEvent->GetTargetDisplayId(), lastWindowId);
+        if (lastAgentPid >= 0) {
+            dispatchSynthetic(pointerEvent, lastWindowId, PointerEvent::POINTER_ACTION_LEAVE_WINDOW);
+        } else {
+            MMI_HILOGD("Skip stale hover leave, window:%{public}d not alive", lastWindowId);
+        }
+    }
+    dispatchSynthetic(pointerEvent, currentWindowId, PointerEvent::POINTER_ACTION_ENTER_WINDOW);
+    store.SetLastHoverWindow(zOrder, currentWindowId);
+    MMI_HILOGD("Hover enter/leave synthesized, lastWindow:%{public}d, currentWindow:%{public}d",
+        lastWindowId, currentWindowId);
+}
+
 void InputWindowsManager::UpdatePointerEvent(int32_t logicalX, int32_t logicalY,
     const std::shared_ptr<PointerEvent>& pointerEvent, const WindowInfo& touchWindow)
 {
@@ -5016,6 +5069,7 @@ void InputWindowsManager::UpdatePointerEvent(int32_t logicalX, int32_t logicalY,
             std::lock_guard<std::mutex> guard(mtx_);
             mouseRedispatchStore_.CacheLastEvent(pointerEvent);
         }
+        SynthesizeHoverEnterLeave(pointerEvent, touchWindow);
         return;
     }
     if (IsTouchPadScrollAxis(touchWindow, pointerEvent)) {
@@ -5232,7 +5286,7 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
                 for (const auto &entry : mouseRedispatchStore_.GetAxisBeginWindowMap()) {
                     if (entry.second && entry.second->id == axisBeginWindowInfo_->id) {
                         DispatchPointerRedispatch(PointerEvent::POINTER_ACTION_AXIS_END,
-                            axisBeginWindowInfo_.value());
+                            axisBeginWindowInfo_.value(), entry.first);
                         mouseRedispatchStore_.DeactivateWindow(axisBeginWindowInfo_->id);
                         keysToErase.push_back(entry.first);
                     }
@@ -5240,6 +5294,26 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
                 for (float key : keysToErase) {
                     mouseRedispatchStore_.EraseAxisBeginWindow(key);
                 }
+            }
+        }
+    }
+    if (dispatchEventFlag) {
+        int32_t curAction = pointerEvent->GetPointerAction();
+        if (curAction == PointerEvent::POINTER_ACTION_BUTTON_DOWN) {
+            if (touchWindow && mouseDownInfo_.id != -1 && touchWindow->id == mouseDownInfo_.id) {
+                MMI_HILOGI("Virtual mouse down conflicts with real mouse down, window:%{public}d", touchWindow->id);
+                return RET_ERR;
+            }
+            if (touchWindow) {
+                mouseRedispatchStore_.SetWindowActive(MouseSessionType::BUTTON, touchWindow->id);
+                mouseRedispatchStore_.SetButtonDownWindow(mouseRedispatchStore_.GetZOrder(), *touchWindow);
+            }
+        } else if ((curAction == PointerEvent::POINTER_ACTION_MOVE &&
+            !pointerEvent->GetPressedButtons().empty()) ||
+            curAction == PointerEvent::POINTER_ACTION_BUTTON_UP) {
+            auto buttonDownWindow = mouseRedispatchStore_.GetButtonDownWindow(mouseRedispatchStore_.GetZOrder());
+            if (buttonDownWindow) {
+                touchWindow = buttonDownWindow;
             }
         }
     }
@@ -5294,7 +5368,8 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
             if ((endTime - beginTime) > RS_PROCESS_TIMEOUT) {
                 MMI_HILOGW("Rs process timeout");
             }
-            if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_BUTTON_UP) {
+            if (!dispatchEventFlag &&
+                pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_BUTTON_UP) {
                 dragFlag_ = false;
                 isDragBorder_ = false;
             }
@@ -5517,20 +5592,36 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
     }
 #endif // OHOS_BUILD_ENABLE_ANCO
     if (action == PointerEvent::POINTER_ACTION_BUTTON_DOWN) {
-        mouseDownInfo_ = *touchWindow;
-        mouseDownEventId_ = pointerEvent->GetId();
+        if (!dispatchEventFlag && touchWindow) {
+            float buttonZOrder = mouseRedispatchStore_.FindButtonSessionZOrder(touchWindow->id);
+            if (buttonZOrder > 0.0f) {
+                auto evictWindow = mouseRedispatchStore_.GetButtonDownWindow(buttonZOrder);
+                if (evictWindow) {
+                    MMI_HILOGI("Real mouse down evicts virtual button session, window:%{public}d", touchWindow->id);
+                    DispatchPointerRedispatch(PointerEvent::POINTER_ACTION_BUTTON_UP,
+                        evictWindow.value(), buttonZOrder);
+                }
+                mouseRedispatchStore_.DeactivateWindow(MouseSessionType::BUTTON, touchWindow->id);
+                mouseRedispatchStore_.EraseButtonDownWindow(buttonZOrder);
+            }
+        }
+        if (!dispatchEventFlag) {
+            mouseDownInfo_ = *touchWindow;
+            mouseDownEventId_ = pointerEvent->GetId();
+        }
     }
-    if ((action == PointerEvent::POINTER_ACTION_MOVE && !pointerEvent->GetPressedButtons().empty()) ||
-        (action == PointerEvent::POINTER_ACTION_BUTTON_UP)) {
+    if (!dispatchEventFlag && (((action == PointerEvent::POINTER_ACTION_MOVE &&
+        !pointerEvent->GetPressedButtons().empty()) ||
+        (action == PointerEvent::POINTER_ACTION_BUTTON_UP)))) {
         if (touchWindow->id != mouseDownInfo_.id) {
             MMI_HILOGE("Mouse from:%{public}d move to new window:%{public}d", mouseDownInfo_.id, touchWindow->id);
         }
     }
-    if (action == PointerEvent::POINTER_ACTION_BUTTON_UP) {
+    if (!dispatchEventFlag && action == PointerEvent::POINTER_ACTION_BUTTON_UP) {
         mouseDownEventId_ = -1;
         MMI_HILOGD("Mouse up, clear mouse down info");
     }
-    if (action == PointerEvent::POINTER_ACTION_CANCEL && mouseDownEventId_ > 0) {
+    if (!dispatchEventFlag && action == PointerEvent::POINTER_ACTION_CANCEL && mouseDownEventId_ > 0) {
         mouseDownEventId_ = -1;
     }
     if (action == PointerEvent::POINTER_ACTION_AXIS_END) {

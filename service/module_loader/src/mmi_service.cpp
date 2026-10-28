@@ -6624,9 +6624,9 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
 #ifdef OHOS_BUILD_ENABLE_TOUCH
     if (pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN) {
         int32_t pointerAction = pointerEvent->GetPointerAction();
-        if (pointerAction == PointerEvent::POINTER_ACTION_HOVER_ENTER ||
-            pointerAction == PointerEvent::POINTER_ACTION_HOVER_EXIT) {
-            MMI_HILOGI("Redispatch discard derived hover event, action:%{public}d, id:%{public}d",
+        if (pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_IN_WINDOW ||
+            pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_OUT_WINDOW) {
+            MMI_HILOGI("Redispatch discard derived event, action:%{public}d, id:%{public}d",
                 pointerAction, pointerEvent->GetId());
             return RET_OK;
         }
