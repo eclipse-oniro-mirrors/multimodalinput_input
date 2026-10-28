@@ -463,6 +463,9 @@ void PointerDrawingManager::ClearResources()
             RsFlushImplicitTransaction();
         }
     }
+    SetSurfaceNode(nullptr);
+    ClearGroupCursorCtxMap();
+    DestroyPointerWindowOfHardCursor();
     UnsubscribeScreenModeChange();
     Rosen::RSInterfaces::GetInstance().SetOnRemoteDiedCallback(nullptr);
     ResetMoveRetryTimer();
