@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 
-#include "input_windows_manager.h"
+#include "i_input_windows_manager.h"
 #include "mouse_redispatch_store.h"
 #include "pointer_event.h"
 #include "window_info.h"
@@ -35,7 +35,10 @@ class MouseHoverEnterLeaveTest : public testing::Test {
 public:
     static void SetUpTestCase(void) {}
     static void TearDownTestCase(void) {}
-    void SetUp() {}
+    void SetUp()
+    {
+        IInputWindowsManager::GetInstance()->GetMouseRedispatchStore().Reset();
+    }
     void TearDown() {}
 
 protected:
@@ -78,7 +81,7 @@ protected:
  */
 HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_FirstHoverRecordsWindowOnly_001, TestSize.Level1)
 {
-    InputWindowsManager inputWindowsManager;
+    auto& inputWindowsManager = *IInputWindowsManager::GetInstance();
     auto& store = inputWindowsManager.GetMouseRedispatchStore();
     auto hoverMove = CreateHoverMoveEvent(TEST_WINDOW_ID);
     ASSERT_NE(hoverMove, nullptr);
@@ -97,7 +100,7 @@ HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_FirstHoverRecordsWin
  */
 HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_SameWindowNoUpdate_001, TestSize.Level1)
 {
-    InputWindowsManager inputWindowsManager;
+    auto& inputWindowsManager = *IInputWindowsManager::GetInstance();
     auto& store = inputWindowsManager.GetMouseRedispatchStore();
     store.SetLastHoverWindow(TEST_Z_ORDER, TEST_WINDOW_ID);
     auto hoverMove = CreateHoverMoveEvent(TEST_WINDOW_ID);
@@ -117,7 +120,7 @@ HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_SameWindowNoUpdate_0
  */
 HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_CrossWindowUpdatesMemory_001, TestSize.Level1)
 {
-    InputWindowsManager inputWindowsManager;
+    auto& inputWindowsManager = *IInputWindowsManager::GetInstance();
     auto& store = inputWindowsManager.GetMouseRedispatchStore();
     store.SetLastHoverWindow(TEST_Z_ORDER, TEST_WINDOW_ID);
     auto hoverMove = CreateHoverMoveEvent(TEST_WINDOW_ID_B);
@@ -137,7 +140,7 @@ HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_CrossWindowUpdatesMe
  */
 HWTEST_F(MouseHoverEnterLeaveTest, MouseHoverEnterLeaveTest_PressedMoveNoSynthesis_001, TestSize.Level1)
 {
-    InputWindowsManager inputWindowsManager;
+    auto& inputWindowsManager = *IInputWindowsManager::GetInstance();
     auto& store = inputWindowsManager.GetMouseRedispatchStore();
     auto pressedMove = CreateHoverMoveEvent(TEST_WINDOW_ID);
     ASSERT_NE(pressedMove, nullptr);
