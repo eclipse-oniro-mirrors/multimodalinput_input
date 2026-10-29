@@ -109,10 +109,10 @@ int32_t MouseDoubleClickCommand::Execute(const std::vector<std::string> &args)
         !ParsePoint(options, true, point, error) ||
         !ParseNumber(options, clickIntervalRule, point.clickInterval, error)) {
         return ParameterError(error.empty() ? "clickInterval must exceed holdDuration" : error,
-            "Please use documented mouse arguments");
+            "Please use documented mouse double click arguments");
     }
     if (point.clickInterval <= point.holdDuration) {
-        return ParameterError("clickInterval must exceed holdDuration", "Please use documented mouse arguments");
+        return ParameterError("clickInterval must exceed holdDuration", "Please use documented mouse double click arguments");
     }
     MouseSession session;
     int32_t ret = CreateControllers(modifiers, session);

@@ -44,24 +44,17 @@ NumberRule ScrollClicksRule()
 }
 
 bool ParseScrollArgs(const std::vector<std::string> &args, std::vector<int32_t> &modifiers, int32_t &clicks,
-    std::string &error, std::string &suggestion)
+    std::string &error)
 {
     Options options;
     if (!ParseOptionPairs(args, ALLOWED_OPTIONS, options, error)) {
-        suggestion = "Please use ohos-input mouse-scroll --help";
         return false;
     }
     const auto modifier = options.find("--modifier");
     if (modifier != options.end() && !ParseModifiers(modifier->second, modifiers, error)) {
-        suggestion = "Please use modifier keys [ctrl, alt, shift, meta], "
-            "pipe-separated with |, in press order, no duplicates";
         return false;
     }
-    if (!ParseNumber(options, ScrollClicksRule(), clicks, error) || !ValidateScrollClicks(clicks, error)) {
-        suggestion = "Please provide --clicks in [-100,-1] or [1,100]";
-        return false;
-    }
-    return true;
+    return ParseNumber(options, ScrollClicksRule(), clicks, error) && ValidateScrollClicks(clicks, error);
 }
 } // namespace
 
@@ -113,9 +106,8 @@ int32_t MouseScrollCommand::Execute(const std::vector<std::string> &args)
     std::vector<int32_t> modifiers;
     int32_t clicks = 0;
     std::string error;
-    std::string suggestion;
-    if (!ParseScrollArgs(args, modifiers, clicks, error, suggestion)) {
-        return ParameterError(error, suggestion);
+    if (!ParseScrollArgs(args, modifiers, clicks, error)) {
+        return ParameterError(error, "Please use documented mouse scroll arguments");
     }
     MouseSession session;
     int32_t ret = CreateControllers(modifiers, session);

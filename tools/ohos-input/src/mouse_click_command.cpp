@@ -91,7 +91,7 @@ int32_t MouseClickCommand::Execute(const std::vector<std::string> &args)
     if (!ParseMouseOptions(ALLOWED_OPTIONS, args, options, modifiers, error) ||
         !ParsePoint(options, true, point, error)) {
         return ParameterError(error.empty() ? "options must use documented --name value once" : error,
-            "Please use documented mouse arguments");
+            "Please use documented mouse click arguments");
     }
     MouseSession session;
     int32_t ret = CreateControllers(modifiers, session);
