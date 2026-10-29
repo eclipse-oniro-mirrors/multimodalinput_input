@@ -257,7 +257,6 @@ int32_t TouchControllerImpl::TouchUp(int32_t touchId, int32_t displayId, int32_t
 
     auto pointerEvent = BuildTouchUpEvent(touchId, displayId, displayX, displayY, GetSysClockTime());
     if (pointerEvent == nullptr) {
-        ClearTouchState(touchId);
         return ERROR_CODE_TOUCH_SEQUENCE_ERROR;
     }
 
