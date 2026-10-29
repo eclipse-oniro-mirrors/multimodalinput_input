@@ -449,5 +449,141 @@ HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStoped_008, TestSize.L
     listener.OnAppDebugStoped(stopInfos);
     EXPECT_EQ(listener.GetAppDebugPid(), -1);
 }
+
+/**
+ * @tc.name: AppDebugListener_OnAppDebugStarted_009
+ * @tc.desc: Test OnAppDebugStarted with multiple pids then a partial stop keeps the last pid
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStarted_009, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    AppDebugListener listener;
+    std::vector<AppExecFwk::AppDebugInfo> startInfos;
+    AppExecFwk::AppDebugInfo firstInfo;
+    firstInfo.pid = 100;
+    startInfos.push_back(firstInfo);
+    AppExecFwk::AppDebugInfo secondInfo;
+    secondInfo.pid = 200;
+    startInfos.push_back(secondInfo);
+    listener.OnAppDebugStarted(startInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 200);
+
+    std::vector<AppExecFwk::AppDebugInfo> stopInfos;
+    AppExecFwk::AppDebugInfo stopInfo;
+    stopInfo.pid = 100;
+    stopInfos.push_back(stopInfo);
+    listener.OnAppDebugStoped(stopInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 200);
+}
+
+/**
+ * @tc.name: AppDebugListener_OnAppDebugStoped_009
+ * @tc.desc: Test OnAppDebugStoped with a vector containing the current pid at the start resets it
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStoped_009, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    AppDebugListener listener;
+    std::vector<AppExecFwk::AppDebugInfo> startInfos;
+    AppExecFwk::AppDebugInfo startInfo;
+    startInfo.pid = 500;
+    startInfos.push_back(startInfo);
+    listener.OnAppDebugStarted(startInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 500);
+
+    std::vector<AppExecFwk::AppDebugInfo> stopInfos;
+    AppExecFwk::AppDebugInfo firstStop;
+    firstStop.pid = 500;
+    stopInfos.push_back(firstStop);
+    AppExecFwk::AppDebugInfo secondStop;
+    secondStop.pid = 600;
+    stopInfos.push_back(secondStop);
+    AppExecFwk::AppDebugInfo thirdStop;
+    thirdStop.pid = 700;
+    stopInfos.push_back(thirdStop);
+    listener.OnAppDebugStoped(stopInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), -1);
+}
+
+/**
+ * @tc.name: AppDebugListener_OnAppDebugStoped_010
+ * @tc.desc: Test OnAppDebugStoped when default -1 matches an explicit -1 stop entry resets to -1
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStoped_010, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    AppDebugListener listener;
+    EXPECT_EQ(listener.GetAppDebugPid(), -1);
+    std::vector<AppExecFwk::AppDebugInfo> stopInfos;
+    AppExecFwk::AppDebugInfo stopInfo;
+    stopInfo.pid = -1;
+    stopInfos.push_back(stopInfo);
+    listener.OnAppDebugStoped(stopInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), -1);
+}
+
+/**
+ * @tc.name: AppDebugListener_GetInstance_004
+ * @tc.desc: Test GetInstance singleton remains stable across start/stop cycles
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_GetInstance_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto *instance = AppDebugListener::GetInstance();
+    ASSERT_NE(instance, nullptr);
+    std::vector<AppExecFwk::AppDebugInfo> startInfos;
+    AppExecFwk::AppDebugInfo startInfo;
+    startInfo.pid = 9999;
+    startInfos.push_back(startInfo);
+    instance->OnAppDebugStarted(startInfos);
+    EXPECT_EQ(instance->GetAppDebugPid(), 9999);
+
+    std::vector<AppExecFwk::AppDebugInfo> stopInfos;
+    AppExecFwk::AppDebugInfo stopInfo;
+    stopInfo.pid = 9999;
+    stopInfos.push_back(stopInfo);
+    instance->OnAppDebugStoped(stopInfos);
+    EXPECT_EQ(instance->GetAppDebugPid(), -1);
+
+    auto *instance2 = AppDebugListener::GetInstance();
+    EXPECT_EQ(instance, instance2);
+    EXPECT_EQ(instance2->GetAppDebugPid(), -1);
+}
+
+/**
+ * @tc.name: AppDebugListener_OnAppDebugStoped_011
+ * @tc.desc: Test OnAppDebugStoped does not match when current pid differs from stop entries
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStoped_011, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    AppDebugListener listener;
+    std::vector<AppExecFwk::AppDebugInfo> startInfos;
+    AppExecFwk::AppDebugInfo startInfo;
+    startInfo.pid = 1111;
+    startInfos.push_back(startInfo);
+    listener.OnAppDebugStarted(startInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 1111);
+
+    std::vector<AppExecFwk::AppDebugInfo> stopInfos;
+    AppExecFwk::AppDebugInfo firstStop;
+    firstStop.pid = 2222;
+    stopInfos.push_back(firstStop);
+    AppExecFwk::AppDebugInfo secondStop;
+    secondStop.pid = 3333;
+    stopInfos.push_back(secondStop);
+    listener.OnAppDebugStoped(stopInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 1111);
+}
 } // namespace MMI
 } // namespace OHOS
