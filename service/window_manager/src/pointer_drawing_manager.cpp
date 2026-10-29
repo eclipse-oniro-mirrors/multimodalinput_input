@@ -458,7 +458,6 @@ void PointerDrawingManager::ClearResources()
         auto surfaceNodePtr = GetSurfaceNode();
         if (surfaceNodePtr != nullptr) {
             surfaceNodePtr->DetachToDisplay(screenId_);
-            SetSurfaceNode(nullptr);
             MMI_HILOGI("Detach screenId:%{public}" PRIu64, screenId_);
             RsFlushImplicitTransaction();
         }
