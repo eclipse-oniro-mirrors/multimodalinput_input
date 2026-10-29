@@ -306,5 +306,18 @@ HWTEST_F(InputActiveSubscribeManagerTest, OnConnected_Test_001, TestSize.Level1)
     EXPECT_NO_FATAL_FAILURE(INPUT_ACTIVE_SUBSCRIBE_MGR.OnConnected());
 }
 
+/**
+ * @tc.name: UnsubscribeInputActive_Test_003
+ * @tc.desc: UnsubscribeInputActive with a positive non-zero id is rejected as invalid
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscribeManagerTest, UnsubscribeInputActive_Test_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t result = INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(1);
+    EXPECT_EQ(result, ERROR_INVALID_SUBSCRIBE_ID);
+}
+
 } // namespace MMI
 } // namespace OHOS
