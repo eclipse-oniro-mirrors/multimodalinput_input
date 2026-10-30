@@ -145,6 +145,7 @@ declare_args() {
     "dfx/src/api_duration_statistics.cpp",
     "dfx/src/dfx_hisysevent.cpp",
     "dfx/src/dfx_hisysevent_device.cpp",
+    "dfx/src/input_event_statistics.cpp",
     "event_dispatch/src/event_dispatch_handler.cpp",
     "event_dump/src/event_dump.cpp",
     "event_dump/src/event_statistic.cpp",

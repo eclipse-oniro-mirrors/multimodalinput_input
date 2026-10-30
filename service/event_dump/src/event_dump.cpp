@@ -20,6 +20,7 @@
 #include "event_statistic.h"
 #include "input_device_manager.h"
 #include "input_event_handler.h"
+#include "input_event_statistics.h"
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
 #include "i_input_windows_manager.h"
 #ifdef OHOS_BUILD_ENABLE_COMBINATION_KEY
@@ -121,6 +122,17 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
         MMI_HILOGE("size of args can't be zero");
         return;
     }
+#if MMI_ENABLE_EVENT_STATISTICS
+    // Intercept the statistics option before getopt so that the legacy option
+    // string and dispatch switch stay untouched. Usage:
+    //   -S [all|touch|key|mouse|touchpad|joystick|report|reset]
+    for (const auto &arg : args) {
+        if (arg == "-S" || arg == "--statistics") {
+            InputEventStatistics::Dump(fd, args);
+            return;
+        }
+    }
+#endif // MMI_ENABLE_EVENT_STATISTICS
     std::vector<int32_t> getoptResults;
     char **argv = new (std::nothrow) char *[args.size() + 1];
     CHKPV(argv);
@@ -387,6 +399,16 @@ void EventDump::DumpHelp(int32_t fd)
     mprintf(fd, "      -B, --pendingBind: dump the deferred bind (active sequence/pending/timer) state\t");
     mprintf(fd, "      -L, --lastInputTime: dump the last input event time of each display group\t");
     mprintf(fd, "      -T, --touchpadScrollDirection: dump the touchpad two-finger scroll direction of each user\t");
+#if MMI_ENABLE_EVENT_STATISTICS
+    mprintf(fd, "      -S, --statistics: dump per-category input event statistics, optional filter:\t");
+    mprintf(fd, "            -S touch: dump touch screen statistics only\t");
+    mprintf(fd, "            -S key: dump keyboard statistics only\t");
+    mprintf(fd, "            -S mouse: dump mouse statistics only\t");
+    mprintf(fd, "            -S touchpad: dump touchpad statistics only\t");
+    mprintf(fd, "            -S joystick: dump joystick statistics only\t");
+    mprintf(fd, "            -S report: report the current statistics window now\t");
+    mprintf(fd, "            -S reset: reset all statistics counters\t");
+#endif // MMI_ENABLE_EVENT_STATISTICS
 }
 
 void EventDump::AttachTouchGestureMgr(std::shared_ptr<ITouchGestureManager> touchGestureMgr)
