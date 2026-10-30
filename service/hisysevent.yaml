@@ -398,3 +398,85 @@ INPUT_EVENT_SOCKET_TIMEOUT:
   MSG: {type: STRING, desc: message}
   PROGRAM_NAME: {type: STRING, desc: program name}
   REMOTE_PID: {type: INT32, desc: remote pid}
+
+INPUT_TOUCH_SCREEN_STATISTIC:
+  __BASE: {type: STATISTIC, level: MINOR, desc: touch screen event statistics of one report window}
+  TOUCH_DOWN_TIMES: {type: UINT32, desc: touch down times}
+  TOUCH_MOVE_TIMES: {type: UINT32, desc: touch move times}
+  TOUCH_UP_TIMES: {type: UINT32, desc: touch up times}
+  TOUCH_CANCEL_TIMES: {type: UINT32, desc: touch cancel times}
+  SINGLE_FINGER_TIMES: {type: UINT32, desc: single finger touch times}
+  MULTI_FINGER_TIMES: {type: UINT32, desc: multi finger touch times}
+  MAX_FINGER_COUNT: {type: UINT32, desc: max concurrent finger count}
+  LOW_PRESSURE_TIMES: {type: UINT32, desc: low pressure touch times}
+  TAP_INTERVAL_BELOW80MS: {type: UINT32, desc: tap interval times below 80ms}
+  TAP_INTERVAL_BELOW200MS: {type: UINT32, desc: tap interval times below 200ms}
+  TAP_INTERVAL_BELOW500MS: {type: UINT32, desc: tap interval times below 500ms}
+  TAP_INTERVAL_ABOVE500MS: {type: UINT32, desc: tap interval times above 500ms}
+  TOUCH_MOVE_INTERVAL_BELOW8MS: {type: UINT32, desc: touch move interval times below 8ms}
+  TOUCH_MOVE_INTERVAL_BELOW16MS: {type: UINT32, desc: touch move interval times below 16ms}
+  TOUCH_MOVE_INTERVAL_BELOW33MS: {type: UINT32, desc: touch move interval times below 33ms}
+  TOUCH_MOVE_INTERVAL_ABOVE33MS: {type: UINT32, desc: touch move interval times above 33ms}
+  MSG: {type: STRING, desc: message}
+
+INPUT_KEY_EVENT_STATISTIC:
+  __BASE: {type: STATISTIC, level: MINOR, desc: keyboard event statistics of one report window}
+  KEY_DOWN_TIMES: {type: UINT32, desc: key down times}
+  KEY_UP_TIMES: {type: UINT32, desc: key up times}
+  KEY_REPEAT_TIMES: {type: UINT32, desc: key repeat times}
+  COMBINATION_KEY_TIMES: {type: UINT32, desc: combination key times}
+  FUNCTION_KEY_TIMES: {type: UINT32, desc: function key times}
+  PRESS_DURATION_BELOW100MS: {type: UINT32, desc: key press duration times below 100ms}
+  PRESS_DURATION_BELOW300MS: {type: UINT32, desc: key press duration times below 300ms}
+  PRESS_DURATION_BELOW1000MS: {type: UINT32, desc: key press duration times below 1000ms}
+  PRESS_DURATION_ABOVE1000MS: {type: UINT32, desc: key press duration times above 1000ms}
+  KEY_INTERVAL_BELOW100MS: {type: UINT32, desc: key down interval times below 100ms}
+  KEY_INTERVAL_BELOW300MS: {type: UINT32, desc: key down interval times below 300ms}
+  KEY_INTERVAL_BELOW1000MS: {type: UINT32, desc: key down interval times below 1000ms}
+  KEY_INTERVAL_ABOVE1000MS: {type: UINT32, desc: key down interval times above 1000ms}
+  MSG: {type: STRING, desc: message}
+
+INPUT_MOUSE_EVENT_STATISTIC:
+  __BASE: {type: STATISTIC, level: MINOR, desc: mouse event statistics of one report window}
+  MOVE_TIMES: {type: UINT32, desc: move times}
+  LEFT_CLICK_TIMES: {type: UINT32, desc: left click times}
+  RIGHT_CLICK_TIMES: {type: UINT32, desc: right click times}
+  MIDDLE_CLICK_TIMES: {type: UINT32, desc: middle click times}
+  VERTICAL_SCROLL_TIMES: {type: UINT32, desc: vertical scroll times}
+  HORIZONTAL_SCROLL_TIMES: {type: UINT32, desc: horizontal scroll times}
+  DRAG_TIMES: {type: UINT32, desc: drag times}
+  DOUBLE_CLICK_TIMES: {type: UINT32, desc: double click times}
+  SCROLL_UP_TIMES: {type: UINT32, desc: wheel scroll up times}
+  SCROLL_DOWN_TIMES: {type: UINT32, desc: wheel scroll down times}
+  MOVE_INTERVAL_BELOW8MS: {type: UINT32, desc: move interval times below 8ms}
+  MOVE_INTERVAL_BELOW16MS: {type: UINT32, desc: move interval times below 16ms}
+  MOVE_INTERVAL_BELOW33MS: {type: UINT32, desc: move interval times below 33ms}
+  MOVE_INTERVAL_ABOVE33MS: {type: UINT32, desc: move interval times above 33ms}
+  MSG: {type: STRING, desc: message}
+
+INPUT_TOUCHPAD_EVENT_STATISTIC:
+  __BASE: {type: STATISTIC, level: MINOR, desc: touchpad event statistics of one report window}
+  MOVE_TIMES: {type: UINT32, desc: move times}
+  TAP_TIMES: {type: UINT32, desc: tap times}
+  CLICK_TIMES: {type: UINT32, desc: physical click times}
+  SCROLL_TIMES: {type: UINT32, desc: scroll times}
+  SWIPE_TIMES: {type: UINT32, desc: swipe times}
+  PINCH_TIMES: {type: UINT32, desc: pinch times}
+  DOUBLE_TAP_TIMES: {type: UINT32, desc: double tap times}
+  ONE_FINGER_TIMES: {type: UINT32, desc: one finger touch times}
+  TWO_FINGER_TIMES: {type: UINT32, desc: two finger touch times}
+  THREE_FINGER_TIMES: {type: UINT32, desc: three finger touch times}
+  FOUR_FINGER_TIMES: {type: UINT32, desc: four finger touch times}
+  FIVE_FINGER_TIMES: {type: UINT32, desc: five and more finger touch times}
+  SWIPE_INTERVAL_BELOW100MS: {type: UINT32, desc: swipe interval times below 100ms}
+  SWIPE_INTERVAL_BELOW300MS: {type: UINT32, desc: swipe interval times below 300ms}
+  SWIPE_INTERVAL_BELOW800MS: {type: UINT32, desc: swipe interval times below 800ms}
+  SWIPE_INTERVAL_ABOVE800MS: {type: UINT32, desc: swipe interval times above 800ms}
+  MSG: {type: STRING, desc: message}
+
+INPUT_JOYSTICK_EVENT_STATISTIC:
+  __BASE: {type: STATISTIC, level: MINOR, desc: joystick event statistics of one report window}
+  BUTTON_DOWN_TIMES: {type: UINT32, desc: button down times}
+  BUTTON_UP_TIMES: {type: UINT32, desc: button up times}
+  AXIS_MOVE_TIMES: {type: UINT32, desc: axis move times}
+  MSG: {type: STRING, desc: message}
