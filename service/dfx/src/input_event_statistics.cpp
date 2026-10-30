@@ -57,6 +57,14 @@ constexpr int64_t TOUCHPAD_SWIPE_EDGE1_MS { 100 };
 constexpr int64_t TOUCHPAD_SWIPE_EDGE2_MS { 300 };
 constexpr int64_t TOUCHPAD_SWIPE_EDGE3_MS { 800 };
 
+/// Named indices of the four interval/duration histogram buckets:
+/// bucket 0 holds values below edge1, bucket 1 below edge2, bucket 2 below
+/// edge3 and bucket 3 everything at or above edge3.
+constexpr size_t INTERVAL_BELOW_EDGE1 { 0 };
+constexpr size_t INTERVAL_BELOW_EDGE2 { 1 };
+constexpr size_t INTERVAL_BELOW_EDGE3 { 2 };
+constexpr size_t INTERVAL_ABOVE_EDGE3 { 3 };
+
 const char* const DUMP_FILTER_TOUCH { "touch" };
 const char* const DUMP_FILTER_KEY { "key" };
 const char* const DUMP_FILTER_MOUSE { "mouse" };
@@ -776,15 +784,15 @@ void InputEventStatistics::DumpTouchScreen(int32_t fd)
     mprintf(fd, "  Low pressure touch times: %u\n",
         touchScreenStats_.lowPressureTimes.load(std::memory_order_relaxed));
     mprintf(fd, "  Tap interval buckets (ms) [0,80)/[80,200)/[200,500)/[500,+inf): %u/%u/%u/%u\n",
-        touchScreenStats_.tapIntervalBuckets[0].load(std::memory_order_relaxed),
-        touchScreenStats_.tapIntervalBuckets[1].load(std::memory_order_relaxed),
-        touchScreenStats_.tapIntervalBuckets[2].load(std::memory_order_relaxed),
-        touchScreenStats_.tapIntervalBuckets[3].load(std::memory_order_relaxed));
+        touchScreenStats_.tapIntervalBuckets[INTERVAL_BELOW_EDGE1].load(std::memory_order_relaxed),
+        touchScreenStats_.tapIntervalBuckets[INTERVAL_BELOW_EDGE2].load(std::memory_order_relaxed),
+        touchScreenStats_.tapIntervalBuckets[INTERVAL_BELOW_EDGE3].load(std::memory_order_relaxed),
+        touchScreenStats_.tapIntervalBuckets[INTERVAL_ABOVE_EDGE3].load(std::memory_order_relaxed));
     mprintf(fd, "  Move interval buckets (ms) [0,8)/[8,16)/[16,33)/[33,+inf): %u/%u/%u/%u\n",
-        touchScreenStats_.touchMoveIntervalBuckets[0].load(std::memory_order_relaxed),
-        touchScreenStats_.touchMoveIntervalBuckets[1].load(std::memory_order_relaxed),
-        touchScreenStats_.touchMoveIntervalBuckets[2].load(std::memory_order_relaxed),
-        touchScreenStats_.touchMoveIntervalBuckets[3].load(std::memory_order_relaxed));
+        touchScreenStats_.touchMoveIntervalBuckets[INTERVAL_BELOW_EDGE1].load(std::memory_order_relaxed),
+        touchScreenStats_.touchMoveIntervalBuckets[INTERVAL_BELOW_EDGE2].load(std::memory_order_relaxed),
+        touchScreenStats_.touchMoveIntervalBuckets[INTERVAL_BELOW_EDGE3].load(std::memory_order_relaxed),
+        touchScreenStats_.touchMoveIntervalBuckets[INTERVAL_ABOVE_EDGE3].load(std::memory_order_relaxed));
 }
 
 void InputEventStatistics::DumpKeyBoard(int32_t fd)
@@ -801,15 +809,15 @@ void InputEventStatistics::DumpKeyBoard(int32_t fd)
     mprintf(fd, "  Function key times: %u\n",
         keyBoardStats_.functionKeyTimes.load(std::memory_order_relaxed));
     mprintf(fd, "  Press duration buckets (ms) [0,100)/[100,300)/[300,1000)/[1000,+inf): %u/%u/%u/%u\n",
-        keyBoardStats_.pressDurationBuckets[0].load(std::memory_order_relaxed),
-        keyBoardStats_.pressDurationBuckets[1].load(std::memory_order_relaxed),
-        keyBoardStats_.pressDurationBuckets[2].load(std::memory_order_relaxed),
-        keyBoardStats_.pressDurationBuckets[3].load(std::memory_order_relaxed));
+        keyBoardStats_.pressDurationBuckets[INTERVAL_BELOW_EDGE1].load(std::memory_order_relaxed),
+        keyBoardStats_.pressDurationBuckets[INTERVAL_BELOW_EDGE2].load(std::memory_order_relaxed),
+        keyBoardStats_.pressDurationBuckets[INTERVAL_BELOW_EDGE3].load(std::memory_order_relaxed),
+        keyBoardStats_.pressDurationBuckets[INTERVAL_ABOVE_EDGE3].load(std::memory_order_relaxed));
     mprintf(fd, "  Key interval buckets (ms) [0,100)/[100,300)/[300,1000)/[1000,+inf): %u/%u/%u/%u\n",
-        keyBoardStats_.keyIntervalBuckets[0].load(std::memory_order_relaxed),
-        keyBoardStats_.keyIntervalBuckets[1].load(std::memory_order_relaxed),
-        keyBoardStats_.keyIntervalBuckets[2].load(std::memory_order_relaxed),
-        keyBoardStats_.keyIntervalBuckets[3].load(std::memory_order_relaxed));
+        keyBoardStats_.keyIntervalBuckets[INTERVAL_BELOW_EDGE1].load(std::memory_order_relaxed),
+        keyBoardStats_.keyIntervalBuckets[INTERVAL_BELOW_EDGE2].load(std::memory_order_relaxed),
+        keyBoardStats_.keyIntervalBuckets[INTERVAL_BELOW_EDGE3].load(std::memory_order_relaxed),
+        keyBoardStats_.keyIntervalBuckets[INTERVAL_ABOVE_EDGE3].load(std::memory_order_relaxed));
 }
 
 void InputEventStatistics::DumpMouse(int32_t fd)
@@ -833,10 +841,10 @@ void InputEventStatistics::DumpMouse(int32_t fd)
         mouseStats_.scrollUpTimes.load(std::memory_order_relaxed),
         mouseStats_.scrollDownTimes.load(std::memory_order_relaxed));
     mprintf(fd, "  Move interval buckets (ms) [0,8)/[8,16)/[16,33)/[33,+inf): %u/%u/%u/%u\n",
-        mouseStats_.moveIntervalBuckets[0].load(std::memory_order_relaxed),
-        mouseStats_.moveIntervalBuckets[1].load(std::memory_order_relaxed),
-        mouseStats_.moveIntervalBuckets[2].load(std::memory_order_relaxed),
-        mouseStats_.moveIntervalBuckets[3].load(std::memory_order_relaxed));
+        mouseStats_.moveIntervalBuckets[INTERVAL_BELOW_EDGE1].load(std::memory_order_relaxed),
+        mouseStats_.moveIntervalBuckets[INTERVAL_BELOW_EDGE2].load(std::memory_order_relaxed),
+        mouseStats_.moveIntervalBuckets[INTERVAL_BELOW_EDGE3].load(std::memory_order_relaxed),
+        mouseStats_.moveIntervalBuckets[INTERVAL_ABOVE_EDGE3].load(std::memory_order_relaxed));
 }
 
 void InputEventStatistics::DumpTouchpad(int32_t fd)
@@ -855,10 +863,10 @@ void InputEventStatistics::DumpTouchpad(int32_t fd)
             touchpadStats_.fingerCountTimes[i].load(std::memory_order_relaxed));
     }
     mprintf(fd, "  Swipe interval buckets (ms) [0,100)/[100,300)/[300,800)/[800,+inf): %u/%u/%u/%u\n",
-        touchpadStats_.swipeIntervalBuckets[0].load(std::memory_order_relaxed),
-        touchpadStats_.swipeIntervalBuckets[1].load(std::memory_order_relaxed),
-        touchpadStats_.swipeIntervalBuckets[2].load(std::memory_order_relaxed),
-        touchpadStats_.swipeIntervalBuckets[3].load(std::memory_order_relaxed));
+        touchpadStats_.swipeIntervalBuckets[INTERVAL_BELOW_EDGE1].load(std::memory_order_relaxed),
+        touchpadStats_.swipeIntervalBuckets[INTERVAL_BELOW_EDGE2].load(std::memory_order_relaxed),
+        touchpadStats_.swipeIntervalBuckets[INTERVAL_BELOW_EDGE3].load(std::memory_order_relaxed),
+        touchpadStats_.swipeIntervalBuckets[INTERVAL_ABOVE_EDGE3].load(std::memory_order_relaxed));
 }
 
 void InputEventStatistics::DumpJoystick(int32_t fd)
