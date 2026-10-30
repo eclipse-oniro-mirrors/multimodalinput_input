@@ -46,12 +46,10 @@ const std::set<std::string> ALLOWED_OPTIONS = {
     "--modifier",
 };
 
-bool ParseKeyPressOptions(const std::vector<std::string> &args, KeyPressOptions &result, std::string &error,
-    std::string &suggestion)
+bool ParseKeyPressOptions(const std::vector<std::string> &args, KeyPressOptions &result, std::string &error)
 {
     Options options;
     if (!ParseOptionPairs(args, ALLOWED_OPTIONS, options, error)) {
-        suggestion = "Please use key-press --help";
         return false;
     }
     const NumberRule keyRule {
@@ -64,7 +62,6 @@ bool ParseKeyPressOptions(const std::vector<std::string> &args, KeyPressOptions 
     };
 
     if (!ParseNumber(options, keyRule, result.key, error)) {
-        suggestion = "Please provide --key <OHOS key code>";
         return false;
     }
     const NumberRule holdRule {
@@ -77,17 +74,14 @@ bool ParseKeyPressOptions(const std::vector<std::string> &args, KeyPressOptions 
         .invalidValueMessage = "holdDuration must be an integer",
     };
     if (!ParseNumber(options, holdRule, result.holdDuration, error)) {
-        suggestion = "Please use holdDuration in [0,10000]";
         return false;
     }
     const auto modifier = options.find("--modifier");
     if (modifier != options.end() && !ParseModifiers(modifier->second, result.modifiers, error)) {
-        suggestion = "Please use distinct modifier keys";
         return false;
     }
     if (std::find(result.modifiers.begin(), result.modifiers.end(), result.key) != result.modifiers.end()) {
         error = "key must not duplicate a modifier key";
-        suggestion = "Please use a key different from modifier keys";
         return false;
     }
     return true;
@@ -147,12 +141,11 @@ int32_t KeyPressCommand::Execute(const std::vector<std::string> &args)
 {
     KeyPressOptions options;
     std::string error;
-    std::string suggestion;
-    if (!ParseKeyPressOptions(args, options, error, suggestion)) {
-        return ParameterError(error, suggestion);
+    if (!ParseKeyPressOptions(args, options, error)) {
+        return ParameterError(error, "Please use documented key press arguments");
     }
     if (options.modifiers.size() + 1 > MAX_PRESSED_KEYS) {
-        return ParameterError("no more than 5 keys may be pressed", "Please reduce modifier keys");
+        return ParameterError("no more than 5 keys may be pressed", "Please use documented key press arguments");
     }
     std::shared_ptr<KeyboardControllerImpl> keyboard;
     int32_t ret = InputManager::GetInstance()->CreateKeyboardController(keyboard);

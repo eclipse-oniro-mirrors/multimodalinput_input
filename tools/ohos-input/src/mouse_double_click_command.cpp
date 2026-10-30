@@ -40,6 +40,33 @@ const std::set<std::string> ALLOWED_OPTIONS = {
     "--clickInterval",
     "--modifier",
 };
+
+NumberRule ClickIntervalRule()
+{
+    return NumberRule {
+        .optionName = "--clickInterval",
+        .isRequired = false,
+        .defaultValue = DEFAULT_CLICK_INTERVAL_MS,
+        .minValue = MIN_CLICK_INTERVAL_MS,
+        .maxValue = MAX_CLICK_INTERVAL_MS,
+    };
+}
+
+bool ParseDoubleClickArgs(const std::vector<std::string> &args, std::vector<int32_t> &modifiers,
+    PointOptions &point, std::string &error)
+{
+    Options options;
+    if (!ParseMouseOptions(ALLOWED_OPTIONS, args, options, modifiers, error) ||
+        !ParsePoint(options, true, point, error) ||
+        !ParseNumber(options, ClickIntervalRule(), point.clickInterval, error)) {
+        return false;
+    }
+    if (point.clickInterval <= point.holdDuration) {
+        error = "clickInterval must exceed holdDuration";
+        return false;
+    }
+    return true;
+}
 } // namespace
 
 std::string MouseDoubleClickCommand::GetName() const
@@ -94,25 +121,11 @@ std::vector<std::string> MouseDoubleClickCommand::GetExamples() const
 
 int32_t MouseDoubleClickCommand::Execute(const std::vector<std::string> &args)
 {
-    Options options;
     std::vector<int32_t> modifiers;
     PointOptions point;
     std::string error;
-    const NumberRule clickIntervalRule {
-        .optionName = "--clickInterval",
-        .isRequired = false,
-        .defaultValue = DEFAULT_CLICK_INTERVAL_MS,
-        .minValue = MIN_CLICK_INTERVAL_MS,
-        .maxValue = MAX_CLICK_INTERVAL_MS,
-    };
-    if (!ParseMouseOptions(ALLOWED_OPTIONS, args, options, modifiers, error) ||
-        !ParsePoint(options, true, point, error) ||
-        !ParseNumber(options, clickIntervalRule, point.clickInterval, error)) {
-        return ParameterError(error.empty() ? "clickInterval must exceed holdDuration" : error,
-            "Please use documented mouse arguments");
-    }
-    if (point.clickInterval <= point.holdDuration) {
-        return ParameterError("clickInterval must exceed holdDuration", "Please use documented mouse arguments");
+    if (!ParseDoubleClickArgs(args, modifiers, point, error)) {
+        return ParameterError(error, "Please use documented mouse double click arguments");
     }
     MouseSession session;
     int32_t ret = CreateControllers(modifiers, session);

@@ -91,6 +91,34 @@ HWTEST_F(IntegrationTest, Scroll_OneTwoAndMinusTwoClicks_MatchConfirmedSequences
     ExpectCalls(calls, { { "BeginAxis", { 1, -15 } }, { "UpdateAxis", { 1, -15 } }, { "EndAxis", { 1 } } });
 }
 
+HWTEST_F(IntegrationTest, Scroll_ParameterErrors_UseDocumentedScrollSuggestion, TestSize.Level1)
+{
+    MockControllerFixture fixture;
+    std::vector<RecordedCall> calls;
+    fixture.Configure(calls);
+    const auto modifierResult = OHOS::MMI::InputCli::Run(
+        { "mouse-scroll", "--clicks", "99", "--modifier", "xx" });
+    EXPECT_EQ(modifierResult.code, PARAMETER_EXIT);
+    const auto modifierParsed = ParseJson(modifierResult);
+    EXPECT_EQ(modifierParsed["status"], "failed");
+    EXPECT_EQ(modifierParsed["errCode"], "ERR_PARAMETER_ERROR");
+    EXPECT_EQ(modifierParsed["errMsg"], "Parameter error: modifier must use ctrl, alt, shift, or meta");
+    EXPECT_EQ(modifierParsed["suggestion"], "Please use documented mouse scroll arguments");
+
+    const auto structureResult = OHOS::MMI::InputCli::Run({ "mouse-scroll", "--clicks" });
+    EXPECT_EQ(structureResult.code, PARAMETER_EXIT);
+    const auto structureParsed = ParseJson(structureResult);
+    EXPECT_EQ(structureParsed["errMsg"], "Parameter error: --clicks requires a value");
+    EXPECT_EQ(structureParsed["suggestion"], "Please use documented mouse scroll arguments");
+
+    const auto clicksResult = OHOS::MMI::InputCli::Run({ "mouse-scroll" });
+    EXPECT_EQ(clicksResult.code, PARAMETER_EXIT);
+    const auto clicksParsed = ParseJson(clicksResult);
+    EXPECT_EQ(clicksParsed["errMsg"], "Parameter error: missing required --clicks");
+    EXPECT_EQ(clicksParsed["suggestion"], "Please use documented mouse scroll arguments");
+    EXPECT_TRUE(calls.empty());
+}
+
 HWTEST_F(IntegrationTest, ConsecutiveActions_DoNotReusePriorActionState, TestSize.Level1)
 {
     MockControllerFixture fixture;

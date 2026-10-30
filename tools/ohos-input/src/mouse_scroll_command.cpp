@@ -32,6 +32,30 @@ const std::set<std::string> ALLOWED_OPTIONS = {
     "--clicks",
     "--modifier",
 };
+
+NumberRule ScrollClicksRule()
+{
+    return NumberRule {
+        .optionName = "--clicks",
+        .isRequired = true,
+        .minValue = -MAX_SCROLL_CLICKS,
+        .maxValue = MAX_SCROLL_CLICKS,
+    };
+}
+
+bool ParseScrollArgs(const std::vector<std::string> &args, std::vector<int32_t> &modifiers, int32_t &clicks,
+    std::string &error)
+{
+    Options options;
+    if (!ParseOptionPairs(args, ALLOWED_OPTIONS, options, error)) {
+        return false;
+    }
+    const auto modifier = options.find("--modifier");
+    if (modifier != options.end() && !ParseModifiers(modifier->second, modifiers, error)) {
+        return false;
+    }
+    return ParseNumber(options, ScrollClicksRule(), clicks, error) && ValidateScrollClicks(clicks, error);
+}
 } // namespace
 
 std::string MouseScrollCommand::GetName() const
@@ -79,21 +103,11 @@ std::vector<std::string> MouseScrollCommand::GetExamples() const
 
 int32_t MouseScrollCommand::Execute(const std::vector<std::string> &args)
 {
-    Options options;
     std::vector<int32_t> modifiers;
     int32_t clicks = 0;
     std::string error;
-    const NumberRule clicksRule {
-        .optionName = "--clicks",
-        .isRequired = true,
-        .minValue = -MAX_SCROLL_CLICKS,
-        .maxValue = MAX_SCROLL_CLICKS,
-    };
-    if (!ParseMouseOptions(ALLOWED_OPTIONS, args, options, modifiers, error) ||
-        !ParseNumber(options, clicksRule, clicks, error) ||
-        !ValidateScrollClicks(clicks, error)) {
-        return ParameterError(error.empty() ? "options must use documented --name value once" : error,
-            "Please provide clicks in [-100,-1] or [1,100]");
+    if (!ParseScrollArgs(args, modifiers, clicks, error)) {
+        return ParameterError(error, "Please use documented mouse scroll arguments");
     }
     MouseSession session;
     int32_t ret = CreateControllers(modifiers, session);
