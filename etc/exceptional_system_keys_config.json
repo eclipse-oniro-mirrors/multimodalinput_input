@@ -260,6 +260,24 @@
         },
         {
             "preKeys": [],
+            "finalKey": 2090,
+            "longPressTime": 0,
+            "triggerType": "down"
+        },
+        {
+            "preKeys": [],
+            "finalKey": 2091,
+            "longPressTime": 0,
+            "triggerType": "down"
+        },
+        {
+            "preKeys": [],
+            "finalKey": 2092,
+            "longPressTime": 0,
+            "triggerType": "down"
+        },
+        {
+            "preKeys": [],
             "finalKey": 40,
             "longPressTime": 0,
             "triggerType": "down"
