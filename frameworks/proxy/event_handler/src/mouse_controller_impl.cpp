@@ -489,6 +489,8 @@ int32_t MouseControllerImpl::InjectPointerEvent(std::shared_ptr<PointerEvent> ev
 
     // Add Controller Flag to mark this event uses CONTROL_DEVICE permission check
     event->AddFlag(InputEvent::EVENT_FLAG_CONTROLLER);
+    event->AddFlag(InputEvent::EVENT_FLAG_PENDING_CHECK);
+    MMI_HILOGD("Pending check flag added to controller mouse event");
 
     int32_t ret = InputMgrImpl.SimulateInputEvent(event, false, useCoordinate);
     if (ret != RET_OK) {

@@ -705,8 +705,7 @@ PointerEvent::PointerEvent(const PointerEvent& other)
       handOption_(other.handOption_), fixedMode_(other.fixedMode_),
       rightButtonSource_(other.rightButtonSource_),
       signature_(other.signature_),
-      distributeEventTime_(other.distributeEventTime_),
-      callingUid_(other.callingUid_)
+      distributeEventTime_(other.distributeEventTime_)
       {}
 
 PointerEvent::~PointerEvent() {}
@@ -1232,7 +1231,6 @@ bool PointerEvent::WriteToParcel(Parcel &out) const
     WRITEDOUBLE(out, velocity_);
     WRITEINT32(out, axisEventType_);
     WRITEINT32(out, pullId_);
-    WRITEINT32(out, callingUid_);
 #ifdef OHOS_BUILD_ENABLE_SECURITY_COMPONENT
     WRITEINT32(out, static_cast<int32_t>(enhanceData_.size()));
     for (uint32_t i = 0; i < enhanceData_.size(); i++) {
@@ -1325,7 +1323,6 @@ bool PointerEvent::ReadFromParcel(Parcel &in)
 
     READINT32(in, axisEventType_);
     READINT32(in, pullId_);
-    READINT32(in, callingUid_);
 #ifdef OHOS_BUILD_ENABLE_SECURITY_COMPONENT
     if (!ReadEnhanceDataFromParcel(in)) {
         return false;
@@ -1852,14 +1849,5 @@ std::string PointerEvent::GetSignature() const
     return signature_;
 }
 
-int32_t PointerEvent::GetCallingUid() const
-{
-    return callingUid_;
-}
-
-void PointerEvent::SetCallingUid(int32_t callingUid)
-{
-    callingUid_ = callingUid;
-}
 } // namespace MMI
 } // namespace OHOS

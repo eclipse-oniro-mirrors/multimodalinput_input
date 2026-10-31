@@ -102,6 +102,11 @@ public:
         return tokenType_;
     }
 
+    uint32_t GetTokenId() const
+    {
+        return tokenId_;
+    }
+
     bool IsSocketValid()
     {
         return !invalidSocket_;

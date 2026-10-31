@@ -226,6 +226,11 @@ int32_t InputEventDataTransformation::SerializeInputEvent(std::shared_ptr<InputE
         << event->GetAction() << event->GetActionStartTime() << event->GetSensorInputTime() << event->GetDeviceId()
         << event->GetSourceType() << event->GetTargetDisplayId() << event->GetTargetWindowId()
         << event->GetAgentWindowId() << event->GetFlag() << event->IsMarkEnabled();
+    auto injectorInfo = event->GetInjectorInfo();
+    pkt << injectorInfo.has_value();
+    if (injectorInfo.has_value()) {
+        pkt << injectorInfo->uid << injectorInfo->tokenId << injectorInfo->optionalData;
+    }
     if (pkt.ChkRWError()) {
         MMI_HILOGE("Serialize packet is failed");
         return RET_ERR;
@@ -266,6 +271,16 @@ int32_t InputEventDataTransformation::DeserializeInputEvent(NetPacket &pkt, std:
     bool markEnabled = true;
     pkt >> markEnabled;
     event->SetMarkEnabled(markEnabled);
+    bool hasInjectorInfo = false;
+    pkt >> hasInjectorInfo;
+    if (hasInjectorInfo) {
+        int32_t uid = -1;
+        uint32_t tokenId = 0;
+        uint64_t optionalData = 0;
+        pkt >> uid >> tokenId >> optionalData;
+        event->SetInjectorInfo(uid, tokenId);
+        event->SetInjectorOptionalData(optionalData);
+    }
     if (pkt.ChkRWError()) {
         MMI_HILOGE("Deserialize packet is failed");
         return RET_ERR;
@@ -317,7 +332,6 @@ int32_t InputEventDataTransformation::Marshalling(std::shared_ptr<PointerEvent> 
     pkt << event->GetPullId();
     pkt << event->GetThrowAngle();
     pkt << event->GetThrowSpeed();
-    pkt << event->GetCallingUid();
     if (pkt.ChkRWError()) {
         MMI_HILOGE("Marshalling pointer event failed");
         return RET_ERR;
@@ -488,11 +502,9 @@ int32_t InputEventDataTransformation::Unmarshalling(NetPacket &pkt, std::shared_
     double throwSpeed {0.0};
     pkt >> throwAngle;
     pkt >> throwSpeed;
-    pkt >> tField;
     CHKRWER(pkt, RET_ERR);
     event->SetThrowAngle(throwAngle);
     event->SetThrowSpeed(throwSpeed);
-    event->SetCallingUid(tField);
 
     if (!DeserializeSettings(pkt, event)) {
         MMI_HILOGE("DeserializeSettings fail");

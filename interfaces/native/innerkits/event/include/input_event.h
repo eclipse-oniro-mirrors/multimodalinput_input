@@ -16,10 +16,18 @@
 #ifndef INPUT_EVENT_H
 #define INPUT_EVENT_H
 
+#include <cstdint>
+#include <optional>
+
 #include "parcel.h"
 
 namespace OHOS {
 namespace MMI {
+struct InjectorInfo {
+    int32_t uid { -1 };
+    uint32_t tokenId { 0 };
+    uint64_t optionalData { 0 };
+};
 class InputEvent : public Parcelable {
 public:
     /**
@@ -194,6 +202,12 @@ public:
      * @since 26
      */
     static constexpr uint32_t EVENT_FLAG_INJECT_UNDER_LOCK = 0x00800000;
+
+    /**
+     * Flag indicating an injected event requires security check before dispatch.
+     * @since 26
+     */
+    static constexpr uint32_t EVENT_FLAG_PENDING_CHECK = 0x04000000;
 
     /**
      * Flag indicating an injected event that should refresh the last input time,
@@ -567,6 +581,13 @@ public:
      */
     void GetExtraData(std::shared_ptr<const uint8_t[]> &data, uint32_t &length) const;
 
+    int32_t GetCallingUid() const;
+    void SetInjectorInfo(int32_t uid, uint32_t tokenId);
+    void SetInjectorOptionalData(uint64_t data);
+    std::optional<InjectorInfo> GetInjectorInfo() const;
+    bool HasInjectorInfo() const;
+    void ClearInjectorInfo();
+
     /**
      * @brief Checks whether the "Processed feedback" of this event is enabled or not.
      * @return Returns <b>true</b> if we need a "Processed feedback" for this event;
@@ -633,6 +654,7 @@ private:
     bool markEnabled_ { true };
     std::shared_ptr<const uint8_t[]> extraData_;
     uint32_t extraDataLength_ { 0 };
+    std::optional<InjectorInfo> injectorInfo_ { std::nullopt };
     std::function<void(int32_t, int64_t)> processedCallback_;
 };
 } // namespace MMI
