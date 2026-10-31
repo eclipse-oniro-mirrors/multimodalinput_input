@@ -116,6 +116,7 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
         { "pendingBind", no_argument, 0, 'B' },
         { "lastInputTime", no_argument, 0, 'L' },
         { "touchpadScrollDirection", no_argument, 0, 'T' },
+        { "assetCheck", no_argument, 0, 'a' },
         { nullptr, 0, 0, 0 }
     };
     if (args.empty()) {
@@ -158,7 +159,7 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
         std::lock_guard<std::mutex> lock(getoptMtx_);
         optind = 1;
         int32_t c;
-        while ((c = getopt_long (args.size(), argv, "hdlwusoifmckKetbnpBLT", dumpOptions, &optionIndex)) != -1) {
+        while ((c = getopt_long (args.size(), argv, "hdlwusoifmckKetbnpBLTa", dumpOptions, &optionIndex)) != -1) {
             getoptResults.push_back(c);
         }
     }
@@ -354,6 +355,14 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
 #endif // OHOS_BUILD_ENABLE_POINTER
                 break;
             }
+            case 'a': {
+                auto dispatchHandler = InputHandler->GetEventDispatchHandler();
+                if (dispatchHandler == nullptr) {
+                    goto RELEASE_RES;
+                }
+                dispatchHandler->DumpAssetChecker(fd);
+                break;
+            }
             default: {
                 mprintf(fd, "cmd param is error\n");
                 DumpHelp(fd);
@@ -409,6 +418,7 @@ void EventDump::DumpHelp(int32_t fd)
     mprintf(fd, "            -S report: report the current statistics window now\t");
     mprintf(fd, "            -S reset: reset all statistics counters\t");
 #endif // MMI_ENABLE_EVENT_STATISTICS
+    mprintf(fd, "      -a, --assetCheck: dump the asset check last result\t");
 }
 
 void EventDump::AttachTouchGestureMgr(std::shared_ptr<ITouchGestureManager> touchGestureMgr)
