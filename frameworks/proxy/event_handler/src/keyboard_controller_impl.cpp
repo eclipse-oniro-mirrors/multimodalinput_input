@@ -251,6 +251,8 @@ int32_t KeyboardControllerImpl::InjectKeyEvent(std::shared_ptr<KeyEvent> event)
 
     // Add Controller Flag to mark this event uses CONTROL_DEVICE permission check
     event->AddFlag(InputEvent::EVENT_FLAG_CONTROLLER);
+    event->AddFlag(InputEvent::EVENT_FLAG_PENDING_CHECK);
+    MMI_HILOGD("Pending check flag added to controller key event");
 
     // Inject event using InputManagerImpl
     int32_t ret = InputMgrImpl.SimulateInputEvent(event);

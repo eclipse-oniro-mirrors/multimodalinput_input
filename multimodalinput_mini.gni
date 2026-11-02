@@ -74,6 +74,7 @@ declare_args() {
   input_feature_triple_finger_snapshot = false
   input_controller_inject_enable = false
   input_feature_api_metrics_histogram = false
+  input_feature_asset_check = false
 
   if (defined(global_parts_info) &&
       defined(global_parts_info.msdp_device_status)) {

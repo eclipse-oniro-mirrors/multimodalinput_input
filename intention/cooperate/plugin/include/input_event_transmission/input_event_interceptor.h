@@ -21,6 +21,7 @@
 #include "channel.h"
 #include "cooperate_events.h"
 #include "i_context.h"
+#include "input_event_transmission/input_event_sampler.h"
 
 namespace OHOS {
 namespace Msdp {
@@ -47,6 +48,7 @@ private:
     int32_t interceptorId_ { -1 };
     std::string remoteNetworkId_;
     Channel<CooperateEvent>::Sender sender_;
+    InputEventSampler inputEventSampler_;
     static std::set<int32_t> filterKeys_;
     static std::set<int32_t> filterPointers_;
 };

@@ -2410,6 +2410,7 @@ ErrCode MMIService::InjectKeyEvent(const KeyEvent& keyEvent, bool isNativeInject
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
     int32_t ret;
     int32_t pid = GetCallingPid();
+    keyEventPtr->SetInjectorInfo(GetCallingUid(), IPCSkeleton::GetCallingTokenID());
     auto tokenId = IPCSkeleton::GetCallingTokenID();
     auto tokenType = OHOS::Security::AccessToken::AccessTokenKit::GetTokenTypeFlag(tokenId);
     if (tokenType == OHOS::Security::AccessToken::TOKEN_HAP) {
@@ -2596,7 +2597,7 @@ ErrCode MMIService::InjectPointerEvent(const PointerEvent& pointerEvent, bool is
     bool isShell = PER_HELPER->RequestFromShell();
     int32_t userId = GetCallingUser();
     int32_t callingUid = GetCallingUid();
-    pointerEventPtr->SetCallingUid(callingUid);
+    pointerEventPtr->SetInjectorInfo(callingUid, IPCSkeleton::GetCallingTokenID());
 #ifdef OHOS_BUILD_ENABLE_ANCO
     ret = InjectPointerEventExt(userId, pointerEventPtr, pid, isNativeInject, isShell, useCoordinate);
 #else
@@ -2631,6 +2632,7 @@ ErrCode MMIService::InjectTouchPadEvent(const PointerEvent& pointerEvent,
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
     int32_t ret;
     int32_t pid = GetCallingPid();
+    pointerEventPtr->SetInjectorInfo(GetCallingUid(), IPCSkeleton::GetCallingTokenID());
     bool isShell = PER_HELPER->RequestFromShell();
     int32_t userId = GetCallingUser();
     ret = delegateTasks_.PostSyncTask(

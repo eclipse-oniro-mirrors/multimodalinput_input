@@ -58,10 +58,13 @@ void InputEventInterceptor::Enable(Context &context)
     FI_HILOGI("Cursor transite out at (%{private}d, %{private}d)", cursorPos.x, cursorPos.y);
     remoteNetworkId_ = context.Peer();
     sender_ = context.Sender();
-    interceptorId_ = env_->GetInput().AddInterceptor(
+    inputEventSampler_.SetPointerEventHandler(
         [this](std::shared_ptr<MMI::PointerEvent> pointerEvent) {
             this->OnPointerEvent(pointerEvent);
-        },
+        }
+    );
+    interceptorId_ = env_->GetInput().AddInterceptor(
+        [this](std::shared_ptr<MMI::PointerEvent> pointerEvent) { inputEventSampler_.OnPointerEvent(pointerEvent); },
         [this](std::shared_ptr<MMI::KeyEvent> keyEvent) {
             this->OnKeyEvent(keyEvent);
         });

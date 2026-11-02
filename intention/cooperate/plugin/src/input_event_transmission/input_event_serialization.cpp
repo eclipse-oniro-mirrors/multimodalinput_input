@@ -21,6 +21,7 @@
 #endif // OHOS_BUILD_ENABLE_SECURITY_PART
 
 #include "devicestatus_define.h"
+#include "input_event_transmission/inner_pointer_item.h"
 
 #undef LOG_TAG
 #define LOG_TAG "InputEventSerialization"
@@ -313,7 +314,9 @@ int32_t InputEventSerialization::DeserializePressedButtons(NetPacket &pkt, std::
 
 int32_t InputEventSerialization::SerializePointerItem(NetPacket &pkt, MMI::PointerEvent::PointerItem &item)
 {
-    pkt << item;
+    InnerPointerItem innerItem;
+    InnerPointerItem::Transform(item, innerItem);
+    pkt << innerItem;
     if (pkt.ChkRWError()) {
         FI_HILOGE("Failed to serialize pointer item");
         return RET_ERR;
@@ -323,7 +326,9 @@ int32_t InputEventSerialization::SerializePointerItem(NetPacket &pkt, MMI::Point
 
 int32_t InputEventSerialization::DeserializePointerItem(NetPacket &pkt, MMI::PointerEvent::PointerItem &item)
 {
-    pkt >> item;
+    InnerPointerItem innerItem;
+    pkt >> innerItem;
+    InnerPointerItem::Transform(innerItem, item);
     if (pkt.ChkRWError()) {
         FI_HILOGE("Failed to deserialize pointer item");
         return RET_ERR;

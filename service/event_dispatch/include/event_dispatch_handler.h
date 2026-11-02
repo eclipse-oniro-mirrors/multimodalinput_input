@@ -16,13 +16,29 @@
 #ifndef EVENT_DISPATCH_HANDLER_H
 #define EVENT_DISPATCH_HANDLER_H
 
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+
 #include "i_input_event_handler.h"
+#include "input_event.h"
 #include "key_event_value_transformation.h"
 #include "uds_server.h"
 #include "window_info.h"
 
 namespace OHOS {
 namespace MMI {
+
+class AssetChecker {
+public:
+    virtual ~AssetChecker() = default;
+    virtual bool HandleEvent(const std::shared_ptr<InputEvent>& event) = 0;
+    virtual void Dump(int32_t fd) = 0;
+    static std::unique_ptr<AssetChecker> Create();
+};
+
 class EventDispatchHandler final : public IInputEventHandler {
     struct DinputSimulateEvent {
         uint32_t type { PointerEvent::SOURCE_TYPE_UNKNOWN };
@@ -46,7 +62,7 @@ class EventDispatchHandler final : public IInputEventHandler {
         POINTER_ACTION_PROXIMITY_OUT = 36,
     };
 public:
-    EventDispatchHandler() = default;
+    EventDispatchHandler();
     DISALLOW_COPY_AND_MOVE(EventDispatchHandler);
     ~EventDispatchHandler() override = default;
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
@@ -70,8 +86,10 @@ public:
     std::chrono::time_point<std::chrono::high_resolution_clock> LasteventBeginTime_ =
     std::chrono::high_resolution_clock::now();
     void SendWindowStateError(int32_t userId, int32_t pid, int32_t windowId);
+    void DumpAssetChecker(int32_t fd);
 private:
     void DispatchPointerEventInner(std::shared_ptr<PointerEvent> point, int32_t fd);
+    void LogBlockedPointerEvent(const std::shared_ptr<PointerEvent>& point);
     void HandleMultiWindowPointerEvent(std::shared_ptr<PointerEvent> point,
         PointerEvent::PointerItem pointerItem);
     bool ReissueEvent(std::shared_ptr<PointerEvent> &point, int32_t windowId, std::optional<WindowInfo> &windowInfo);
@@ -105,6 +123,7 @@ private:
         int64_t startTime { -1 };
     } windowStateErrorInfo_;
     std::map<int32_t, std::vector<std::shared_ptr<WindowInfo>>> cancelEventList_;
+    std::unique_ptr<AssetChecker> assetChecker_;
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
     void FilterInvalidPointerItem(const std::shared_ptr<PointerEvent> pointEvent, int32_t fd);
 #endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH

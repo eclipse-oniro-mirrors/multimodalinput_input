@@ -56,6 +56,15 @@ static constexpr auto sendConsecutiveEventInterval = std::chrono::milliseconds(1
 #endif // OHOS_BUILD_ENABLE_WATCH
 } // namespace
 
+EventDispatchHandler::EventDispatchHandler() : assetChecker_(AssetChecker::Create()) {}
+
+void EventDispatchHandler::DumpAssetChecker(int32_t fd)
+{
+    if (assetChecker_) {
+        assetChecker_->Dump(fd);
+    }
+}
+
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
 void EventDispatchHandler::HandleKeyEvent(const std::shared_ptr<KeyEvent> keyEvent)
 {
@@ -509,6 +518,21 @@ void EventDispatchHandler::ResetDisplayXY(const std::shared_ptr<PointerEvent> &p
 #endif // OHOS_BUILD_ENABLE_ONE_HAND_MODE
 }
 
+void EventDispatchHandler::LogBlockedPointerEvent(const std::shared_ptr<PointerEvent>& point)
+{
+    int32_t action = point->GetAction();
+    if (action == PointerEvent::POINTER_ACTION_MOVE ||
+        action == PointerEvent::POINTER_ACTION_AXIS_UPDATE ||
+        action == PointerEvent::POINTER_ACTION_HOVER_MOVE ||
+        action == PointerEvent::POINTER_ACTION_PULL_MOVE ||
+        action == PointerEvent::POINTER_ACTION_SWIPE_UPDATE ||
+        action == PointerEvent::POINTER_ACTION_ROTATE_UPDATE) {
+        return;
+    }
+    MMI_HILOGI("Pointer event blocked by asset check, "
+        "id:%{private}d, action:%{public}d", point->GetId(), action);
+}
+
 void EventDispatchHandler::DispatchPointerEventInner(std::shared_ptr<PointerEvent> point, int32_t fd)
 {
     currentTime_ = point->GetActionTime();
@@ -560,6 +584,10 @@ void EventDispatchHandler::DispatchPointerEventInner(std::shared_ptr<PointerEven
         MMI_HILOGD("The pointer event does not report normally,app not respon. PointerEvent(deviceid:%{public}d,"
             "action:%{public}s)", point->GetDeviceId(), point->DumpPointerAction());
         ANRMgr->HandleAnrState(sess, ANR_DISPATCH, currentTime);
+    }
+    if (assetChecker_->HandleEvent(point)) {
+        LogBlockedPointerEvent(point);
+        return;
     }
     auto pointerEvent = std::make_shared<PointerEvent>(*point);
     pointerEvent->SetMarkEnabled(AcquireEnableMark(pointerEvent));
@@ -640,6 +668,11 @@ int32_t EventDispatchHandler::DispatchKeyEvent(int32_t fd, UDSServer& udsServer,
             "KeyEvent(deviceid:%{public}d, key action:%{public}d)",
             key->GetDeviceId(), key->GetKeyAction());
         ANRMgr->HandleAnrState(session, ANR_DISPATCH, currentTime);
+    }
+    if (assetChecker_->HandleEvent(key)) {
+        MMI_HILOGI("Key event blocked by asset check, id:%{private}d, action:%{public}d",
+            key->GetId(), key->GetAction());
+        return RET_OK;
     }
     auto keyHandler = InputHandler->GetEventNormalizeHandler();
     CHKPR(keyHandler, RET_ERR);

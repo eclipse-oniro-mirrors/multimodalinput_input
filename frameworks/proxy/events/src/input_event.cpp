@@ -44,7 +44,8 @@ InputEvent::InputEvent(const InputEvent& other)
       deviceId_(other.deviceId_), sourceType_(other.sourceType_), targetDisplayId_(other.targetDisplayId_),
       targetWindowId_(other.targetWindowId_), agentWindowId_(other.agentWindowId_),
       bitwise_(other.bitwise_), markEnabled_(other.markEnabled_),
-      extraData_(other.extraData_), extraDataLength_(other.extraDataLength_) {}
+      extraData_(other.extraData_), extraDataLength_(other.extraDataLength_),
+      injectorInfo_(other.injectorInfo_) {}
 
 InputEvent::~InputEvent() {}
 
@@ -68,6 +69,7 @@ void InputEvent::Reset()
     agentWindowId_ = -1;
     bitwise_ = EVENT_FLAG_NONE;
     markEnabled_ = true;
+    injectorInfo_ = std::nullopt;
 }
 
 std::string InputEvent::ToString()
@@ -343,6 +345,40 @@ void InputEvent::GetExtraData(std::shared_ptr<const uint8_t[]> &data, uint32_t &
     }
 }
 
+int32_t InputEvent::GetCallingUid() const
+{
+    return injectorInfo_.has_value() ? injectorInfo_->uid : -1;
+}
+
+void InputEvent::SetInjectorInfo(int32_t uid, uint32_t tokenId)
+{
+    uint64_t savedData = injectorInfo_.has_value() ? injectorInfo_->optionalData : 0;
+    injectorInfo_ = InjectorInfo{ uid, tokenId, savedData };
+}
+
+void InputEvent::SetInjectorOptionalData(uint64_t data)
+{
+    if (!injectorInfo_.has_value()) {
+        injectorInfo_ = InjectorInfo{};
+    }
+    injectorInfo_->optionalData = data;
+}
+
+std::optional<InjectorInfo> InputEvent::GetInjectorInfo() const
+{
+    return injectorInfo_;
+}
+
+bool InputEvent::HasInjectorInfo() const
+{
+    return injectorInfo_.has_value();
+}
+
+void InputEvent::ClearInjectorInfo()
+{
+    injectorInfo_ = std::nullopt;
+}
+
 bool InputEvent::WriteToParcel(Parcel &out) const
 {
     WRITEINT32(out, eventType_);
@@ -363,6 +399,13 @@ bool InputEvent::WriteToParcel(Parcel &out) const
         WRITEBUFFER(out, (void *)extraData_.get(), extraDataLength_);
     } else {
         WRITEUINT32(out, 0);
+    }
+    bool hasInjectorInfo = injectorInfo_.has_value();
+    WRITEBOOL(out, hasInjectorInfo);
+    if (hasInjectorInfo) {
+        WRITEINT32(out, injectorInfo_->uid);
+        WRITEUINT32(out, injectorInfo_->tokenId);
+        WRITEUINT64(out, injectorInfo_->optionalData);
     }
     return true;
 }
@@ -392,21 +435,31 @@ bool InputEvent::ReadFromParcel(Parcel &in)
     READBOOL(in, markEnabled_);
     READUINT32(in, extraDataLength_);
 
-    if (extraDataLength_ == 0) {
-        return true;
-    }
     if (extraDataLength_ > DATA_LENGTH_LIMIT) {
         extraDataLength_ = 0;
         return false;
     }
-    const uint8_t *buffer = in.ReadBuffer(extraDataLength_);
-    std::shared_ptr<uint8_t[]> sp(new uint8_t[extraDataLength_], [](uint8_t* ptr) { delete[] ptr; });
-    if ((buffer == nullptr) || (sp == nullptr)) {
-        extraDataLength_ = 0;
-        return false;
+    if (extraDataLength_ > 0) {
+        const uint8_t *buffer = in.ReadBuffer(extraDataLength_);
+        std::shared_ptr<uint8_t[]> sp(std::make_unique<uint8_t[]>(extraDataLength_));
+        if ((buffer == nullptr) || (sp == nullptr)) {
+            extraDataLength_ = 0;
+            return false;
+        }
+        std::copy(buffer, buffer + extraDataLength_, sp.get());
+        extraData_ = sp;
     }
-    std::copy(buffer, buffer + extraDataLength_, sp.get());
-    extraData_ = sp;
+    bool hasInjectorInfo = false;
+    READBOOL(in, hasInjectorInfo);
+    if (hasInjectorInfo) {
+        InjectorInfo info;
+        READINT32(in, info.uid);
+        READUINT32(in, info.tokenId);
+        READUINT64(in, info.optionalData);
+        injectorInfo_ = info;
+    } else {
+        injectorInfo_ = std::nullopt;
+    }
     return true;
 #endif // defined(ANDROID_PLATFORM) || defined(IOS_PLATFORM)
 }

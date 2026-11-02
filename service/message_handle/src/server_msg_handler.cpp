@@ -162,6 +162,10 @@ int32_t ServerMsgHandler::OnInjectKeyEvent(const std::shared_ptr<KeyEvent> keyEv
         if (DISPLAY_MONITOR->GetScreenLocked()) {
             keyEvent->AddFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
         }
+        if (PER_HELPER->CheckControlDevicePermission()) {
+            keyEvent->AddFlag(InputEvent::EVENT_FLAG_PENDING_CHECK);
+            MMI_HILOGD("Pending check flag added to inject key event, pid:%{public}d", pid);
+        }
     }
     if (keyEvent->HasFlag(InputEvent::EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME)) {
         InputHandler->UpdateLastInputTime();
@@ -276,6 +280,10 @@ int32_t ServerMsgHandler::OnInjectPointerEvent(int32_t userId, const std::shared
         if (DISPLAY_MONITOR->GetScreenLocked()) {
             pointerEvent->AddFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
         }
+        if (PER_HELPER->CheckControlDevicePermission()) {
+            pointerEvent->AddFlag(InputEvent::EVENT_FLAG_PENDING_CHECK);
+            MMI_HILOGD("Pending check flag added to inject pointer event, pid:%{public}d", pid);
+        }
     }
     if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME)) {
         InputHandler->UpdateLastInputTime();
@@ -297,6 +305,10 @@ int32_t ServerMsgHandler::OnInjectTouchPadEvent(int32_t userId, const std::share
         }
         if (DISPLAY_MONITOR->GetScreenLocked()) {
             pointerEvent->AddFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
+        }
+        if (PER_HELPER->CheckControlDevicePermission()) {
+            pointerEvent->AddFlag(InputEvent::EVENT_FLAG_PENDING_CHECK);
+            MMI_HILOGD("Pending check flag added to inject touchpad event, pid:%{public}d", pid);
         }
     }
     if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_NEED_UPDATE_LAST_INPUT_TIME)) {

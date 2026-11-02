@@ -69,6 +69,8 @@ std::shared_ptr<PointerEvent> TouchControllerImpl::CreatePointerEvent(const Poin
     }
     pointerEvent->AddFlag(InputEvent::EVENT_FLAG_SIMULATE);
     pointerEvent->AddFlag(InputEvent::EVENT_FLAG_CONTROLLER);
+    pointerEvent->AddFlag(InputEvent::EVENT_FLAG_PENDING_CHECK);
+    MMI_HILOGD("Pending check flag added to controller touch event");
     pointerEvent->RemoveAllPointerItems();
     AddPointerItems(pointerEvent, context, contacts);
     return pointerEvent;
