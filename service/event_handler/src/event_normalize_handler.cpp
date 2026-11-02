@@ -33,7 +33,6 @@
 #include "i_input_windows_manager.h"
 #include "input_device_manager.h"
 #include "input_event_handler.h"
-#include "input_event_statistics.h"
 #include "input_scene_board_judgement.h"
 #include "key_auto_repeat.h"
 #include "key_event_normalize.h"
@@ -417,9 +416,6 @@ void EventNormalizeHandler::HandleKeyEvent(const std::shared_ptr<KeyEvent> keyEv
     CHKPV(nextHandler_);
     DfxHisysevent::GetDispStartTime();
     CHKPV(keyEvent);
-#if MMI_ENABLE_EVENT_STATISTICS
-    InputEventStatistics::RecordKeyEvent(keyEvent);
-#endif // MMI_ENABLE_EVENT_STATISTICS
     KeyEventHdr->SimulatedModifierKeyEventNormalize(keyEvent);
     MMI_HILOGI("[KC,KA,NL,CL,SL,TDID]:[%{private}d,%{public}d,%{public}d,%{public}d,%{public}d,%{public}d]",
         keyEvent->GetKeyCode(), keyEvent->GetKeyAction(),
@@ -449,9 +445,6 @@ void EventNormalizeHandler::HandlePointerEvent(const std::shared_ptr<PointerEven
     CHKPV(nextHandler_);
     DfxHisysevent::GetDispStartTime();
     CHKPV(pointerEvent);
-#if MMI_ENABLE_EVENT_STATISTICS
-    InputEventStatistics::RecordPointerEvent(pointerEvent);
-#endif // MMI_ENABLE_EVENT_STATISTICS
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
     if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
         PointerEventSetPressedKeys(pointerEvent);
@@ -503,9 +496,6 @@ void EventNormalizeHandler::HandleTouchEvent(const std::shared_ptr<PointerEvent>
     CHKPV(nextHandler_);
     DfxHisysevent::GetDispStartTime();
     CHKPV(pointerEvent);
-#if MMI_ENABLE_EVENT_STATISTICS
-    InputEventStatistics::RecordPointerEvent(pointerEvent);
-#endif // MMI_ENABLE_EVENT_STATISTICS
     WIN_MGR->UpdateTargetPointer(pointerEvent);
     if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK) &&
         !WIN_MGR->IsWindowInjectableUnderLock(pointerEvent->GetTargetWindowId(),
