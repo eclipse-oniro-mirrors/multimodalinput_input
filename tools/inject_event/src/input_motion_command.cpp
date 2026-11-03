@@ -73,6 +73,12 @@ void PrintUsage()
     std::cerr << "       uinput motion_reset" << std::endl;
 }
 
+void PrintCoordinateHint()
+{
+    std::cout << "If the command does not work as expected, check whether the specified coordinates exceed"
+        " the screen boundary" << std::endl;
+}
+
 bool ParseNumber(const std::string &text, int32_t &value)
 {
     if (text.empty()) {
@@ -375,6 +381,7 @@ int32_t InputMotionCommand::HandleDown(int32_t x, int32_t y, int32_t fingerId, i
         return MOTION_EXIT_FAILURE;
     }
     ReleaseLock();
+    PrintCoordinateHint();
     return MOTION_EXIT_SUCCESS;
 }
 
@@ -412,6 +419,7 @@ int32_t InputMotionCommand::HandleMove(int32_t x, int32_t y, int32_t fingerId, i
         return MOTION_EXIT_FAILURE;
     }
     ReleaseLock();
+    PrintCoordinateHint();
     return MOTION_EXIT_SUCCESS;
 }
 
@@ -451,6 +459,7 @@ int32_t InputMotionCommand::HandleUp(int32_t x, int32_t y, int32_t fingerId, int
         return MOTION_EXIT_FAILURE;
     }
     ReleaseLock();
+    PrintCoordinateHint();
     return MOTION_EXIT_SUCCESS;
 }
 
