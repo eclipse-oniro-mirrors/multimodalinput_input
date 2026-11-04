@@ -32,6 +32,7 @@
 #include "mmi_matrix3.h"
 #include "cursor_drawing_component.h"
 #include "scene_board_judgement.h"
+#include "struct_multimodal.h"
 #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
 #include "touch_drawing_manager.h"
 #endif // #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
@@ -195,6 +196,9 @@ void InputWindowsManager::InitWindowInfo(WindowInfo& info)
 }
 
 InputWindowsManager::InputWindowsManager() : bindInfo_(BIND_CFG_FILE_NAME)
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+    , touchArbitration_(*this)
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 {
     MMI_HILOGD("Bind cfg file name:%{private}s", BIND_CFG_FILE_NAME.c_str());
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
@@ -240,6 +244,9 @@ void InputWindowsManager::DeviceStatusChanged(int32_t deviceId, const std::strin
         pendingBinds_.erase(deviceId);
         CancelPendingBindTimer(deviceId);
         TouchDispatchEventCache().ClearDeviceEvents(deviceId);
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+        ClearTouchArbitrationStateByDevice(deviceId);
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     }
 }
 
@@ -6215,6 +6222,77 @@ std::map<int32_t, std::map<int32_t, WindowInfoEX>>& InputWindowsManager::TouchIt
         ? touchRedispatchStore_.GetTouchItemDownInfos() : touchItemDownInfos_;
 }
 
+#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+void InputWindowsManager::DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent)
+{
+    if (cancelEvent == nullptr) {
+        MMI_HILOG_DISPATCHE("Cancel pointer event is null, pointerId:%{public}d", pointerId);
+        return;
+    }
+    PointerEvent::PointerItem pointerItem;
+    if (!cancelEvent->GetPointerItem(pointerId, pointerItem)) {
+        MMI_HILOG_DISPATCHE("Can't find cancel pointer item, pointerId:%{public}d", pointerId);
+        return;
+    }
+    const int32_t originAction = cancelEvent->GetPointerAction();
+    cancelEvent->SetOriginPointerAction(originAction);
+    int32_t cancelAction = PointerEvent::POINTER_ACTION_CANCEL;
+    bool isDragging = extraData_.appended && extraData_.sourceType == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
+        (pointerItem.GetToolType() == PointerEvent::TOOL_TYPE_FINGER && extraData_.pointerId == pointerId);
+    if (isDragging) {
+        cancelAction = PointerEvent::POINTER_ACTION_PULL_CANCEL;
+    }
+    cancelEvent->SetPointerAction(cancelAction);
+    cancelEvent->SetPointerId(pointerId);
+    cancelEvent->SetActionTime(GetSysClockTime());
+    pointerItem.SetPressed(false);
+    pointerItem.SetCanceled(true);
+    cancelEvent->SetTargetWindowId(pointerItem.GetTargetWindowId());
+    auto windowInfo = GetWindowAndDisplayInfo(pointerItem.GetTargetWindowId(), cancelEvent->GetTargetDisplayId());
+    if (windowInfo) {
+        cancelEvent->SetAgentWindowId(windowInfo->agentWindowId);
+    } else {
+        MMI_HILOG_DISPATCHE("Can't find cancel target window, windowId:%{public}d, displayId:%{public}d",
+            pointerItem.GetTargetWindowId(), cancelEvent->GetTargetDisplayId());
+    }
+    cancelEvent->UpdatePointerItem(pointerId, pointerItem);
+    cancelEvent->UpdateId();
+    auto filter = InputHandler->GetFilterHandler();
+    if (filter == nullptr) {
+        MMI_HILOGE("EventFilterHandler is null");
+        return;
+    }
+    filter->HandleTouchEvent(cancelEvent);
+}
+
+void InputWindowsManager::ClearTouchTargetState(int32_t displayId, int32_t deviceId, int32_t pointerId)
+{
+    auto &infos = TouchItemDownInfos();
+    auto devIter = infos.find(deviceId);
+    if (devIter != infos.end()) {
+        devIter->second.erase(pointerId);
+        if (devIter->second.empty()) {
+            infos.erase(devIter);
+        }
+    }
+    ClearTargetWindowId(pointerId, deviceId);
+    LastTouch touch { .deviceId_ = deviceId, .pointerId_ = pointerId };
+    TouchLastTouchInfos().erase(touch);
+    auto &firstTouchInfos = TouchFirstTouchInfos();
+    auto firstIter = firstTouchInfos.find(deviceId);
+    if (firstIter != firstTouchInfos.end() && firstIter->second.displayId == displayId) {
+        firstTouchInfos.erase(firstIter);
+    }
+}
+#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+void InputWindowsManager::ClearTouchArbitrationStateByDevice(int32_t deviceId)
+{
+    touchArbitration_.ClearTouchArbitrationStateByDevice(deviceId);
+}
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+
 int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent)
 {
     CHKPR(pointerEvent, ERROR_NULL_POINTER);
@@ -6242,6 +6320,13 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         MMI_HILOG_DISPATCHE("Can't find pointer item, pointer:%{public}d", pointerId);
         return RET_ERR;
     }
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+    if (pointerEvent->GetPointerAction() != PointerEvent::POINTER_ACTION_DOWN) {
+        if (touchArbitration_.HandleClosedTouchArbitrationStream(pointerEvent)) {
+            return RET_OK;
+        }
+    }
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     double physicalX = pointerItem.GetDisplayXPos();
     double physicalY = pointerItem.GetDisplayYPos();
 
@@ -6870,6 +6955,12 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         TouchLastTouchInfos()[touch] = lastInfo;
         ClearExtraData();
     }
+#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+    if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN) {
+        touchArbitration_.HandleTouchSourceDownArbitration(pointerEvent);
+    }
+    touchArbitration_.UpdateTouchArbitrationState(pointerEvent);
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     return ERR_OK;
 }
 
@@ -7694,7 +7785,7 @@ int32_t InputWindowsManager::UpdateTargetPointer(std::shared_ptr<PointerEvent> p
 #endif // OHOS_BUILD_ENABLE_TOUCH
 #ifdef OHOS_BUILD_ENABLE_POINTER
         case PointerEvent::SOURCE_TYPE_MOUSE: {
-            ret =  UpdateMouseTarget(pointerEvent);
+            ret = UpdateMouseTarget(pointerEvent);
             break;
         }
         case PointerEvent::SOURCE_TYPE_TOUCHPAD: {

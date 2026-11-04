@@ -367,6 +367,10 @@ void ServerMsgHandler::DealGesturePointers(std::shared_ptr<PointerEvent> pointer
         pointerEvent->GetId(), pointerEvent->GetPointerId());
     std::shared_ptr<PointerEvent> touchEvent = WIN_MGR->GetLastPointerEventForGesture();
     CHKPV(touchEvent);
+    if (IsControllerTouchEvent(pointerEvent) &&
+        pointerEvent->GetDeviceId() != touchEvent->GetDeviceId()) {
+        return;
+    }
     std::list<PointerEvent::PointerItem> lastPointerItems = touchEvent->GetAllPointerItems();
     std::list<PointerEvent::PointerItem> currenPointerItems = pointerEvent->GetAllPointerItems();
     for (auto &item : lastPointerItems) {

@@ -365,35 +365,46 @@ void TouchDrawingHandler::DrawBubble()
             MMI_HILOGE("Can't find pointer item, pointer:%{public}d", pointerId);
             return;
         }
-        auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
-        Rosen::Drawing::Point centerPt(displayXY.first, displayXY.second);
-        Rosen::Drawing::Pen pen;
-        pen.SetColor(Rosen::Drawing::Color::COLOR_BLACK);
-        pen.SetAntiAlias(true);
-        pen.SetAlphaF(OUT_CIRCLE_TRANSPARENCY);
-        pen.SetWidth(bubble_.outerCircleWidth);
-        canvas->AttachPen(pen);
-        canvas->DrawCircle(centerPt, bubble_.outerCircleRadius);
-        canvas->DetachPen();
-
-        Rosen::Drawing::Brush brush;
-        brush.SetColor(Rosen::Drawing::Color::COLOR_WHITE);
-        brush.SetAntiAlias(true);
-        brush.SetAlphaF(INNER_CIRCLE_TRANSPARENCY);
-        canvas->AttachBrush(brush);
-        canvas->DrawCircle(centerPt, bubble_.innerCircleRadius);
-        canvas->DetachBrush();
-        CHKPV(surfaceNode_);
-        if (pointerEvent_->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN &&
-            pointerEvent_->GetPointerId() == pointerId) {
-            MMI_HILOGI("Bubble is draw success, %{public}d|%{public}d|%{private}d|%{private}d|%{public}d|%{public}d|"
-                "%{public}.2f|%{public}.2f|%{public}" PRIu64, pointerEvent_->GetPointerAction(),
-                pointerEvent_->GetPointerId(), displayXY.first, displayXY.second, scaleW_, scaleH_,
-                surfaceNode_->GetStagingProperties().GetRotation(),
-                bubbleCanvasNode_->GetStagingProperties().GetRotation(), bubbleCanvasNode_->GetId());
+        if (pointerEvent_->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER) && pointerItem.IsCanceled()) {
+            MMI_HILOGI("Skip canceled pointer bubble draw, pointerId:%{public}d", pointerId);
+            continue;
         }
+        DrawBubbleForPointer(canvas, pointerItem, pointerId);
     }
     bubbleCanvasNode_->FinishRecording();
+}
+
+void TouchDrawingHandler::DrawBubbleForPointer(RosenCanvas *canvas,
+    const PointerEvent::PointerItem &pointerItem, int32_t pointerId)
+{
+    CHKPV(canvas);
+    auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
+    Rosen::Drawing::Point centerPt(displayXY.first, displayXY.second);
+    Rosen::Drawing::Pen pen;
+    pen.SetColor(Rosen::Drawing::Color::COLOR_BLACK);
+    pen.SetAntiAlias(true);
+    pen.SetAlphaF(OUT_CIRCLE_TRANSPARENCY);
+    pen.SetWidth(bubble_.outerCircleWidth);
+    canvas->AttachPen(pen);
+    canvas->DrawCircle(centerPt, bubble_.outerCircleRadius);
+    canvas->DetachPen();
+
+    Rosen::Drawing::Brush brush;
+    brush.SetColor(Rosen::Drawing::Color::COLOR_WHITE);
+    brush.SetAntiAlias(true);
+    brush.SetAlphaF(INNER_CIRCLE_TRANSPARENCY);
+    canvas->AttachBrush(brush);
+    canvas->DrawCircle(centerPt, bubble_.innerCircleRadius);
+    canvas->DetachBrush();
+    CHKPV(surfaceNode_);
+    if (pointerEvent_->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN &&
+        pointerEvent_->GetPointerId() == pointerId) {
+        MMI_HILOGI("Bubble is draw success, %{public}d|%{public}d|%{private}d|%{private}d|%{public}d|%{public}d|"
+            "%{public}.2f|%{public}.2f|%{public}" PRIu64, pointerEvent_->GetPointerAction(),
+            pointerEvent_->GetPointerId(), displayXY.first, displayXY.second, scaleW_, scaleH_,
+            surfaceNode_->GetStagingProperties().GetRotation(),
+            bubbleCanvasNode_->GetStagingProperties().GetRotation(), bubbleCanvasNode_->GetId());
+    }
 }
 
 void TouchDrawingHandler::DrawPointerPositionHandler()
@@ -402,6 +413,13 @@ void TouchDrawingHandler::DrawPointerPositionHandler()
     CHKPV(pointerEvent_);
     if ((pointerEvent_->GetPointerAction() != PointerEvent::POINTER_ACTION_DOWN) &&
         (pointerEvent_->GetDeviceId() != currentDeviceId_)) {
+        return;
+    }
+    PointerEvent::PointerItem currentItem;
+    if (pointerEvent_->GetPointerItem(pointerEvent_->GetPointerId(), currentItem)
+        && currentItem.IsCanceled()) {
+        MMI_HILOGI("Skip pointer position draw, canceled pointerId:%{public}d",
+            pointerEvent_->GetPointerId());
         return;
     }
     UpdatePointerPosition();
@@ -416,6 +434,10 @@ void TouchDrawingHandler::DrawPointerPositionHandler()
         if (!pointerEvent_->GetPointerItem(pointerId, pointerItem)) {
             MMI_HILOGE("Can't find pointer item, pointer:%{public}d", pointerId);
             return;
+        }
+        if (pointerItem.IsCanceled()) {
+            MMI_HILOGI("Skip canceled pointer position draw, pointerId:%{public}d", pointerId);
+            continue;
         }
         auto displayXY = CalcDrawCoordinate(displayInfo_, pointerItem);
         DrawTracker(displayXY.first, displayXY.second, pointerId);
@@ -628,7 +650,13 @@ void TouchDrawingHandler::UpdatePointerPosition()
     int32_t pointerAction = pointerEvent_->GetPointerAction();
     int32_t pointerId = pointerEvent_->GetPointerId();
     if (pointerAction == PointerEvent::POINTER_ACTION_DOWN) {
-        if (pointerEvent_->GetPointerCount() == SINGLE_TOUCH) {
+        int32_t validPointerCount = 0;
+        for (const auto &item : pointerEvent_->GetAllPointerItems()) {
+            if (!item.IsCanceled()) {
+                ++validPointerCount;
+            }
+        }
+        if (validPointerCount == SINGLE_TOUCH) {
             InitLabels();
         }
         maxPointerCount_ = ++currentPointerCount_;

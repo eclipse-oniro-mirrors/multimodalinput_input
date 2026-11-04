@@ -83,6 +83,8 @@ private:
     void DestoryTouchWindow();
     void DrawBubbleHandler();
     void DrawBubble();
+    void DrawBubbleForPointer(RosenCanvas *canvas, const PointerEvent::PointerItem &pointerItem,
+        int32_t pointerId);
     void DrawPointerPositionHandler();
     void DrawTracker(int32_t x, int32_t y, int32_t pointerId);
     void DrawCrosshairs(RosenCanvas *canvas, int32_t x, int32_t y);
