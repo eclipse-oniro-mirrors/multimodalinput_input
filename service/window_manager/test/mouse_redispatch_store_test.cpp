@@ -127,12 +127,9 @@ HWTEST_F(MouseRedispatchStoreTest, MouseRedispatchStoreTest_LastEventPerZOrder_0
 
     store.CacheLastEvent(eventA);
     store.GetLastEvent();
-    store.SetLastHoverWindow(TEST_Z_ORDER, TEST_WINDOW_ID);
 
     EXPECT_EQ(store.GetLastEvent(TEST_Z_ORDER), eventA);
     EXPECT_EQ(store.GetLastEvent(TEST_Z_ORDER_B), nullptr);
-    EXPECT_EQ(store.GetLastHoverWindow(TEST_Z_ORDER), TEST_WINDOW_ID);
-    EXPECT_EQ(store.GetLastHoverWindow(TEST_Z_ORDER_B), -1);
 }
 
 /**
@@ -163,7 +160,7 @@ HWTEST_F(MouseRedispatchStoreTest, MouseRedispatchStoreTest_ButtonDownWindowPerZ
 
 /**
  * @tc.name: MouseRedispatchStoreTest_ResetClearsAll_001
- * @tc.desc: Reset shall clear session records, hover memory and cached events
+ * @tc.desc: Reset shall clear session records and cached events
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -175,7 +172,6 @@ HWTEST_F(MouseRedispatchStoreTest, MouseRedispatchStoreTest_ResetClearsAll_001, 
     store.SetWindowActive(MouseSessionType::BUTTON, TEST_WINDOW_ID);
     store.SetWindowActive(MouseSessionType::AXIS, TEST_WINDOW_ID);
     store.SetButtonDownWindow(TEST_Z_ORDER, CreateWindowInfo(TEST_WINDOW_ID));
-    store.SetLastHoverWindow(TEST_Z_ORDER, TEST_WINDOW_ID);
     store.SetAxisBeginWindow(CreateWindowInfo(TEST_WINDOW_ID));
 
     store.Reset();
@@ -183,7 +179,6 @@ HWTEST_F(MouseRedispatchStoreTest, MouseRedispatchStoreTest_ResetClearsAll_001, 
     EXPECT_FALSE(store.IsWindowActive(MouseSessionType::BUTTON, TEST_WINDOW_ID));
     EXPECT_FALSE(store.IsWindowActive(MouseSessionType::AXIS, TEST_WINDOW_ID));
     EXPECT_EQ(store.GetButtonDownWindow(TEST_Z_ORDER), std::nullopt);
-    EXPECT_EQ(store.GetLastHoverWindow(TEST_Z_ORDER), -1);
     EXPECT_EQ(store.GetAxisBeginWindow(), std::nullopt);
     EXPECT_EQ(store.GetLastEvent(TEST_Z_ORDER), nullptr);
 }

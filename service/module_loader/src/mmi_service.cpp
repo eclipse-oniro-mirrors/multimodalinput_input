@@ -6617,21 +6617,45 @@ void MMIService::RegisterForDisplayManagerService(int32_t systemAbilityId)
 }
 #endif // OHOS_BUILD_ENABLE_POINTER && OHOS_BUILD_ENABLE_POINTER_DRAWING
 
+static bool IsRedispatchExcludedEvent(const std::shared_ptr<PointerEvent>& pointerEvent)
+{
+    int32_t pointerAction = pointerEvent->GetPointerAction();
+    if (pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_IN_WINDOW ||
+        pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_OUT_WINDOW ||
+        pointerAction == PointerEvent::POINTER_ACTION_ENTER_WINDOW ||
+        pointerAction == PointerEvent::POINTER_ACTION_LEAVE_WINDOW ||
+        pointerAction == PointerEvent::POINTER_ACTION_PULL_IN_WINDOW ||
+        pointerAction == PointerEvent::POINTER_ACTION_PULL_OUT_WINDOW ||
+        pointerAction == PointerEvent::POINTER_ACTION_PULL_MOVE) {
+        return true;
+    }
+    if (pointerEvent->GetSourceType() != PointerEvent::SOURCE_TYPE_MOUSE) {
+        return false;
+    }
+    if (pointerAction == PointerEvent::POINTER_ACTION_MOVE &&
+        pointerEvent->GetPressedButtons().empty()) {
+        return true;
+    }
+    auto buttons = pointerEvent->GetPressedButtons();
+    bool primaryOnly = (buttons.size() == 1 && buttons.count(PointerEvent::MOUSE_BUTTON_LEFT) > 0);
+    if (pointerAction == PointerEvent::POINTER_ACTION_BUTTON_DOWN && !primaryOnly) {
+        return true;
+    }
+    if (pointerAction == PointerEvent::POINTER_ACTION_BUTTON_UP && !primaryOnly && !buttons.empty()) {
+        return true;
+    }
+    return false;
+}
+
 int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> pointerEvent)
 {
     pointerEvent->SetTargetWindowId(-1);
     pointerEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_REDISPATCH);
-#ifdef OHOS_BUILD_ENABLE_TOUCH
-    if (pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN) {
-        int32_t pointerAction = pointerEvent->GetPointerAction();
-        if (pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_IN_WINDOW ||
-            pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_OUT_WINDOW) {
-            MMI_HILOGI("Redispatch discard derived event, action:%{public}d, id:%{public}d",
-                pointerAction, pointerEvent->GetId());
-            return RET_OK;
-        }
+    if (IsRedispatchExcludedEvent(pointerEvent)) {
+        MMI_HILOGI("Redispatch discard excluded event, action:%{public}d, id:%{public}d",
+            pointerEvent->GetPointerAction(), pointerEvent->GetId());
+        return RET_OK;
     }
-#endif // OHOS_BUILD_ENABLE_TOUCH
     LogTracer lt(pointerEvent->GetId(), pointerEvent->GetEventType(),
         pointerEvent->GetPointerAction());
     auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
@@ -6735,7 +6759,7 @@ ErrCode MMIService::RedispatchInputEvent(const PointerEvent &pointerEvent)
     }
     if (!PER_HELPER->CheckInjectPermission()) {
         MMI_HILOGE("Verify Inject Permission failed");
-        return ERROR_NOT_SYSAPI;
+        return ERROR_INJECT_NO_PERMISSION;
     }
     int32_t ret = delegateTasks_.PostSyncTask([this, pointerEventPtr] {
         return RedispatchInputEventInner(pointerEventPtr);

@@ -115,20 +115,6 @@ float MouseRedispatchStore::FindButtonSessionZOrder(int32_t windowId) const
     return 0.0f;
 }
 
-void MouseRedispatchStore::SetLastHoverWindow(float zOrder, int32_t windowId)
-{
-    lastHoverWindowMap_[zOrder] = windowId;
-}
-
-int32_t MouseRedispatchStore::GetLastHoverWindow(float zOrder) const
-{
-    auto iter = lastHoverWindowMap_.find(zOrder);
-    if (iter != lastHoverWindowMap_.end()) {
-        return iter->second;
-    }
-    return -1;
-}
-
 const std::set<int32_t>& MouseRedispatchStore::GetActiveWindows(MouseSessionType sessionType) const
 {
     return (sessionType == MouseSessionType::BUTTON) ? activeButtonWindows_ : activeAxisWindows_;
@@ -175,9 +161,18 @@ bool MouseRedispatchStore::Abandon(const std::shared_ptr<PointerEvent>& pointerE
     int32_t action = pointerEvent->GetPointerAction();
     int32_t windowId = pointerEvent->GetTargetWindowId();
     bool pressed = !pointerEvent->GetPressedButtons().empty();
+    PointerEvent::PointerItem pointerItem;
+    int32_t toolType = PointerEvent::TOOL_TYPE_MOUSE;
+    if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
+        toolType = pointerItem.GetToolType();
+    }
     if (action == PointerEvent::POINTER_ACTION_AXIS_BEGIN ||
         action == PointerEvent::POINTER_ACTION_AXIS_UPDATE ||
         action == PointerEvent::POINTER_ACTION_AXIS_END) {
+        if (toolType != PointerEvent::TOOL_TYPE_TOUCHPAD) {
+            MMI_HILOGD("Abandon mouse redispatch, mouse wheel is not supported, toolType:%{public}d", toolType);
+            return true;
+        }
         if (!IsWindowActive(MouseSessionType::AXIS, windowId)) {
             MMI_HILOGD("Abandon mouse redispatch, axis window:%{public}d not active", windowId);
             return true;
@@ -189,6 +184,13 @@ bool MouseRedispatchStore::Abandon(const std::shared_ptr<PointerEvent>& pointerE
     }
     if (action == PointerEvent::POINTER_ACTION_BUTTON_DOWN || pressed ||
         action == PointerEvent::POINTER_ACTION_BUTTON_UP) {
+        auto buttons = pointerEvent->GetPressedButtons();
+        bool primaryOnly = (buttons.size() == 1 && buttons.count(PointerEvent::MOUSE_BUTTON_LEFT) > 0);
+        bool primaryUp = (action == PointerEvent::POINTER_ACTION_BUTTON_UP && buttons.empty());
+        if (!primaryOnly && !primaryUp) {
+            MMI_HILOGD("Abandon mouse redispatch, non-primary button is not supported, action:%{public}d", action);
+            return true;
+        }
         if (!IsWindowActive(MouseSessionType::BUTTON, windowId)) {
             MMI_HILOGD("Abandon mouse redispatch, button window:%{public}d not active", windowId);
             return true;
@@ -219,7 +221,6 @@ void MouseRedispatchStore::Reset()
     lastEventMap_.clear();
     axisBeginWindowMap_.clear();
     buttonDownWindowMap_.clear();
-    lastHoverWindowMap_.clear();
     activeAxisWindows_.clear();
     activeButtonWindows_.clear();
 }

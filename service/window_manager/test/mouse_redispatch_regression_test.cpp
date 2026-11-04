@@ -77,9 +77,9 @@ HWTEST_F(MouseRedispatchRegressionTest, MouseRedispatchRegressionTest_MouseAband
     EXPECT_FALSE(store.Abandon(moveEvent));
 
     auto axisBeginEvent = CreatePointerEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN,
-        PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_FINGER);
+        PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_TOUCHPAD);
     auto axisEndEvent = CreatePointerEvent(PointerEvent::POINTER_ACTION_AXIS_END,
-        PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_FINGER);
+        PointerEvent::SOURCE_TYPE_MOUSE, PointerEvent::TOOL_TYPE_TOUCHPAD);
     ASSERT_NE(axisBeginEvent, nullptr);
     ASSERT_NE(axisEndEvent, nullptr);
 

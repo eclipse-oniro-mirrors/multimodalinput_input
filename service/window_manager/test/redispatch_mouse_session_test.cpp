@@ -42,7 +42,8 @@ public:
 protected:
     std::unique_ptr<MouseRedispatchStore> store_;
 
-    static std::shared_ptr<PointerEvent> CreateMouseEvent(int32_t pointerAction, const std::vector<int32_t>& buttons)
+    static std::shared_ptr<PointerEvent> CreateMouseEvent(int32_t pointerAction, const std::vector<int32_t>& buttons,
+        int32_t toolType = PointerEvent::TOOL_TYPE_MOUSE)
     {
         auto pointerEvent = PointerEvent::Create();
         if (pointerEvent == nullptr) {
@@ -59,7 +60,7 @@ protected:
         }
         PointerEvent::PointerItem item;
         item.SetPointerId(0);
-        item.SetToolType(PointerEvent::TOOL_TYPE_MOUSE);
+        item.SetToolType(toolType);
         pointerEvent->AddPointerItem(item);
         return pointerEvent;
     }
@@ -79,19 +80,6 @@ protected:
         return window;
     }
 };
-
-/**
- * @tc.name: RedispatchMouseSessionTest_AbandonFreeHoverPassThrough_001
- * @tc.desc: Unpressed mouse events shall always pass admission without session (DD-5, AC-8.2)
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_AbandonFreeHoverPassThrough_001, TestSize.Level1)
-{
-    auto hoverMove = CreateMouseEvent(PointerEvent::POINTER_ACTION_MOVE, {});
-    ASSERT_NE(hoverMove, nullptr);
-    EXPECT_FALSE(store_->Abandon(hoverMove));
-}
 
 /**
  * @tc.name: RedispatchMouseSessionTest_AbandonButtonDownRequiresActivation_001
@@ -166,8 +154,10 @@ HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_AbandonComboButt
  */
 HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_AbandonAxisSessionUnchanged_001, TestSize.Level1)
 {
-    auto axisBegin = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN, {});
-    auto axisEnd = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_END, {});
+    auto axisBegin = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN, {},
+        PointerEvent::TOOL_TYPE_TOUCHPAD);
+    auto axisEnd = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_END, {},
+        PointerEvent::TOOL_TYPE_TOUCHPAD);
     ASSERT_NE(axisBegin, nullptr);
     ASSERT_NE(axisEnd, nullptr);
 
@@ -192,6 +182,44 @@ HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_ButtonSessionFou
     store_->EraseButtonDownWindow(TEST_Z_ORDER);
     store_->DeactivateWindow(MouseSessionType::BUTTON, TEST_WINDOW_ID);
     EXPECT_FLOAT_EQ(store_->FindButtonSessionZOrder(TEST_WINDOW_ID), 0.0f);
+}
+/**
+ * @tc.name: RedispatchMouseSessionTest_MouseWheelRejected_001
+ * @tc.desc: Mouse wheel axis events (TOOL_TYPE_MOUSE) shall be rejected even when an axis session is
+ *           active; only touchpad two-finger axis events support redispatch (BR-7, EX-8)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_MouseWheelRejected_001, TestSize.Level1)
+{
+    auto mouseWheel = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN, {},
+        PointerEvent::TOOL_TYPE_MOUSE);
+    ASSERT_NE(mouseWheel, nullptr);
+    EXPECT_TRUE(store_->Abandon(mouseWheel));
+
+    store_->SetWindowActive(MouseSessionType::AXIS, TEST_WINDOW_ID);
+    EXPECT_TRUE(store_->Abandon(mouseWheel));
+}
+
+/**
+ * @tc.name: RedispatchMouseSessionTest_NonPrimaryButtonRejected_001
+ * @tc.desc: Non-primary button (middle/side) events shall be rejected and shall not establish a
+ *           button session (BR-8, EX-9)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_NonPrimaryButtonRejected_001, TestSize.Level1)
+{
+    auto middleDown = CreateMouseEvent(PointerEvent::POINTER_ACTION_BUTTON_DOWN,
+        { PointerEvent::MOUSE_BUTTON_MIDDLE });
+    ASSERT_NE(middleDown, nullptr);
+    EXPECT_TRUE(store_->Abandon(middleDown));
+    EXPECT_FALSE(store_->IsWindowActive(MouseSessionType::BUTTON, TEST_WINDOW_ID));
+
+    auto pressedMove = CreateMouseEvent(PointerEvent::POINTER_ACTION_MOVE,
+        { PointerEvent::MOUSE_BUTTON_MIDDLE });
+    ASSERT_NE(pressedMove, nullptr);
+    EXPECT_TRUE(store_->Abandon(pressedMove));
 }
 } // namespace MMI
 } // namespace OHOS

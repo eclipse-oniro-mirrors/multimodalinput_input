@@ -14494,6 +14494,10 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AbandonRedispatch_001,
     pointerEvent->SetTargetWindowId(targetWindowId);
     pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
     pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_BEGIN);
+    PointerEvent::PointerItem axisItem;
+    axisItem.SetPointerId(0);
+    axisItem.SetToolType(PointerEvent::TOOL_TYPE_TOUCHPAD);
+    pointerEvent->AddPointerItem(axisItem);
     auto result = inputWindowsManager->mouseRedispatchStore_.Abandon(pointerEvent);
     EXPECT_TRUE(result);
     inputWindowsManager->mouseRedispatchStore_.SetWindowActive(targetWindowId);

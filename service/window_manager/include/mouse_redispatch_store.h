@@ -52,9 +52,6 @@ public:
     void EraseButtonDownWindow(float zOrder);
     float FindButtonSessionZOrder(int32_t windowId) const;
 
-    void SetLastHoverWindow(float zOrder, int32_t windowId);
-    int32_t GetLastHoverWindow(float zOrder) const;
-
     void SetWindowActive(int32_t windowId);
     void SetWindowActive(MouseSessionType sessionType, int32_t windowId);
     bool IsWindowActive(int32_t windowId) const;
@@ -77,7 +74,6 @@ private:
     std::map<float, std::shared_ptr<PointerEvent>> lastEventMap_;
     std::map<float, std::optional<WindowInfo>> axisBeginWindowMap_;
     std::map<float, std::optional<WindowInfo>> buttonDownWindowMap_;
-    std::map<float, int32_t> lastHoverWindowMap_;
     std::set<int32_t> activeAxisWindows_;
     std::set<int32_t> activeButtonWindows_;
 };

@@ -183,5 +183,214 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_MouseHoverEnterN
     int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
     EXPECT_NE(ret, RET_OK);
 }
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardEnterWindow_001
+ * @tc.desc: Normal-path mouse ENTER_WINDOW derived event shall be discarded on redispatch (BR-2)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardEnterWindow_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_ENTER_WINDOW,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardLeaveWindow_001
+ * @tc.desc: Normal-path mouse LEAVE_WINDOW derived event shall be discarded on redispatch (BR-2)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardLeaveWindow_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_LEAVE_WINDOW,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardPullInWindow_001
+ * @tc.desc: PULL_IN_WINDOW drag derived event shall be discarded on redispatch (BR-2, EX-7)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardPullInWindow_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_PULL_IN_WINDOW,
+        PointerEvent::TOOL_TYPE_FINGER, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardPullOutWindow_001
+ * @tc.desc: PULL_OUT_WINDOW drag derived event shall be discarded on redispatch (BR-2, EX-7)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardPullOutWindow_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_PULL_OUT_WINDOW,
+        PointerEvent::TOOL_TYPE_FINGER, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardPullMove_001
+ * @tc.desc: PULL_MOVE drag event shall be discarded on redispatch (BR-2, EX-7)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardPullMove_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_PULL_MOVE,
+        PointerEvent::TOOL_TYPE_FINGER, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardMouseHoverMove_001
+ * @tc.desc: Hover mouse MOVE (no pressed buttons) shall be discarded at the entry gate (BR-2, EX-10)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardMouseHoverMove_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_MOVE,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_MousePressedMoveNotDiscarded_001
+ * @tc.desc: Mouse MOVE with primary button pressed shall not be caught by the entry gate (AC-8.2)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_MousePressedMoveNotDiscarded_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_MOVE,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_LEFT);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_NE(ret, RET_OK);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardNonPrimaryButtonDown_001
+ * @tc.desc: Non-primary BUTTON_DOWN (side/middle/combo) shall be discarded at the entry gate (BR-8, EX-9)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardNonPrimaryButtonDown_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_BUTTON_DOWN,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_RIGHT);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_TRUE(pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH));
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardComboButtonDown_001
+ * @tc.desc: Combo BUTTON_DOWN (left+right) shall be discarded at the entry gate (BR-8, EX-9)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardComboButtonDown_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_BUTTON_DOWN,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_LEFT);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_RIGHT);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_DiscardNonPrimaryButtonUp_001
+ * @tc.desc: Non-primary BUTTON_UP (side button release) shall be discarded at the entry gate (BR-8, EX-9)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_DiscardNonPrimaryButtonUp_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_BUTTON_UP,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_RIGHT);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_EQ(pointerEvent->GetTargetWindowId(), -1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_PrimaryButtonDownNotDiscarded_001
+ * @tc.desc: Primary BUTTON_DOWN (left only) shall not be caught by the entry gate (AC-8.1)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_PrimaryButtonDownNotDiscarded_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_BUTTON_DOWN,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_LEFT);
+
+    int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
+    EXPECT_NE(ret, RET_OK);
+}
 } // namespace MMI
 } // namespace OHOS
