@@ -153,7 +153,7 @@ public:
         if (IsMain()) {
             return GetIsCurrentOffScreenRendering() ? offRenderScale_ : scale_;
         } else if (IsExtend()) {
-            return offRenderScale_;
+            return GetIsCurrentOffScreenRendering() ? offRenderScale_ : scale_;
         } else if (IsMirror()) {
             return scale_;
         }

@@ -2602,5 +2602,155 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_UpdateHotspotInBuffer_001, TestSiz
             << "hard and soft hotspots are identical, test input does not exercise the split";
     }
 }
+
+/**
+ * @tc.name: ScreenPointerTest_GetScale_001
+ * @tc.desc: Test GetScale with SCREEN_MAIN mode and off-screen rendering: the main-screen branch
+ *           must return offRenderScale_ while isCurrentOffScreenRendering_ is true. scale_ is set
+ *           to a different value so the assertion identifies exactly which operand was selected.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    screenpointer->mode_ = mode_t::SCREEN_MAIN;
+    screenpointer->isCurrentOffScreenRendering_ = true;
+    screenpointer->offRenderScale_ = 2.0;
+    screenpointer->scale_ = 0.5;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 2.0f);
+}
+
+/**
+ * @tc.name: ScreenPointerTest_GetScale_002
+ * @tc.desc: Test GetScale with SCREEN_MAIN mode and no off-screen rendering: the main-screen
+ *           branch must return scale_. offRenderScale_ keeps a stale non-default value (it is
+ *           never reset when a screen leaves off-screen rendering), so returning scale_ proves
+ *           the stale value is not leaked.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    screenpointer->mode_ = mode_t::SCREEN_MAIN;
+    screenpointer->isCurrentOffScreenRendering_ = false;
+    screenpointer->offRenderScale_ = 2.0;
+    screenpointer->scale_ = 0.5;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 0.5f);
+}
+
+/**
+ * @tc.name: ScreenPointerTest_GetScale_003
+ * @tc.desc: Test GetScale with SCREEN_EXTEND mode and off-screen rendering: the extend-screen
+ *           branch must return offRenderScale_ while isCurrentOffScreenRendering_ is true.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    screenpointer->mode_ = mode_t::SCREEN_EXTEND;
+    screenpointer->isCurrentOffScreenRendering_ = true;
+    screenpointer->offRenderScale_ = 2.0;
+    screenpointer->scale_ = 0.5;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 2.0f);
+}
+
+/**
+ * @tc.name: ScreenPointerTest_GetScale_004
+ * @tc.desc: Test GetScale with SCREEN_EXTEND mode and no off-screen rendering: the extend-screen
+ *           branch must return scale_ instead of the unconditionally returned offRenderScale_.
+ *           offRenderScale_ keeps a stale non-default value from a previous off-screen-rendering
+ *           episode, so returning scale_ proves the stale value no longer leaks into cfg.x/cfg.y
+ *           and dpi scaling on extend screens.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    screenpointer->mode_ = mode_t::SCREEN_EXTEND;
+    screenpointer->isCurrentOffScreenRendering_ = false;
+    screenpointer->offRenderScale_ = 2.0;
+    screenpointer->scale_ = 0.5;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 0.5f);
+}
+
+/**
+ * @tc.name: ScreenPointerTest_GetScale_005
+ * @tc.desc: Test GetScale with SCREEN_MIRROR mode: the mirror branch returns scale_ regardless
+ *           of the off-screen flag -- offRenderScale_ must be ignored in mirror mode in both
+ *           states.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_005, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    screenpointer->mode_ = mode_t::SCREEN_MIRROR;
+    screenpointer->offRenderScale_ = 2.0;
+    screenpointer->scale_ = 0.5;
+    screenpointer->isCurrentOffScreenRendering_ = false;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 0.5f);
+    screenpointer->isCurrentOffScreenRendering_ = true;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 0.5f);
+}
+
+/**
+ * @tc.name: ScreenPointerTest_GetScale_006
+ * @tc.desc: Test GetScale fallback with SCREEN_ALONE and SCREEN_UNIQUE modes: neither matches
+ *           main, extend or mirror, so GetScale returns the unconditional default 1.0f, not any
+ *           member value.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_006, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+    screenpointer->offRenderScale_ = 2.0;
+    screenpointer->scale_ = 0.5;
+    screenpointer->isCurrentOffScreenRendering_ = true;
+    screenpointer->mode_ = mode_t::SCREEN_ALONE;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 1.0f);
+    screenpointer->mode_ = mode_t::SCREEN_UNIQUE;
+    EXPECT_FLOAT_EQ(screenpointer->GetScale(), 1.0f);
+}
 } // namespace MMI
 } // namespace OHOS
