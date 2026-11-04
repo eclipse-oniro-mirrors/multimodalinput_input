@@ -26,6 +26,8 @@
 
 namespace OHOS {
 namespace MMI {
+enum class MouseSessionType { BUTTON, AXIS };
+
 class MouseRedispatchStore final {
 public:
     struct Guard {
@@ -38,15 +40,24 @@ public:
 
     void CacheLastEvent(const std::shared_ptr<PointerEvent>& event);
     std::shared_ptr<PointerEvent> GetLastEvent() const;
+    std::shared_ptr<PointerEvent> GetLastEvent(float zOrder) const;
 
     void SetAxisBeginWindow(const std::optional<WindowInfo>& window);
     std::optional<WindowInfo> GetAxisBeginWindow() const;
     void EraseAxisBeginWindow(float zOrder);
     const std::map<float, std::optional<WindowInfo>>& GetAxisBeginWindowMap() const;
 
+    void SetButtonDownWindow(float zOrder, const WindowInfo& window);
+    std::optional<WindowInfo> GetButtonDownWindow(float zOrder) const;
+    void EraseButtonDownWindow(float zOrder);
+    float FindButtonSessionZOrder(int32_t windowId) const;
+
     void SetWindowActive(int32_t windowId);
+    void SetWindowActive(MouseSessionType sessionType, int32_t windowId);
     bool IsWindowActive(int32_t windowId) const;
+    bool IsWindowActive(MouseSessionType sessionType, int32_t windowId) const;
     void DeactivateWindow(int32_t windowId);
+    void DeactivateWindow(MouseSessionType sessionType, int32_t windowId);
 
     bool Abandon(const std::shared_ptr<PointerEvent>& pointerEvent);
 
@@ -54,12 +65,17 @@ public:
     void Reset();
 
 private:
+    const std::set<int32_t>& GetActiveWindows(MouseSessionType sessionType) const;
+    std::set<int32_t>& GetActiveWindows(MouseSessionType sessionType);
+
     bool active_ { false };
     float zOrder_ { 0.0f };
 
-    std::shared_ptr<PointerEvent> lastEvent_ { nullptr };
+    std::map<float, std::shared_ptr<PointerEvent>> lastEventMap_;
     std::map<float, std::optional<WindowInfo>> axisBeginWindowMap_;
-    std::set<int32_t> activeWindows_;
+    std::map<float, std::optional<WindowInfo>> buttonDownWindowMap_;
+    std::set<int32_t> activeAxisWindows_;
+    std::set<int32_t> activeButtonWindows_;
 };
 } // namespace MMI
 } // namespace OHOS

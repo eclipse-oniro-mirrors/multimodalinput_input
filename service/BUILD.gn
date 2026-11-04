@@ -1724,6 +1724,439 @@ ohos_unittest("InputWindowsManagerCoverageTest") {
   ]
 }
 
+ohos_unittest("TouchRedispatchStoreTest") {
+  module_out_path = module_output_path
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  include_dirs = [ "${mmi_path}/service/window_manager/include" ]
+
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "window_manager/test/touch_redispatch_store_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "init:libbegetutil",
+    "libinput:libinput-third-mmi",
+    "window_manager:libdm_lite",
+    "window_manager:libwm",
+    "window_manager:libwsutils",
+  ]
+}
+
+ohos_unittest("RedispatchTargetTest") {
+  module_out_path = module_output_path
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  include_dirs = [ "${mmi_path}/service/window_manager/include" ]
+
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "window_manager/test/redispatch_target_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "init:libbegetutil",
+    "libinput:libinput-third-mmi",
+    "window_manager:libdm_lite",
+    "window_manager:libwm",
+    "window_manager:libwsutils",
+  ]
+}
+
+ohos_unittest("RedispatchVisibilityTest") {
+  module_out_path = module_output_path
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  include_dirs = [
+    "${mmi_path}/service/event_dispatch/include",
+    "${mmi_path}/service/window_manager/include",
+  ]
+
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "event_dispatch/test/redispatch_visibility_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "init:libbegetutil",
+    "libinput:libinput-third-mmi",
+    "window_manager:libdm_lite",
+    "window_manager:libwm",
+    "window_manager:libwsutils",
+  ]
+}
+
+ohos_unittest("RedispatchDerivedEventTest") {
+  module_out_path = module_output_path
+
+  include_dirs = [
+    "${mmi_path}/common/event_integrity/include",
+    "${mmi_path}/service/module_loader/include",
+    "${mmi_path}/service/window_manager/include",
+    "${mmi_path}/test/facility/libinput_interface/include",
+    "${mmi_path}/util/common/include",
+    "${mmi_service_path}/product_property_config/include",
+    "${mmi_service_path}/custom_config_parser/include",
+  ]
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+    "${mmi_path}/service/filter:mmi_event_filter_config",
+    "${mmi_path}/service/connect_manager:mmi_connect_manager_config",
+    "${mmi_path}/common/anco/comm:mmi_anco_channel_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  branch_protector_ret = "pac_ret"
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "module_loader/test/redispatch_derived_event_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/test/facility/libinput_wrapper:libinput_wrapper_sources",
+    "${mmi_path}/test/facility/virtual_device:virtual_device_sources",
+    "${mmi_path}/util:libmmi-util",
+    "${mmi_path}/test/facility/mock:mmi_mock_sources",
+  ]
+
+  external_deps = [
+    "ability_base:configuration",
+    "ability_runtime:app_manager",
+    "cJSON:cjson",
+    "c_utils:utils",
+    "data_share:datashare_consumer",
+    "googletest:gtest_main",
+    "googletest:gmock_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "hisysevent:libhisysevent",
+    "image_framework:image_native",
+    "init:libbegetutil",
+    "ipc:ipc_core",
+    "libinput:libinput-third-mmi",
+    "preferences:native_preferences",
+    "safwk:system_ability_fwk",
+    "samgr:samgr_proxy",
+    "window_manager:libwm",
+  ]
+
+  if (security_component_enable) {
+    external_deps += [ "security_component_manager:libsecurity_component_sdk" ]
+  }
+}
+
+ohos_unittest("RedispatchPermissionTest") {
+  module_out_path = module_output_path
+
+  include_dirs = [
+    "${mmi_path}/common/event_integrity/include",
+    "${mmi_path}/service/module_loader/include",
+    "${mmi_path}/service/window_manager/include",
+    "${mmi_path}/test/facility/libinput_interface/include",
+    "${mmi_path}/util/common/include",
+    "${mmi_service_path}/product_property_config/include",
+    "${mmi_service_path}/custom_config_parser/include",
+  ]
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+    "${mmi_path}/service/filter:mmi_event_filter_config",
+    "${mmi_path}/service/connect_manager:mmi_connect_manager_config",
+    "${mmi_path}/common/anco/comm:mmi_anco_channel_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  branch_protector_ret = "pac_ret"
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "module_loader/test/redispatch_permission_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/test/facility/libinput_wrapper:libinput_wrapper_sources",
+    "${mmi_path}/test/facility/virtual_device:virtual_device_sources",
+    "${mmi_path}/util:libmmi-util",
+    "${mmi_path}/test/facility/mock:mmi_mock_sources",
+  ]
+
+  external_deps = [
+    "ability_base:configuration",
+    "ability_runtime:app_manager",
+    "cJSON:cjson",
+    "c_utils:utils",
+    "data_share:datashare_consumer",
+    "googletest:gtest_main",
+    "googletest:gmock_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "hisysevent:libhisysevent",
+    "image_framework:image_native",
+    "init:libbegetutil",
+    "ipc:ipc_core",
+    "libinput:libinput-third-mmi",
+    "preferences:native_preferences",
+    "safwk:system_ability_fwk",
+    "samgr:samgr_proxy",
+    "window_manager:libwm",
+  ]
+
+  if (security_component_enable) {
+    external_deps += [ "security_component_manager:libsecurity_component_sdk" ]
+  }
+}
+
+ohos_unittest("MouseRedispatchRegressionTest") {
+  module_out_path = module_output_path
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  include_dirs = [ "${mmi_path}/service/window_manager/include" ]
+
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "window_manager/test/mouse_redispatch_regression_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "init:libbegetutil",
+    "libinput:libinput-third-mmi",
+    "window_manager:libdm_lite",
+    "window_manager:libwm",
+    "window_manager:libwsutils",
+  ]
+}
+
+ohos_unittest("MouseRedispatchStoreTest") {
+  module_out_path = module_output_path
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  include_dirs = [ "${mmi_path}/service/window_manager/include" ]
+
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "window_manager/test/mouse_redispatch_store_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "init:libbegetutil",
+    "libinput:libinput-third-mmi",
+    "window_manager:libdm_lite",
+    "window_manager:libwm",
+    "window_manager:libwsutils",
+  ]
+}
+
+ohos_unittest("RedispatchMouseSessionTest") {
+  module_out_path = module_output_path
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  include_dirs = [ "${mmi_path}/service/window_manager/include" ]
+
+  sanitize = {
+    cfi = true
+    cfi_cross_dso = true
+    debug = false
+    blocklist = "./ipc_blocklist.txt"
+  }
+
+  sources = [ "window_manager/test/redispatch_mouse_session_test.cpp" ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-common",
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/service:libmmi-server-common",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "googletest:gmock_main",
+    "googletest:gtest_main",
+    "graphic_2d:2d_graphics",
+    "graphic_2d:librender_service_base",
+    "graphic_2d:librender_service_client",
+    "hilog:libhilog",
+    "init:libbegetutil",
+    "libinput:libinput-third-mmi",
+    "window_manager:libdm_lite",
+    "window_manager:libwm",
+    "window_manager:libwsutils",
+  ]
+}
+
 ohos_unittest("InputWindowsManagerOneTest") {
   module_out_path = module_output_path
   use_exceptions = true

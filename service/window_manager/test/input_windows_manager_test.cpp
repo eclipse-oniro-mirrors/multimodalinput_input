@@ -14493,6 +14493,11 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AbandonRedispatch_001,
     int32_t targetWindowId = 1;
     pointerEvent->SetTargetWindowId(targetWindowId);
     pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_BEGIN);
+    PointerEvent::PointerItem axisItem;
+    axisItem.SetPointerId(0);
+    axisItem.SetToolType(PointerEvent::TOOL_TYPE_TOUCHPAD);
+    pointerEvent->AddPointerItem(axisItem);
     auto result = inputWindowsManager->mouseRedispatchStore_.Abandon(pointerEvent);
     EXPECT_TRUE(result);
     inputWindowsManager->mouseRedispatchStore_.SetWindowActive(targetWindowId);
@@ -14519,12 +14524,12 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_DispatchPointerRedispa
     WindowInfo windowInfo;
     windowInfo.id = 1;
     windowInfo.agentWindowId = 1;
-    inputWindowsManager->DispatchPointerRedispatch(pointerAction, windowInfo);
+    inputWindowsManager->DispatchPointerRedispatch(pointerAction, windowInfo, 0.0f);
     EXPECT_EQ(inputWindowsManager->mouseRedispatchStore_.GetLastEvent(), nullptr);
     std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
     ASSERT_NE(pointerEvent, nullptr);
     inputWindowsManager->mouseRedispatchStore_.CacheLastEvent(pointerEvent);
-    inputWindowsManager->DispatchPointerRedispatch(pointerAction, windowInfo);
+    inputWindowsManager->DispatchPointerRedispatch(pointerAction, windowInfo, 0.0f);
     EXPECT_NE(inputWindowsManager->mouseRedispatchStore_.GetLastEvent(), nullptr);
     PointerEvent::PointerItem item;
     item.SetPointerId(0);
@@ -16559,7 +16564,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_TouchRedispatchWindowL
     item.SetPointerId(pointerId);
     downEvent->AddPointerItem(item);
 
-    store.SetFingerActive(zOrder, deviceId, pointerId, downEvent);
+    store.SetFingerActive(zOrder, deviceId, pointerId, PointerEvent::TOOL_TYPE_FINGER, downEvent);
     EXPECT_TRUE(store.IsFingerActive(zOrder, deviceId, pointerId));
     EXPECT_EQ(store.GetFingerWindowId(zOrder, deviceId, pointerId), downWindowId);
 

@@ -25,6 +25,7 @@ inline constexpr int32_t ERROR_UNSUPPORT { -2 };
 inline constexpr int32_t ARGV_VALID { 2 };
 inline constexpr int32_t ERROR_NO_PERMISSION { -201 };
 inline constexpr int32_t ERROR_KEYBOARD_NO_PERMISSION { 201 };
+inline constexpr int32_t ERROR_INJECT_NO_PERMISSION { 201 };
 inline constexpr int32_t ERROR_NOT_SYSAPI { 202 };
 inline constexpr int32_t ERROR_DEVICE_NOT_EXIST { 3900001 };
 inline constexpr int32_t ERROR_DISPLAY_NOT_EXIST { 3900004 };

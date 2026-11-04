@@ -68,6 +68,29 @@ struct LastTouchInfo {
     WindowInfo lastTouchWindowInfo;
 };
 
+struct RedispatchFingerKey {
+    int32_t deviceId { -1 };
+    int32_t pointerId { -1 };
+    int32_t toolType { PointerEvent::TOOL_TYPE_FINGER };
+
+    bool operator<(const RedispatchFingerKey &other) const
+    {
+        if (deviceId != other.deviceId) {
+            return (deviceId < other.deviceId);
+        }
+        if (pointerId != other.pointerId) {
+            return (pointerId < other.pointerId);
+        }
+        return (toolType < other.toolType);
+    }
+
+    bool operator==(const RedispatchFingerKey &other) const
+    {
+        return (deviceId == other.deviceId && pointerId == other.pointerId &&
+            toolType == other.toolType);
+    }
+};
+
 class TouchRedispatchStore final {
 public:
     struct Guard {
@@ -78,14 +101,18 @@ public:
     bool IsActive() const { return active_; }
     float GetZOrder() const { return zOrder_; }
 
-    void SetFingerActive(float zOrder, int32_t deviceId, int32_t pointerId,
+    void SetFingerActive(float zOrder, int32_t deviceId, int32_t pointerId, int32_t toolType,
                          const std::shared_ptr<PointerEvent>& event);
-    bool IsFingerActive(float zOrder, int32_t deviceId, int32_t pointerId) const;
-    void DeactivateFinger(float zOrder, int32_t deviceId, int32_t pointerId);
-    std::shared_ptr<PointerEvent> GetFingerEvent(float zOrder, int32_t deviceId, int32_t pointerId) const;
-    int32_t GetFingerWindowId(float zOrder, int32_t deviceId, int32_t pointerId) const;
+    bool IsFingerActive(float zOrder, int32_t deviceId, int32_t pointerId,
+                        int32_t toolType = PointerEvent::TOOL_TYPE_FINGER) const;
+    void DeactivateFinger(float zOrder, int32_t deviceId, int32_t pointerId,
+                          int32_t toolType = PointerEvent::TOOL_TYPE_FINGER);
+    std::shared_ptr<PointerEvent> GetFingerEvent(float zOrder, int32_t deviceId, int32_t pointerId,
+        int32_t toolType = PointerEvent::TOOL_TYPE_FINGER) const;
+    int32_t GetFingerWindowId(float zOrder, int32_t deviceId, int32_t pointerId,
+        int32_t toolType = PointerEvent::TOOL_TYPE_FINGER) const;
 
-    using FingerMap = std::map<float, std::map<std::pair<int32_t, int32_t>, RedispatchFingerInfo>>;
+    using FingerMap = std::map<float, std::map<RedispatchFingerKey, RedispatchFingerInfo>>;
     const FingerMap& GetFingerMap() const;
 
     std::map<int32_t, std::map<int32_t, std::set<int32_t>>>& GetTargetTouchWinIds();
@@ -108,7 +135,7 @@ private:
     bool active_ { false };
     float zOrder_ { 0.0f };
 
-    std::map<float, std::map<std::pair<int32_t, int32_t>, RedispatchFingerInfo>> redispatchFingers_;
+    std::map<float, std::map<RedispatchFingerKey, RedispatchFingerInfo>> redispatchFingers_;
 
     std::map<float, std::map<int32_t, std::map<int32_t, std::set<int32_t>>>> targetTouchWinIds_;
     std::map<float, std::map<int32_t, WindowPartInfo>> firstTouchInfos_;
