@@ -428,9 +428,9 @@ int32_t PointerRenderer::BlurRender(uint8_t *addr, uint32_t addrSize, uint32_t w
         MMI_HILOGI("Blur Render init success");
     } else if (defaultBitmap_.GetWidth() != static_cast<int32_t>(width) ||
                defaultBitmap_.GetHeight() != static_cast<int32_t>(height)) {
-        // Buffer tier changed since the bitmap was built (e.g. a mirror screen being initialised
-        // after the main screen already drew one blur frame).  Rebuild at the new dimensions so
-        // the memcpy_s below never reads past the bitmap's allocation.
+        // The renderer is shared across screens; whenever a request arrives at dimensions other
+        // than those the bitmap was built at, rebuild so the memcpy_s below never reads past the
+        // bitmap's allocation.
         MMI_HILOGI("Blur bitmap tier mismatch (%{public}dx%{public}d vs %{public}ux%{public}u), rebuilding",
             defaultBitmap_.GetWidth(), defaultBitmap_.GetHeight(), width, height);
         SetupBlurBitmap(width, height, cfg);
