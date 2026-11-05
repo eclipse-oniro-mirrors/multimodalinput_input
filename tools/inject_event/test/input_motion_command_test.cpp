@@ -35,6 +35,7 @@ constexpr char STATE_FILE_PATH[] = "/data/local/tmp/uinput_motion_state";
 void ResetMock()
 {
     MOCKHANDLER->mockSimulateInputEventRet = RET_OK;
+    MOCKHANDLER->mockSimulateInputEventFailFromCount = -1;
     MOCKHANDLER->simulateInputEventCallCount = 0;
     MOCKHANDLER->lastSimulatedPointerEvent = nullptr;
     MOCKHANDLER->simulatedPointerEvents.clear();
@@ -185,6 +186,223 @@ HWTEST_F(InputMotionCommandTest, ConcurrentAccess_FlockMutex, TestSize.Level1)
 }
 
 /**
+ * @tc.name: StateFile_ForwardCompatibility
+ * @tc.desc: Test LoadState tolerates appended fields in future format
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, StateFile_ForwardCompatibility, TestSize.Level1)
+{
+    const std::string stateFilePath = "/data/local/tmp/uinput_motion_state";
+    unlink(stateFilePath.c_str());
+    FILE* file = fopen(stateFilePath.c_str(), "w");
+    ASSERT_NE(file, nullptr);
+    fprintf(file, "1 0 500 800 1 99\n2 0 300 400 1\n3 0 100 100 1 55 888\n");
+    fclose(file);
+    InputMotionCommand command;
+    EXPECT_EQ(command.AcquireLock(), 0);
+    FingerStateMap loaded;
+    EXPECT_EQ(command.LoadState(loaded), 0);
+    command.ReleaseLock();
+    ASSERT_EQ(loaded.count(0), 1u);
+    ASSERT_EQ(loaded[0].size(), 3u);
+    EXPECT_EQ(loaded[0][0].fingerId, 1);
+    EXPECT_EQ(loaded[0][0].x, 500);
+    EXPECT_EQ(loaded[0][0].downTime, 99);
+    EXPECT_EQ(loaded[0][1].fingerId, 2);
+    EXPECT_EQ(loaded[0][1].downTime, 0);
+    EXPECT_EQ(loaded[0][2].fingerId, 3);
+    EXPECT_EQ(loaded[0][2].downTime, 55);
+    unlink(stateFilePath.c_str());
+}
+
+/**
+ * @tc.name: StateFile_InvalidLinesFiltered
+ * @tc.desc: Test LoadState filters tampered or legacy invalid lines
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, StateFile_InvalidLinesFiltered, TestSize.Level1)
+{
+    const std::string stateFilePath = "/data/local/tmp/uinput_motion_state";
+    unlink(stateFilePath.c_str());
+    FILE* file = fopen(stateFilePath.c_str(), "w");
+    ASSERT_NE(file, nullptr);
+    fprintf(file, "1 0 500 800 1\n100 0 500 800 1\n2 0 -5 800 1\n3 0 300 -1 1\n4 0 100 200 0\n");
+    fclose(file);
+    InputMotionCommand command;
+    EXPECT_EQ(command.AcquireLock(), 0);
+    FingerStateMap loaded;
+    EXPECT_EQ(command.LoadState(loaded), 0);
+    command.ReleaseLock();
+    ASSERT_EQ(loaded.count(0), 1u);
+    ASSERT_EQ(loaded[0].size(), 1u);
+    EXPECT_EQ(loaded[0][0].fingerId, 1);
+    EXPECT_EQ(loaded[0][0].x, 500);
+    EXPECT_EQ(loaded[0][0].y, 800);
+    unlink(stateFilePath.c_str());
+}
+
+/**
+ * @tc.name: MotionDown_DuplicatePress_Rejected
+ * @tc.desc: Test repeated motion_down on same finger is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, MotionDown_DuplicatePress_Rejected, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* downArgvs[] = { "uinput", "motion_down", "500", "800", "-f", "1" };
+    char** argv = const_cast<char**>(downArgvs);
+    EXPECT_EQ(InputMotionCommand::Handle(6, argv), 0);
+    {
+        StderrRedirect redirect;
+        EXPECT_EQ(InputMotionCommand::Handle(6, argv), 1);
+        EXPECT_NE(redirect.Content().find("finger 1 is already pressed"), std::string::npos);
+    }
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 1);
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: InvalidParameter_NonNumericOptionValue
+ * @tc.desc: Test motion_down with non-numeric option value is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, InvalidParameter_NonNumericOptionValue, TestSize.Level1)
+{
+    const char* injectArgvs[] = { "uinput", "motion_down", "500", "800", "-f", "abc" };
+    char** argv = const_cast<char**>(injectArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(6, argv), 1);
+    EXPECT_NE(redirect.Content().find("invalid number for option -f: abc"), std::string::npos);
+}
+
+/**
+ * @tc.name: InvalidParameter_TooManyPositionals
+ * @tc.desc: Test motion_down with too many positional parameters is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, InvalidParameter_TooManyPositionals, TestSize.Level1)
+{
+    const char* injectArgvs[] = { "uinput", "motion_down", "500", "800", "900" };
+    char** argv = const_cast<char**>(injectArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(5, argv), 1);
+    EXPECT_NE(redirect.Content().find("too many positional parameters: 900"), std::string::npos);
+}
+
+/**
+ * @tc.name: InjectFailed_DownRolledBack
+ * @tc.desc: Test motion_down rolls back state when injection is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, InjectFailed_DownRolledBack, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    MOCKHANDLER->mockSimulateInputEventFailFromCount = 1;
+    const char* downArgvs[] = { "uinput", "motion_down", "500", "800", "-f", "1" };
+    char** argv = const_cast<char**>(downArgvs);
+    {
+        StderrRedirect redirect;
+        EXPECT_EQ(InputMotionCommand::Handle(6, argv), 1);
+        EXPECT_NE(redirect.Content().find("inject event failed"), std::string::npos);
+    }
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 1);
+    FingerStateMap states = LoadStateForVerify();
+    EXPECT_TRUE(states.empty());
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: InjectFailed_MoveKeepsOldCoords
+ * @tc.desc: Test motion_move rolls back coordinates when injection is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, InjectFailed_MoveKeepsOldCoords, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* downArgvs[] = { "uinput", "motion_down", "500", "800", "-f", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(downArgvs)), 0);
+    MOCKHANDLER->mockSimulateInputEventFailFromCount = 2;
+    const char* moveArgvs[] = { "uinput", "motion_move", "600", "800", "-f", "1" };
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(moveArgvs)), 1);
+    EXPECT_NE(redirect.Content().find("inject event failed"), std::string::npos);
+    FingerStateMap states = LoadStateForVerify();
+    ASSERT_EQ(states.count(0), 1u);
+    ASSERT_EQ(states[0].size(), 1u);
+    EXPECT_EQ(states[0][0].fingerId, 1);
+    EXPECT_EQ(states[0][0].x, 500);
+    EXPECT_EQ(states[0][0].y, 800);
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: InjectFailed_UpKeepsFinger
+ * @tc.desc: Test motion_up keeps finger state when injection is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, InjectFailed_UpKeepsFinger, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* downArgvs[] = { "uinput", "motion_down", "500", "800", "-f", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(downArgvs)), 0);
+    MOCKHANDLER->mockSimulateInputEventFailFromCount = 2;
+    const char* upArgvs[] = { "uinput", "motion_up", "600", "800", "-f", "1" };
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(upArgvs)), 1);
+    EXPECT_NE(redirect.Content().find("inject event failed"), std::string::npos);
+    FingerStateMap states = LoadStateForVerify();
+    ASSERT_EQ(states.count(0), 1u);
+    ASSERT_EQ(states[0].size(), 1u);
+    EXPECT_EQ(states[0][0].fingerId, 1);
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: Reset_PartialFailure_PersistsRemaining
+ * @tc.desc: Test motion_reset persists remaining fingers on partial failure
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, Reset_PartialFailure_PersistsRemaining, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* downArgvs1[] = { "uinput", "motion_down", "100", "100", "-f", "0" };
+    const char* downArgvs2[] = { "uinput", "motion_down", "200", "200", "-f", "1" };
+    const char* downArgvs3[] = { "uinput", "motion_down", "300", "300", "-f", "2" };
+    const char* resetArgvs[] = { "uinput", "motion_reset" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(downArgvs1)), 0);
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(downArgvs2)), 0);
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(downArgvs3)), 0);
+    MOCKHANDLER->mockSimulateInputEventFailFromCount = 5;
+    EXPECT_EQ(InputMotionCommand::Handle(2, const_cast<char**>(resetArgvs)), 1);
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 5);
+    FingerStateMap states = LoadStateForVerify();
+    ASSERT_EQ(states.count(0), 1u);
+    ASSERT_EQ(states[0].size(), 2u);
+    EXPECT_EQ(states[0][0].fingerId, 1);
+    EXPECT_EQ(states[0][1].fingerId, 2);
+    MOCKHANDLER->mockSimulateInputEventFailFromCount = -1;
+    EXPECT_EQ(InputMotionCommand::Handle(2, const_cast<char**>(resetArgvs)), 0);
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 7);
+    FingerStateMap cleared = LoadStateForVerify();
+    EXPECT_TRUE(cleared.empty());
+    unlink(STATE_FILE_PATH);
+}
+
+/**
  * @tc.name: StateFile_ReadWrite
  * @tc.desc: Test FingerState serialization to and from state file
  * @tc.type: FUNC
@@ -196,9 +414,9 @@ HWTEST_F(InputMotionCommandTest, StateFile_ReadWrite, TestSize.Level1)
     unlink(stateFilePath.c_str());
     InputMotionCommand command;
     FingerStateMap states;
-    states[0].push_back(FingerState { 1, 0, 500, 800, true });
-    states[0].push_back(FingerState { 2, 0, 300, 400, true });
-    states[1].push_back(FingerState { 3, 1, 100, 200, true });
+    states[0].push_back(FingerState { 1, 0, 500, 800, true, 111 });
+    states[0].push_back(FingerState { 2, 0, 300, 400, true, 222 });
+    states[1].push_back(FingerState { 3, 1, 100, 200, true, 333 });
     EXPECT_EQ(command.AcquireLock(), 0);
     EXPECT_EQ(command.SaveState(states), 0);
     FingerStateMap loaded;
@@ -211,14 +429,17 @@ HWTEST_F(InputMotionCommandTest, StateFile_ReadWrite, TestSize.Level1)
     EXPECT_EQ(loaded[0][0].x, 500);
     EXPECT_EQ(loaded[0][0].y, 800);
     EXPECT_TRUE(loaded[0][0].isDown);
+    EXPECT_EQ(loaded[0][0].downTime, 111);
     EXPECT_EQ(loaded[0][1].fingerId, 2);
     EXPECT_EQ(loaded[0][1].x, 300);
     EXPECT_EQ(loaded[0][1].y, 400);
+    EXPECT_EQ(loaded[0][1].downTime, 222);
     ASSERT_EQ(loaded[1].size(), 1u);
     EXPECT_EQ(loaded[1][0].fingerId, 3);
     EXPECT_EQ(loaded[1][0].screenId, 1);
     EXPECT_EQ(loaded[1][0].x, 100);
     EXPECT_EQ(loaded[1][0].y, 200);
+    EXPECT_EQ(loaded[1][0].downTime, 333);
     unlink(stateFilePath.c_str());
 }
 
@@ -242,10 +463,17 @@ HWTEST_F(InputMotionCommandTest, MotionDown_BasicInput, TestSize.Level1)
     EXPECT_EQ(event->GetPointerId(), 1);
     EXPECT_EQ(event->GetSourceType(), PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
     EXPECT_EQ(event->GetTargetDisplayId(), 0);
+    EXPECT_TRUE(event->HasFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID));
     PointerEvent::PointerItem item;
     ASSERT_TRUE(event->GetPointerItem(1, item));
     EXPECT_EQ(item.GetDisplayX(), 500);
     EXPECT_EQ(item.GetDisplayY(), 800);
+    EXPECT_TRUE(item.IsPressed());
+    EXPECT_GT(item.GetDownTime(), 0);
+    EXPECT_EQ(item.GetOriginPointerId(), 1);
+    EXPECT_EQ(item.GetToolType(), PointerEvent::TOOL_TYPE_FINGER);
+    EXPECT_GT(event->GetActionTime(), static_cast<int64_t>(0));
+    EXPECT_GT(event->GetActionStartTime(), static_cast<int64_t>(0));
     FingerStateMap states = LoadStateForVerify();
     ASSERT_EQ(states.count(0), 1u);
     ASSERT_EQ(states[0].size(), 1u);
@@ -281,10 +509,13 @@ HWTEST_F(InputMotionCommandTest, MotionMove_CarriesHistoryState, TestSize.Level1
     ASSERT_TRUE(event->GetPointerItem(1, firstItem));
     EXPECT_EQ(firstItem.GetDisplayX(), 600);
     EXPECT_EQ(firstItem.GetDisplayY(), 800);
+    EXPECT_TRUE(firstItem.IsPressed());
     PointerEvent::PointerItem secondItem;
     ASSERT_TRUE(event->GetPointerItem(2, secondItem));
     EXPECT_EQ(secondItem.GetDisplayX(), 300);
     EXPECT_EQ(secondItem.GetDisplayY(), 400);
+    EXPECT_TRUE(secondItem.IsPressed());
+    EXPECT_GT(secondItem.GetDownTime(), 0);
     FingerStateMap states = LoadStateForVerify();
     ASSERT_EQ(states.count(0), 1u);
     ASSERT_EQ(states[0].size(), 2u);
@@ -321,6 +552,8 @@ HWTEST_F(InputMotionCommandTest, MotionUp_StateCleared, TestSize.Level1)
     ASSERT_TRUE(event->GetPointerItem(1, item));
     EXPECT_EQ(item.GetDisplayX(), 600);
     EXPECT_EQ(item.GetDisplayY(), 800);
+    EXPECT_FALSE(item.IsPressed());
+    EXPECT_GT(item.GetDownTime(), static_cast<int64_t>(0));
     FingerStateMap states = LoadStateForVerify();
     EXPECT_TRUE(states.empty());
     unlink(STATE_FILE_PATH);
@@ -343,6 +576,43 @@ HWTEST_F(InputMotionCommandTest, MotionUp_OrderViolation_NoPressedFinger, TestSi
     EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 0);
     EXPECT_NE(redirect.Content().find("finger 1 is not pressed, cannot lift"), std::string::npos);
     unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: Reset_CorruptedStateFile_SelfHeals
+ * @tc.desc: Test motion_reset self-heals corrupted state file with blind UP sweep
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, Reset_CorruptedStateFile_SelfHeals, TestSize.Level1)
+{
+    const std::string stateFilePath = "/data/local/tmp/uinput_motion_state";
+    unlink(stateFilePath.c_str());
+    FILE* file = fopen(stateFilePath.c_str(), "w");
+    ASSERT_NE(file, nullptr);
+    fprintf(file, "1 0 50\n");
+    fclose(file);
+    ResetMock();
+    const char* resetArgvs[] = { "uinput", "motion_reset" };
+    char** argv = const_cast<char**>(resetArgvs);
+    {
+        StderrRedirect redirect;
+        EXPECT_EQ(InputMotionCommand::Handle(2, argv), 0);
+        EXPECT_NE(redirect.Content().find(", clearing"), std::string::npos);
+    }
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 10);
+    const auto &events = MOCKHANDLER->simulatedPointerEvents;
+    ASSERT_EQ(events.size(), 10u);
+    for (int32_t i = 0; i < 10; ++i) {
+        std::shared_ptr<PointerEvent> event = events[static_cast<size_t>(i)];
+        ASSERT_NE(event, nullptr);
+        EXPECT_EQ(event->GetPointerAction(), PointerEvent::POINTER_ACTION_UP);
+        EXPECT_EQ(event->GetPointerId(), i);
+    }
+    FingerStateMap states = LoadStateForVerify();
+    EXPECT_TRUE(states.empty());
+    unlink(stateFilePath.c_str());
+    unlink("/data/local/tmp/uinput_motion_state.tmp");
 }
 
 /**

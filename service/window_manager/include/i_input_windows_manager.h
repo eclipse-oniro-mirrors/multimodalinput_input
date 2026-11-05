@@ -239,9 +239,9 @@ public:
 #endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_MONITOR)
 #ifdef OHOS_BUILD_ENABLE_TOUCH
     virtual std::shared_ptr<PointerEvent> GetLastPointerEventForGesture() = 0;
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     virtual void ClearTouchArbitrationStateByDevice(int32_t deviceId) = 0;
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 #endif // OHOS_BUILD_ENABLE_TOUCH
     virtual std::pair<int32_t, int32_t> CalcDrawCoordinate(const OLD::DisplayInfo& displayInfo,
         PointerEvent::PointerItem pointerItem) = 0;

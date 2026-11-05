@@ -35,6 +35,7 @@ public:
     int32_t mockGetUserDefinedCursorPixelMapRet { -1 };
     std::shared_ptr<Media::PixelMap> mockPixelMapPtr { nullptr };
     int32_t mockSimulateInputEventRet { RET_OK };
+    int32_t mockSimulateInputEventFailFromCount { -1 };
     int32_t simulateInputEventCallCount { 0 };
     std::shared_ptr<PointerEvent> lastSimulatedPointerEvent { nullptr };
     std::vector<std::shared_ptr<PointerEvent>> simulatedPointerEvents {};

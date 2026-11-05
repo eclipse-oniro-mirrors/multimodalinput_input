@@ -73,6 +73,7 @@ declare_args() {
   input_feature_universal_drag_enable = false
   input_feature_triple_finger_snapshot = false
   input_controller_inject_enable = false
+  input_touch_source_arbitration_enable = true
   input_feature_api_metrics_histogram = false
   input_feature_asset_check = false
 
@@ -354,6 +355,7 @@ print("input_feature_touchpad = ${input_feature_touchpad}")
 print("input_feature_pen = ${input_feature_pen}")
 print("input_feature_touch_gesture = ${input_feature_touch_gesture}")
 print("input_controller_inject_enable = ${input_controller_inject_enable}")
+print("input_touch_source_arbitration_enable = ${input_touch_source_arbitration_enable}")
 
 input_default_defines = []
 
@@ -602,9 +604,13 @@ if (input_feature_touch_gesture) {
   input_default_defines += [ "OHOS_BUILD_ENABLE_TOUCH_GESTURE" ]
 }
 
+if (input_touch_source_arbitration_enable || input_controller_inject_enable) {
+  input_default_defines += [ "OHOS_BUILD_ENABLE_TOUCH_ARBITRATION" ]
+  libmmi_service_sources += [ "window_manager/src/touch_arbitration_manager.cpp" ]
+}
+
 if (input_controller_inject_enable) {
   input_default_defines += [ "OHOS_BUILD_ENABLE_CONTROLLER_INJECT" ]
-  libmmi_service_sources += [ "window_manager/src/touch_arbitration_manager.cpp" ]
 }
 
 if (defined(global_parts_info) &&

@@ -16,7 +16,9 @@
 #include "input_motion_command.h"
 
 #include <algorithm>
+#include <cerrno>
 #include <charconv>
+#include <cstdio>
 #include <fcntl.h>
 #include <iostream>
 #include <sstream>
@@ -26,6 +28,8 @@
 
 #include "input_manager.h"
 #include "pointer_event.h"
+#include "struct_multimodal.h"
+#include "util.h"
 
 namespace OHOS {
 namespace MMI {
@@ -40,6 +44,8 @@ constexpr int32_t SUB_COMMAND_INDEX { 1 };
 constexpr int32_t FIRST_OPTION_INDEX { 2 };
 constexpr int32_t POSITION_COUNT { 2 };
 constexpr char MOTION_STATE_FILE_PATH[] = "/data/local/tmp/uinput_motion_state";
+constexpr char MOTION_STATE_LOCK_PATH[] = "/data/local/tmp/uinput_motion_state.lock";
+constexpr char MOTION_STATE_TMP_PATH[] = "/data/local/tmp/uinput_motion_state.tmp";
 constexpr mode_t MOTION_STATE_FILE_MODE { 0666 };
 constexpr int32_t MOTION_INVALID_FD { -1 };
 constexpr int32_t OPTION_VALUE_STEP { 2 };
@@ -63,6 +69,12 @@ FingerState *FindFingerState(FingerStateMap &stateMap, int32_t screenId, int32_t
         }
     }
     return nullptr;
+}
+
+bool IsValidFingerState(const FingerState &state)
+{
+    return (state.fingerId >= MIN_FINGER_ID) && (state.fingerId <= MAX_FINGER_ID) &&
+        (state.screenId >= 0) && (state.x >= 0) && (state.y >= 0) && state.isDown;
 }
 
 void PrintUsage()
@@ -213,13 +225,14 @@ int32_t InputMotionCommand::AcquireLock()
         std::cerr << "state file lock is already held" << std::endl;
         return MOTION_EXIT_FAILURE;
     }
-    int32_t fd = open(MOTION_STATE_FILE_PATH, O_CREAT | O_RDWR, MOTION_STATE_FILE_MODE);
+    int32_t fd = open(MOTION_STATE_LOCK_PATH, O_CREAT | O_RDWR, MOTION_STATE_FILE_MODE);
     if (fd == MOTION_INVALID_FD) {
-        std::cerr << "failed to open state file: " << MOTION_STATE_FILE_PATH << std::endl;
+        std::cerr << "failed to open state lock file: " << MOTION_STATE_LOCK_PATH << std::endl;
         return MOTION_EXIT_FAILURE;
     }
     if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
-        std::cerr << "state file is locked by another process" << std::endl;
+        std::cerr << "state file is locked by another process, please retry later or run motion_reset"
+            << std::endl;
         close(fd);
         return MOTION_EXIT_FAILURE;
     }
@@ -244,17 +257,26 @@ int32_t InputMotionCommand::LoadState(FingerStateMap &stateMap)
         std::cerr << "state file is not locked before reading" << std::endl;
         return MOTION_EXIT_FAILURE;
     }
+    int32_t dataFd = open(MOTION_STATE_FILE_PATH, O_RDONLY);
+    if (dataFd == MOTION_INVALID_FD) {
+        if (errno == ENOENT) {
+            return MOTION_EXIT_SUCCESS;
+        }
+        std::cerr << "failed to open state file: " << MOTION_STATE_FILE_PATH << std::endl;
+        return MOTION_EXIT_FAILURE;
+    }
     std::string content;
     char buf[256];
     ssize_t n = 0;
-    lseek(fd_, 0, SEEK_SET);
-    while ((n = read(fd_, buf, sizeof(buf))) > 0) {
+    while ((n = read(dataFd, buf, sizeof(buf))) > 0) {
         content.append(buf, static_cast<size_t>(n));
     }
     if (n < 0) {
         std::cerr << "failed to read state file: " << MOTION_STATE_FILE_PATH << std::endl;
+        close(dataFd);
         return MOTION_EXIT_FAILURE;
     }
+    close(dataFd);
     std::istringstream iss(content);
     std::string line;
     while (std::getline(iss, line)) {
@@ -269,6 +291,12 @@ int32_t InputMotionCommand::LoadState(FingerStateMap &stateMap)
             return MOTION_EXIT_FAILURE;
         }
         state.isDown = (isDown != 0);
+        int64_t downTime = 0;
+        lineStream >> downTime;
+        state.downTime = downTime;
+        if (!IsValidFingerState(state)) {
+            continue;
+        }
         stateMap[state.screenId].push_back(state);
     }
     return MOTION_EXIT_SUCCESS;
@@ -284,61 +312,89 @@ int32_t InputMotionCommand::SaveState(const FingerStateMap &stateMap)
     for (const auto &entry : stateMap) {
         for (const auto &state : entry.second) {
             oss << state.fingerId << " " << state.screenId << " " << state.x << " " << state.y << " "
-                << (state.isDown ? 1 : 0) << "\n";
+                << (state.isDown ? 1 : 0) << " " << state.downTime << "\n";
         }
     }
     const std::string content = oss.str();
-    lseek(fd_, 0, SEEK_SET);
-    if (ftruncate(fd_, 0) != 0) {
-        std::cerr << "failed to truncate state file: " << MOTION_STATE_FILE_PATH << std::endl;
+    int32_t tmpFd = open(MOTION_STATE_TMP_PATH, O_CREAT | O_WRONLY | O_TRUNC, MOTION_STATE_FILE_MODE);
+    if (tmpFd == MOTION_INVALID_FD) {
+        std::cerr << "failed to open temp state file: " << MOTION_STATE_TMP_PATH << std::endl;
         return MOTION_EXIT_FAILURE;
     }
     size_t written = 0;
     while (written < content.size()) {
-        ssize_t n = write(fd_, content.data() + written, content.size() - written);
+        ssize_t n = write(tmpFd, content.data() + written, content.size() - written);
         if (n <= 0) {
             std::cerr << "failed to write state file: " << MOTION_STATE_FILE_PATH << std::endl;
+            close(tmpFd);
             return MOTION_EXIT_FAILURE;
         }
         written += static_cast<size_t>(n);
+    }
+    close(tmpFd);
+    if (std::rename(MOTION_STATE_TMP_PATH, MOTION_STATE_FILE_PATH) != 0) {
+        std::cerr << "failed to replace state file: " << MOTION_STATE_FILE_PATH << std::endl;
+        return MOTION_EXIT_FAILURE;
     }
     return MOTION_EXIT_SUCCESS;
 }
 
 std::shared_ptr<PointerEvent> InputMotionCommand::BuildPointerEvent(int32_t pointerAction, int32_t x, int32_t y,
-    int32_t fingerId, int32_t screenId, const FingerStateMap &stateMap)
+    int32_t fingerId, int32_t screenId, const FingerStateMap &stateMap, int64_t actionTime, int64_t downTime)
 {
     auto pointerEvent = PointerEvent::Create();
     if (pointerEvent == nullptr) {
         std::cerr << "failed to create pointer event" << std::endl;
         return nullptr;
     }
+    bool hasOtherPressedFinger = false;
     auto screenIt = stateMap.find(screenId);
     if (screenIt != stateMap.end()) {
         for (const auto &state : screenIt->second) {
             if (state.fingerId == fingerId) {
                 continue;
             }
+            hasOtherPressedFinger = true;
             PointerEvent::PointerItem item;
             item.SetPointerId(state.fingerId);
+            item.SetOriginPointerId(state.fingerId);
             item.SetDisplayX(state.x);
             item.SetDisplayY(state.y);
+            item.SetDisplayXPos(static_cast<double>(state.x));
+            item.SetDisplayYPos(static_cast<double>(state.y));
             item.SetRawDisplayX(state.x);
             item.SetRawDisplayY(state.y);
+            item.SetDeviceId(VIRTUAL_TOUCH_DEVICE_ID);
+            item.SetToolType(PointerEvent::TOOL_TYPE_FINGER);
+            item.SetDownTime(state.downTime);
+            item.SetPressed(true);
             pointerEvent->AddPointerItem(item);
         }
     }
     PointerEvent::PointerItem currentItem;
     currentItem.SetPointerId(fingerId);
+    currentItem.SetOriginPointerId(fingerId);
     currentItem.SetDisplayX(x);
     currentItem.SetDisplayY(y);
+    currentItem.SetDisplayXPos(static_cast<double>(x));
+    currentItem.SetDisplayYPos(static_cast<double>(y));
     currentItem.SetRawDisplayX(x);
     currentItem.SetRawDisplayY(y);
+    currentItem.SetDeviceId(VIRTUAL_TOUCH_DEVICE_ID);
+    currentItem.SetToolType(PointerEvent::TOOL_TYPE_FINGER);
+    currentItem.SetDownTime(downTime);
+    currentItem.SetPressed(pointerAction != PointerEvent::POINTER_ACTION_UP);
     pointerEvent->AddPointerItem(currentItem);
     pointerEvent->SetPointerId(fingerId);
     pointerEvent->SetPointerAction(pointerAction);
     pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
     pointerEvent->SetTargetDisplayId(screenId);
+    pointerEvent->SetActionTime(actionTime);
+    if ((pointerAction == PointerEvent::POINTER_ACTION_DOWN) && !hasOtherPressedFinger) {
+        pointerEvent->SetActionStartTime(actionTime);
+    }
+    pointerEvent->SetDeviceId(VIRTUAL_TOUCH_DEVICE_ID);
+    pointerEvent->AddFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID);
     return pointerEvent;
 }
 
@@ -364,19 +420,22 @@ int32_t InputMotionCommand::HandleDown(int32_t x, int32_t y, int32_t fingerId, i
     state.x = x;
     state.y = y;
     state.isDown = true;
+    state.downTime = GetSysClockTime();
     stateMap[screenId].push_back(state);
+    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        ReleaseLock();
+        return MOTION_EXIT_FAILURE;
+    }
     std::shared_ptr<PointerEvent> pointerEvent = BuildPointerEvent(PointerEvent::POINTER_ACTION_DOWN, x, y, fingerId,
-        screenId, stateMap);
+        screenId, stateMap, GetSysClockTime(), state.downTime);
     if (pointerEvent == nullptr) {
+        RollbackState(stateMap, screenId, fingerId);
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
     if (InputManager::GetInstance()->SimulateInputEvent(pointerEvent) != RET_OK) {
         std::cerr << "inject event failed" << std::endl;
-        ReleaseLock();
-        return MOTION_EXIT_FAILURE;
-    }
-    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        RollbackState(stateMap, screenId, fingerId);
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
@@ -401,20 +460,24 @@ int32_t InputMotionCommand::HandleMove(int32_t x, int32_t y, int32_t fingerId, i
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
+    int32_t oldX = pressed->x;
+    int32_t oldY = pressed->y;
     pressed->x = x;
     pressed->y = y;
+    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        ReleaseLock();
+        return MOTION_EXIT_FAILURE;
+    }
     std::shared_ptr<PointerEvent> pointerEvent = BuildPointerEvent(PointerEvent::POINTER_ACTION_MOVE, x, y, fingerId,
-        screenId, stateMap);
+        screenId, stateMap, GetSysClockTime(), pressed->downTime);
     if (pointerEvent == nullptr) {
+        RollbackMoveState(stateMap, screenId, fingerId, oldX, oldY);
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
     if (InputManager::GetInstance()->SimulateInputEvent(pointerEvent) != RET_OK) {
         std::cerr << "inject event failed" << std::endl;
-        ReleaseLock();
-        return MOTION_EXIT_FAILURE;
-    }
-    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        RollbackMoveState(stateMap, screenId, fingerId, oldX, oldY);
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
@@ -439,22 +502,25 @@ int32_t InputMotionCommand::HandleUp(int32_t x, int32_t y, int32_t fingerId, int
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
+    FingerState lifted = *pressed;
     auto screenIt = stateMap.find(screenId);
     auto &fingers = screenIt->second;
     fingers.erase(std::remove_if(fingers.begin(), fingers.end(),
         [fingerId](const FingerState &state) { return state.fingerId == fingerId; }), fingers.end());
+    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        ReleaseLock();
+        return MOTION_EXIT_FAILURE;
+    }
     std::shared_ptr<PointerEvent> pointerEvent = BuildPointerEvent(PointerEvent::POINTER_ACTION_UP, x, y, fingerId,
-        screenId, stateMap);
+        screenId, stateMap, GetSysClockTime(), lifted.downTime);
     if (pointerEvent == nullptr) {
+        RollbackUpState(stateMap, lifted);
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
     if (InputManager::GetInstance()->SimulateInputEvent(pointerEvent) != RET_OK) {
         std::cerr << "inject event failed" << std::endl;
-        ReleaseLock();
-        return MOTION_EXIT_FAILURE;
-    }
-    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        RollbackUpState(stateMap, lifted);
         ReleaseLock();
         return MOTION_EXIT_FAILURE;
     }
@@ -470,13 +536,32 @@ int32_t InputMotionCommand::HandleReset()
     }
     FingerStateMap stateMap;
     if (LoadState(stateMap) != MOTION_EXIT_SUCCESS) {
+        std::cerr << "failed to load state file: " << MOTION_STATE_FILE_PATH << ", clearing" << std::endl;
+        FingerStateMap emptyMap;
+        for (int32_t fingerId = MIN_FINGER_ID; fingerId <= MAX_FINGER_ID; ++fingerId) {
+            std::shared_ptr<PointerEvent> pointerEvent = BuildPointerEvent(PointerEvent::POINTER_ACTION_UP, 0, 0,
+                fingerId, DEFAULT_SCREEN_ID, emptyMap, GetSysClockTime(), 0);
+            if ((pointerEvent != nullptr) &&
+                (InputManager::GetInstance()->SimulateInputEvent(pointerEvent) != RET_OK)) {
+                std::cerr << "inject event failed for finger " << fingerId << std::endl;
+            }
+        }
+        stateMap.clear();
+        if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+            ReleaseLock();
+            return MOTION_EXIT_FAILURE;
+        }
         ReleaseLock();
-        return MOTION_EXIT_FAILURE;
+        return MOTION_EXIT_SUCCESS;
     }
-    for (const auto &screenEntry : stateMap) {
-        for (const auto &state : screenEntry.second) {
+    while (!stateMap.empty()) {
+        auto screenIt = stateMap.begin();
+        int32_t targetScreenId = screenIt->first;
+        auto &fingers = screenIt->second;
+        while (!fingers.empty()) {
+            FingerState state = fingers.front();
             std::shared_ptr<PointerEvent> pointerEvent = BuildPointerEvent(PointerEvent::POINTER_ACTION_UP, state.x,
-                state.y, state.fingerId, screenEntry.first, stateMap);
+                state.y, state.fingerId, targetScreenId, stateMap, GetSysClockTime(), state.downTime);
             if (pointerEvent == nullptr) {
                 ReleaseLock();
                 return MOTION_EXIT_FAILURE;
@@ -486,15 +571,51 @@ int32_t InputMotionCommand::HandleReset()
                 ReleaseLock();
                 return MOTION_EXIT_FAILURE;
             }
+            fingers.erase(fingers.begin());
+            if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+                std::cerr << "failed to persist lifted finger: " << MOTION_STATE_FILE_PATH << std::endl;
+                ReleaseLock();
+                return MOTION_EXIT_FAILURE;
+            }
         }
-    }
-    stateMap.clear();
-    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
-        ReleaseLock();
-        return MOTION_EXIT_FAILURE;
+        stateMap.erase(screenIt);
     }
     ReleaseLock();
     return MOTION_EXIT_SUCCESS;
+}
+
+void InputMotionCommand::RollbackState(FingerStateMap &stateMap, int32_t screenId, int32_t fingerId)
+{
+    auto screenIt = stateMap.find(screenId);
+    if (screenIt != stateMap.end()) {
+        auto &fingers = screenIt->second;
+        fingers.erase(std::remove_if(fingers.begin(), fingers.end(),
+            [fingerId](const FingerState &state) { return state.fingerId == fingerId; }), fingers.end());
+    }
+    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        std::cerr << "failed to rollback state file: " << MOTION_STATE_FILE_PATH << std::endl;
+    }
+}
+
+void InputMotionCommand::RollbackMoveState(FingerStateMap &stateMap, int32_t screenId, int32_t fingerId,
+    int32_t oldX, int32_t oldY)
+{
+    FingerState *pressed = FindFingerState(stateMap, screenId, fingerId);
+    if (pressed != nullptr) {
+        pressed->x = oldX;
+        pressed->y = oldY;
+    }
+    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        std::cerr << "failed to rollback state file: " << MOTION_STATE_FILE_PATH << std::endl;
+    }
+}
+
+void InputMotionCommand::RollbackUpState(FingerStateMap &stateMap, const FingerState &lifted)
+{
+    stateMap[lifted.screenId].push_back(lifted);
+    if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
+        std::cerr << "failed to rollback state file: " << MOTION_STATE_FILE_PATH << std::endl;
+    }
 }
 } // namespace MMI
 } // namespace OHOS

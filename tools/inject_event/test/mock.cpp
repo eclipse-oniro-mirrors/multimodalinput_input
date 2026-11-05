@@ -46,6 +46,10 @@ int32_t InputManager::SimulateInputEvent(std::shared_ptr<PointerEvent> pointerEv
     MOCKHANDLER->lastSimulatedPointerEvent = pointerEvent;
     MOCKHANDLER->simulatedPointerEvents.push_back(pointerEvent);
     ++MOCKHANDLER->simulateInputEventCallCount;
+    if ((MOCKHANDLER->mockSimulateInputEventFailFromCount > 0) &&
+        (MOCKHANDLER->simulateInputEventCallCount >= MOCKHANDLER->mockSimulateInputEventFailFromCount)) {
+        return RET_ERR;
+    }
     return MOCKHANDLER->mockSimulateInputEventRet;
 }
 }  // namespace MMI

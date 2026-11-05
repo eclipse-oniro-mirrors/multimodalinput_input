@@ -53,7 +53,8 @@ bool TouchArbitrationManager::IsVirtualTouchEvent(const std::shared_ptr<PointerE
     }
     return pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
         pointerEvent->GetDeviceId() == VIRTUAL_TOUCH_DEVICE_ID &&
-        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER);
+        (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER) ||
+        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID));
 }
 
 TouchArbitrationSource TouchArbitrationManager::GetTouchArbitrationSource(

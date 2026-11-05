@@ -33,6 +33,7 @@ struct FingerState {
     int32_t x;
     int32_t y;
     bool isDown;
+    int64_t downTime;
 };
 
 using FingerStateMap = std::map<int32_t, std::vector<FingerState>>;
@@ -52,7 +53,10 @@ public:
 private:
     static int32_t ValidateParams(int32_t x, int32_t y, int32_t fingerId);
     static std::shared_ptr<PointerEvent> BuildPointerEvent(int32_t pointerAction, int32_t x, int32_t y,
-        int32_t fingerId, int32_t screenId, const FingerStateMap &stateMap);
+        int32_t fingerId, int32_t screenId, const FingerStateMap &stateMap, int64_t actionTime, int64_t downTime);
+    void RollbackState(FingerStateMap &stateMap, int32_t screenId, int32_t fingerId);
+    void RollbackMoveState(FingerStateMap &stateMap, int32_t screenId, int32_t fingerId, int32_t oldX, int32_t oldY);
+    void RollbackUpState(FingerStateMap &stateMap, const FingerState &lifted);
     int32_t HandleDown(int32_t x, int32_t y, int32_t fingerId, int32_t screenId);
     int32_t HandleMove(int32_t x, int32_t y, int32_t fingerId, int32_t screenId);
     int32_t HandleUp(int32_t x, int32_t y, int32_t fingerId, int32_t screenId);

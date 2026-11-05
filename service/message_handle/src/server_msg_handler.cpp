@@ -101,6 +101,13 @@ bool IsControllerTouchEvent(const std::shared_ptr<PointerEvent> &pointerEvent)
     return false;
 #endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 }
+
+bool IsRawPointerIdEvent(const std::shared_ptr<PointerEvent> &pointerEvent)
+{
+    CHKPF(pointerEvent);
+    return pointerEvent->HasFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID) &&
+        pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN;
+}
 } // namespace
 
 void ServerMsgHandler::Init(UDSServer &udsServer)
@@ -367,7 +374,7 @@ void ServerMsgHandler::DealGesturePointers(std::shared_ptr<PointerEvent> pointer
         pointerEvent->GetId(), pointerEvent->GetPointerId());
     std::shared_ptr<PointerEvent> touchEvent = WIN_MGR->GetLastPointerEventForGesture();
     CHKPV(touchEvent);
-    if (IsControllerTouchEvent(pointerEvent) &&
+    if ((IsControllerTouchEvent(pointerEvent) || IsRawPointerIdEvent(pointerEvent)) &&
         pointerEvent->GetDeviceId() != touchEvent->GetDeviceId()) {
         return;
     }

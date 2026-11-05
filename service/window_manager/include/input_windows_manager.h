@@ -24,9 +24,9 @@
 #include "input_display_bind_helper.h"
 #include "mouse_redispatch_store.h"
 #include "pointer_dispatch_event_cache.h"
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 #include "touch_arbitration_manager.h"
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 #include "touch_redispatch_store.h"
 
 namespace OHOS {
@@ -106,10 +106,10 @@ public:
     void SetFoldState ();
     bool CheckAppFocused(int32_t pid);
     void UpdateUIExtensionInfo(const std::vector<UIExtensionInfo> &uiExtensionInfos);
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     void DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent);
     void ClearTouchTargetState(int32_t displayId, int32_t deviceId, int32_t pointerId);
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
     std::vector<std::pair<int32_t, TargetInfo>> GetPidAndUpdateTarget(std::shared_ptr<KeyEvent> keyEvent);
     void ReissueEvent(std::shared_ptr<KeyEvent> keyEvent, int32_t focusWindowId);
@@ -437,9 +437,9 @@ void HandleOneHandMode(const OLD::DisplayInfo &displayInfo, std::shared_ptr<Poin
     bool SkipNavigationWindow(uint32_t flag, int32_t toolType);
     void HandleGestureInjection(bool gestureInject);
     int32_t UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent);
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
-    void ClearTouchArbitrationStateByDevice(int32_t deviceId) override;
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+    void ClearTouchArbitrationStateByDevice(int32_t deviceId);
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     void UpdateTargetTouchWinIds(const WindowInfo &item, PointerEvent::PointerItem &pointerItem,
         std::shared_ptr<PointerEvent> pointerEvent, int32_t pointerId, int32_t displayId, int32_t deviceId);
     void ClearMismatchTypeWinIds(int32_t pointerId, int32_t displayId, int32_t deviceId);
@@ -722,9 +722,9 @@ private:
     std::map<int32_t, std::unique_ptr<Media::PixelMap>> transparentWins_;
 #ifdef OHOS_BUILD_ENABLE_TOUCH
     std::shared_ptr<PointerEvent> lastPointerEventForGesture_ { nullptr };
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     TouchArbitrationManager touchArbitration_;
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 #endif // OHOS_BUILD_ENABLE_TOUCH
     bool IsFoldable_ { false };
     int32_t timerId_ { -1 };

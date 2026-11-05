@@ -137,6 +137,12 @@ public:
     static constexpr uint32_t EVENT_FLAG_CALIBRATE_POSITION = 0x00000800;
 
     static constexpr uint32_t EVENT_FLAG_GENERATE_FROM_REAL = 0x00000400;
+
+    /**
+     * The pointer id of the injected touchscreen event keeps its original
+     * value, without the simulate pointer id offset.
+     */
+    static constexpr uint32_t EVENT_FLAG_RAW_POINTER_ID = 0x00001000;
     
     static constexpr uint32_t EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH = 0x00000600;
 
