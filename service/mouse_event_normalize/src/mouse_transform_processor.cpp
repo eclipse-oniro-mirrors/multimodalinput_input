@@ -166,6 +166,11 @@ int32_t MouseTransformProcessor::HandleMotionInner(struct libinput_event_pointer
     CHKPR(pointerEvent_, ERROR_NULL_POINTER);
 
 #ifndef OHOS_BUILD_ENABLE_WATCH
+#ifdef OHOS_BUILD_ENABLE_VKEYBOARD
+    if (isVirtualDeviceEvent_) {
+        HandleVirtualDeviceEvent(data);
+    }
+#endif
     MotionDataContext ctx = ExtractMotionData(data, event);
     if (!ctx.isValid) {
         MMI_HILOGE("Failed to extract motion data");
@@ -382,8 +387,6 @@ int32_t MouseTransformProcessor::UpdateTouchpadMoveLocation(const OLD::DisplayIn
         return RET_ERR;
     }
     int32_t userId = WIN_MGR->FindDisplayUserId(pointerEvent_->GetTargetDisplayId());
-    bool isFoldPC = std::find(DEVICE_TYPE_FOLD_PC_VECTOR.begin(), DEVICE_TYPE_FOLD_PC_VECTOR.end(), SYS_PRODUCT_TYPE) !=
-                    DEVICE_TYPE_FOLD_PC_VECTOR.end();
     if (displayInfo->width == static_cast<int32_t>(CONST_DOUBLE_ZERO) ||
         displayInfo->height == static_cast<int32_t>(CONST_DOUBLE_ZERO)) {
         MMI_HILOGW("displayinfo get failed, use default acclerate. width:%{public}d height:%{public}d",
@@ -393,20 +396,22 @@ int32_t MouseTransformProcessor::UpdateTouchpadMoveLocation(const OLD::DisplayIn
             MousePreferenceAccessor::GetTouchpadSpeed(*env_, userId),
             static_cast<DeviceType>(deviceType), abs_x, abs_y);
         return ret;
-    } else if (isFoldPC && devName == "input_mt_wrapper") {
-        DeviceType deviceVirtType = DeviceType::DEVICE_FOLD_PC_VIRT;
+    }
 #ifdef OHOS_BUILD_ENABLE_VKEYBOARD
+    if (IsVirtualTouchpadDevice(device, devName)) {
+        DeviceType deviceVirtType = DeviceType::DEVICE_FOLD_PC_VIRT;
         if (PRODUCT_TYPE_PARSER.GetProductType(SYS_PRODUCT_TYPE, deviceVirtType) != RET_OK) {
             MMI_HILOGW("GetProductType failed, productType: %{public}s", SYS_PRODUCT_TYPE.c_str());
         }
         deviceVirtType = ConvertToVirtualDeviceType(deviceVirtType);
-#endif // OHOS_BUILD_ENABLE_VKEYBOARD
         pointerEvent_->AddFlag(InputEvent::EVENT_FLAG_VIRTUAL_TOUCHPAD_POINTER);
         ret = PointerMotionAcceleration::AccelerateTouchpad(offset, winMgr->GetMouseIsCaptureMode(),
             MousePreferenceAccessor::GetTouchpadSpeed(*env_, userId), static_cast<DeviceType>(deviceVirtType),
             abs_x, abs_y);
         return ret;
-    } else {
+    } else
+#endif // OHOS_BUILD_ENABLE_VKEYBOARD
+    {
         pointerEvent_->AddFlag(InputEvent::EVENT_FLAG_TOUCHPAD_POINTER);
         double displaySize = sqrt(pow(displayInfo->width, CONST_TWO) + pow(displayInfo->height, CONST_TWO));
         if (displayInfo->validWidth != static_cast<int32_t>(CONST_DOUBLE_ZERO) &&
@@ -1895,7 +1900,25 @@ bool MouseTransformProcessor::IsEventFromVirtualSource(struct libinput_event* ev
     bool isFoldPC = std::find(DEVICE_TYPE_FOLD_PC_VECTOR.begin(), DEVICE_TYPE_FOLD_PC_VECTOR.end(), SYS_PRODUCT_TYPE) !=
                     DEVICE_TYPE_FOLD_PC_VECTOR.end();
     // virtual touchpad's event is generated from the touchscreen on a foldable PC.
-    return (isFoldPC && devName == "input_mt_wrapper");
+    if (isFoldPC && devName == "input_mt_wrapper") {
+        return true;
+    }
+    if (libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_TABLET_TOOL)) {
+        MMI_HILOGD("Virtual source from tablet_tool device");
+        return true;
+    }
+    return false;
+}
+
+bool MouseTransformProcessor::IsVirtualTouchpadDevice(struct libinput_device *device, const std::string &devName)
+{
+    bool isFoldPC = std::find(DEVICE_TYPE_FOLD_PC_VECTOR.begin(), DEVICE_TYPE_FOLD_PC_VECTOR.end(), SYS_PRODUCT_TYPE) !=
+                    DEVICE_TYPE_FOLD_PC_VECTOR.end();
+    if (!isFoldPC) {
+        return false;
+    }
+    return devName == "input_mt_wrapper" ||
+        libinput_device_has_capability(device, LIBINPUT_DEVICE_CAP_TABLET_TOOL);
 }
 
 void MouseTransformProcessor::GetVirtualTouchpadTapSwitch(bool &switchFlag)

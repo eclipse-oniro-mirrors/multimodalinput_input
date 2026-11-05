@@ -224,7 +224,7 @@ typedef int32_t (*GET_LIBINPUT_EVENT_FOR_VKEYBOARD_TYPE)(
     libinput_event_touch *touch, int32_t& delayMs, std::vector<libinput_event*>& events);
 GET_LIBINPUT_EVENT_FOR_VKEYBOARD_TYPE getLibinputEventForVKeyboard_ = nullptr;
 typedef int32_t (*GET_LIBINPUT_EVENT_FOR_VTRACKPAD_TYPE)(
-    libinput_event_touch *touch, std::vector<libinput_event*>& events);
+    libinput_event *event, std::vector<libinput_event*>& events);
 GET_LIBINPUT_EVENT_FOR_VTRACKPAD_TYPE getLibinputEventForVTrackpad_ = nullptr;
 typedef void (*RESET_VTRACKPAD_STATE)();
 RESET_VTRACKPAD_STATE resetVTrackpadState_ = nullptr;
@@ -232,6 +232,13 @@ typedef void (*STOP_VTRACKPAD_TIMER)();
 STOP_VTRACKPAD_TIMER stopVTrackpadTimer_ = nullptr;
 typedef bool (*VKEYBOARD_ISINSIDEFULLKBD_TYPE)(double x, double y);
 VKEYBOARD_ISINSIDEFULLKBD_TYPE vkeyboard_isInsideFullKbd_ = nullptr;
+typedef int32_t (*HANDLE_PENPOINT_TYPE)(
+    double screenX, double screenY, int32_t pointerId, int32_t eventType, double pressure,
+    double tiltX, double tiltY, int32_t toolType);
+HANDLE_PENPOINT_TYPE handlePenPoint_ = nullptr;
+typedef int32_t (*GET_LIBINPUT_EVENT_FOR_VPEN_TYPE)(
+    libinput_event_table_tool *tabletEvent, int32_t& delayMs, std::vector<libinput_event*>& events);
+GET_LIBINPUT_EVENT_FOR_VPEN_TYPE getLibinputEventForVPen_ = nullptr;
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
 constexpr int32_t MMI_PRIORITY { 2 };
 } // namespace
@@ -4894,6 +4901,10 @@ void MMIService::InitVKeyboardFuncHandler()
                 g_VKeyboardHandle, "StopVTrackpadTimer");
             vkeyboard_isInsideFullKbd_ = (VKEYBOARD_ISINSIDEFULLKBD_TYPE)dlsym(
                 g_VKeyboardHandle, "IsInsideFullKeyboard");
+            handlePenPoint_ = (HANDLE_PENPOINT_TYPE)dlsym(
+                g_VKeyboardHandle, "HandlePenPoint")；
+            getLibinputEventForVPen_ = (GET_LIBINPUT_EVENT_FOR_VPEN_TYPE)dlsym(
+                g_VKeyboardHandle, "GetLibinputEventForVPen");
             libinputAdapter_.InitVKeyboard(handleTouchPoint_,
                 vkeyboard_hardwareKeyEventDetected_,
                 vkeyboard_getKeyboardActivationState_,
@@ -4903,7 +4914,9 @@ void MMIService::InitVKeyboardFuncHandler()
                 getLibinputEventForVTrackpad_,
                 resetVTrackpadState_,
                 stopVTrackpadTimer_,
-                vkeyboard_isInsideFullKbd_);
+                vkeyboard_isInsideFullKbd_,
+                handlePenPoint_,
+                getLibinputEventForVPen_);
         }
     }
 }

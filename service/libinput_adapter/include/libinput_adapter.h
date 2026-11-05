@@ -37,11 +37,15 @@ typedef std::function<bool()> IsFloatingKeyboard;
 typedef std::function<bool()> IsVKeyboardShown;
 typedef std::function<int32_t(libinput_event_touch *touch, int32_t& delayMs,
                               std::vector<libinput_event*>& events)> GetLibinputEventForVKeyboard;
-typedef std::function<int32_t(libinput_event_touch *touch,
+typedef std::function<int32_t(libinput_event *event,
                               std::vector<libinput_event*>& events)> GetLibinputEventForVTrackpad;
 typedef std::function<void()> ResetVTrackpadState;
 typedef std::function<void()> StopVTrackpadTimer;
 typedef std::function<bool(double x, double y)> IsInsideFullKbd;
+typedef std::function<int32_t(double screenX, double screenY, int32_t pointerId, int32_t eventType,
+                              double pressure, double tiltX, double tiltY, int32_t toolType)> HandlePenPoint;
+typedef std::function<int32_t(libinput_event_tablet_tool *tabletEvent, int32_t& delayMs,
+                              std::vector<libinput_event*>& events)> GetLibinputEventForVPen;
 #ifdef OHOS_BUILD_ENABLE_VKEYBOARD
 enum VKeyboardEventType {
     NoKeyboardEvent = -1,
@@ -68,6 +72,15 @@ enum class VKeyboardActivation : int32_t {
     TOUCH_CANCEL = 2,
     TOUCH_DROP = 3,
     EIGHT_FINGERS_UP = 4,
+};
+
+enum class VPenEventType : int32_t {
+    PEN_DOWN = 0,
+    PEN_UP = 1,
+    PEN_MOTION = 2,
+    PEN_PROXIMITY_IN = 3,
+    PEN_PROXIMITY_OUT = 4,
+    PEN_BUTTON = 5,
 };
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
 class LibinputAdapter final {
@@ -102,7 +115,9 @@ public:
         GetLibinputEventForVTrackpad getLibinputEventForVTrackpad,
         ResetVTrackpadState resetVTrackpadState,
         StopVTrackpadTimer stopVTrackpadTimer,
-        IsInsideFullKbd isInsideFullKbd
+        IsInsideFullKbd isInsideFullKbd,
+        HandlePenPoint handlePenPoint,
+        GetLibinputEventForVPen getLibinputEventForVPen
         );
 
 private:
@@ -124,12 +139,11 @@ private:
     void HandleVKeyboardMessage(VKeyboardEventType eventType, std::vector<libinput_event*> &keyboardEvents,
                                 int64_t frameTime);
     void HandleVTrackpadMessage(VTrackpadEventType eventType, std::vector<libinput_event*> &events,
-                                int64_t frameTime, libinput_event_touch *touch,
-                                libinput_event *event, bool& delayvtpDestroy);
+                                int64_t frameTime, libinput_event *event, bool& delayvtpDestroy);
     bool IsVKeyboardActivationDropEvent(libinput_event_touch* touch, libinput_event_type eventType);
-    void InjectEventForTwoFingerOnTouchpad(libinput_event_touch* touch,
+    void InjectEventForTwoFingerOnTouchpad(libinput_event* event,
         libinput_event_type eventType, int64_t frameTime);
-    void InjectEventForCastWindow(libinput_event_touch* touch);
+    void InjectEventForCastWindow(libinput_event* event);
     bool IsCursorInCastWindow();
     int32_t ConvertToTouchEventType(libinput_event_type eventType);
     void HandleHWKeyEventForVKeyboard(libinput_event* event);
@@ -140,11 +154,19 @@ private:
     void StartVKeyboardDelayTimer(int32_t delayMs);
     bool GetIsCaptureMode();
     void SafeDestroyVKeyboardDelayedEvent();
-    libinput_event_touch* SafeGetVTrackPadTouchEvent();
+    libinput_event* SafeGetVTrackPadTouchEvent();
     void SafeDestroyVTrackPadDelayedEvent();
     void DelayInjectReleaseCallback();
     void DelayInjectPressReleaseCallback();
     void UpdateBootFlag();
+    static bool IsTabletToolEvent(libinput_event_type eventType);
+    void ProcessTabletToolEventAsVKeyboardEvent(libinput_event *event, libinput_event_type eventType,
+        int64_t frameTime);
+    void CalculatePenCoordinates(libinput_event_type eventType, int32_t penEventType,
+        libinput_event_tablet_tool *tabletEvent, double &x, double &y);
+    void HandleVPenMessages(libinput_event *event, int64_t frameTime, libinput_event_type eventType,
+        libinput_event_tablet_tool *tabletEvent);
+    int32_t ConvertToPenEventType(libinput_event_type eventType, libinput_event_tablet_tool *tabletEvent);
 
     libinput_event *vkbDelayedKeyEvent_ = nullptr;
     libinput_event *vtpDelayedEvent_ = nullptr;
@@ -170,8 +192,11 @@ private:
     ResetVTrackpadState resetVTrackpadState_ { nullptr };
     StopVTrackpadTimer stopVTrackpadTimer_ { nullptr };
     IsInsideFullKbd isInsideFullKbd_ { nullptr };
+    HandlePenPoint handlePenPoint_ { nullptr };
+    GetLibinputEventForVPen getLibinputEventForVPen_ { nullptr };
     int32_t deviceId_;
     std::unordered_map<int32_t, std::pair<double, double>> touchPoints_;
+    std::unordered_map<int32_t, std::pair<double, double>> penPoints_;
     static std::unordered_map<std::string, int32_t> keyCodes_;
     std::unordered_map<int32_t, double> touchPointPressureCache_;
 
