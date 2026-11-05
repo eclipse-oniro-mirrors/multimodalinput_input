@@ -3360,5 +3360,75 @@ HWTEST_F(PointerEventTest, ResetPointerItemsId_001, TestSize.Level1)
     ASSERT_EQ(pointerEvent->GetPointerItem(0, item), true);
 }
 
+/**
+ * @tc.name: PointerEventTest_RedispatchCount_001
+ * @tc.desc: Verify the default value and Set/Get of redispatchCount
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_RedispatchCount_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 0);
+    pointerEvent->SetRedispatchCount(2);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 2);
+}
+
+/**
+ * @tc.name: PointerEventTest_RedispatchCount_002
+ * @tc.desc: Verify the copy constructor carries redispatchCount
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_RedispatchCount_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetRedispatchCount(3);
+    PointerEvent copied(*pointerEvent);
+    EXPECT_EQ(copied.GetRedispatchCount(), 3);
+}
+
+/**
+ * @tc.name: PointerEventTest_RedispatchCount_003
+ * @tc.desc: Verify Reset clears redispatchCount
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_RedispatchCount_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetRedispatchCount(5);
+    pointerEvent->Reset();
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 0);
+}
+
+/**
+ * @tc.name: PointerEventTest_RedispatchCountParcel_001
+ * @tc.desc: redispatchCount survives a Marshalling/Unmarshalling round-trip
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_RedispatchCountParcel_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_BUTTON_DOWN);
+    pointerEvent->SetRedispatchCount(4);
+    Parcel parcel;
+    ASSERT_TRUE(pointerEvent->Marshalling(parcel));
+    auto *restored = PointerEvent::Unmarshalling(parcel);
+    ASSERT_NE(restored, nullptr);
+    EXPECT_EQ(restored->GetRedispatchCount(), 4);
+    delete restored;
+}
+
 } // namespace MMI
 } // namespace OHOS

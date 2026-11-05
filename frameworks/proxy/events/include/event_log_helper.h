@@ -37,8 +37,9 @@ static constexpr std::string_view InfoTrackingDict =
         "AT-ActionTime, CL-CapsLock, DI-DisplayId, DPT-DispatchTimes, DT-DownTime, DX-DisplayX, DXP-DisplayXPos,"
         " DY-DisplayY, DYP-DisplayYPos, ES-EventSource, ET-EventType, GU-GetUnicode, I-id, IP-IsPressed,"
         " IR-IsRepeat, SI-IsSimulate, KA-KeyAction, KC-KeyCode, KIC-keyItemsCount, LA-LongAxis, NL-NumLock,"
-        " OPI-OriginPointerId, PA-PointerAction, PH-Phys, PI-pointerId, P-Pressure, SA-ShortAxis, SL-ScrollLock,"
-        " ST-SourceType, WI-WindowId, WXP-WindowXPos, WYP-WindowYPos, PBS-PressedButtonsSize";
+        " OPI-OriginPointerId, PA-PointerAction, PH-Phys, PI-pointerId, P-Pressure, RPT-RedispatchCount,"
+        " SA-ShortAxis, SL-ScrollLock, ST-SourceType, WI-WindowId, WXP-WindowXPos, WYP-WindowYPos,"
+        " PBS-PressedButtonsSize";
 
 static constexpr std::string_view DebugTrackingDict =
         "Debug-InputTracking-Dict: "
@@ -283,11 +284,11 @@ private:
         std::string isSimulate = event->HasFlag(InputEvent::EVENT_FLAG_SIMULATE) ? "true" : "false";
         MMI_HILOGD("See InputTracking-Dict I:%{public}d, ET:%{public}s, AT:%{public}" PRId64
             ", PA:%{public}s, ST:%{public}s, DI:%{public}d, WI:%{public}d, DPT:%{public}d"
-            ", SI:%{public}s, PBS:%{public}zu",
+            ", SI:%{public}s, PBS:%{public}zu, RPT:%{public}d",
             event->GetId(), InputEvent::EventTypeToString(event->GetEventType()), event->GetActionTime(),
             event->DumpPointerAction(), event->DumpSourceType(), event->GetTargetDisplayId(),
             event->GetTargetWindowId(), event->GetDispatchTimes(), isSimulate.c_str(),
-            event->GetPressedButtons().size());
+            event->GetPressedButtons().size(), event->GetRedispatchCount());
         for (const auto &item : pointerItems) {
             if (!IsBetaVersion()) {
                 MMI_HILOG_HEADER(LOG_INFO, lh, "PI:%{public}d, IP:%{public}d, P:%{public}.2f, MF:%{public}d, "
