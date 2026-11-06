@@ -392,5 +392,62 @@ HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_PrimaryButtonDow
     int32_t ret = mmiService.RedispatchInputEventInner(pointerEvent);
     EXPECT_NE(ret, RET_OK);
 }
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_RedispatchCount_001
+ * @tc.desc: RedispatchInputEventInner increments redispatchCount on every redispatch request
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_RedispatchCount_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_BUTTON_DOWN,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetButtonPressed(PointerEvent::MOUSE_BUTTON_LEFT);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 0);
+
+    EXPECT_NE(mmiService.RedispatchInputEventInner(pointerEvent), RET_OK);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 1);
+
+    EXPECT_NE(mmiService.RedispatchInputEventInner(pointerEvent), RET_OK);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 2);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_RedispatchCountDiscardedAlsoCounts_001
+ * @tc.desc: redispatchCount increments even when the event is discarded by the entry gate (BR-2)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_RedispatchCountDiscardedAlsoCounts_001,
+    TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_MOVE,
+        PointerEvent::TOOL_TYPE_MOUSE, PointerEvent::SOURCE_TYPE_MOUSE);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    EXPECT_EQ(mmiService.RedispatchInputEventInner(pointerEvent), RET_OK);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 1);
+}
+
+/**
+ * @tc.name: RedispatchDerivedEventTest_RedispatchCountTouchCounts_001
+ * @tc.desc: Touchscreen redispatch also increments redispatchCount
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(RedispatchDerivedEventTest, RedispatchDerivedEventTest_RedispatchCountTouchCounts_001, TestSize.Level1)
+{
+    MMIService mmiService;
+    auto pointerEvent = CreateTouchEvent(PointerEvent::POINTER_ACTION_DOWN,
+        PointerEvent::TOOL_TYPE_PEN, PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
+    ASSERT_NE(pointerEvent, nullptr);
+
+    EXPECT_NE(mmiService.RedispatchInputEventInner(pointerEvent), RET_OK);
+    EXPECT_EQ(pointerEvent->GetRedispatchCount(), 1);
+}
 } // namespace MMI
 } // namespace OHOS

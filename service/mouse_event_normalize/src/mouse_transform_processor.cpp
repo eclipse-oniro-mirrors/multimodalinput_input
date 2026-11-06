@@ -2057,6 +2057,7 @@ bool MouseTransformProcessor::RestoreLastPointerEvent()
     pointerEvent_->SetFingerCount(lastPointerEvent_->GetFingerCount());
     pointerEvent_->SetZOrder(lastPointerEvent_->GetZOrder());
     pointerEvent_->SetDispatchTimes(lastPointerEvent_->GetDispatchTimes());
+    pointerEvent_->SetRedispatchCount(lastPointerEvent_->GetRedispatchCount());
     pointerEvent_->SetAxisEventType(lastPointerEvent_->GetAxisEventType());
     pointerEvent_->SetRightButtonSource(lastPointerEvent_->GetRightButtonSource());
     pointerEvent_->RemoveAllPointerItems();

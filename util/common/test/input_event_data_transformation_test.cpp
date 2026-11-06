@@ -199,5 +199,29 @@ HWTEST_F(InputEventDataTransformationTest, KeyEventToNetPacket, TestSize.Level1)
     EXPECT_EQ(outItem->GetRawCode(), 30);
 }
 
+/**
+ * @tc.name: PointerEventRedispatchCountRoundTrip
+ * @tc.desc: redispatchCount survives a NetPacket Marshalling/Unmarshalling round-trip
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventDataTransformationTest, PointerEventRedispatchCountRoundTrip, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_BUTTON_DOWN);
+    pointerEvent->SetRedispatchCount(2);
+
+    NetPacket pkt(MmiMessageId::ON_POINTER_EVENT);
+    ASSERT_EQ(InputEventDataTransformation::Marshalling(pointerEvent, pkt), RET_OK);
+
+    auto outEvent = PointerEvent::Create();
+    ASSERT_NE(outEvent, nullptr);
+    ASSERT_EQ(InputEventDataTransformation::Unmarshalling(pkt, outEvent), RET_OK);
+    EXPECT_EQ(outEvent->GetRedispatchCount(), 2);
+}
+
 } // namespace MMI
 } // namespace OHOS

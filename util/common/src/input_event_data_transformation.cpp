@@ -372,6 +372,7 @@ void InputEventDataTransformation::SerializePointerEvent(const std::shared_ptr<P
 #ifdef OHOS_BUILD_ENABLE_ANCO
     pkt << event->GetAncoDeal();
 #endif // OHOS_BUILD_ENABLE_ANCO
+    pkt << event->GetRedispatchCount();
 }
 
 void InputEventDataTransformation::SerializeFingerprint(const std::shared_ptr<PointerEvent> event, NetPacket &pkt)
@@ -417,6 +418,8 @@ int32_t InputEventDataTransformation::DeserializePressedButtons(std::shared_ptr<
     pkt >> bField;
     event->SetAncoDeal(bField);
 #endif // OHOS_BUILD_ENABLE_ANCO
+    pkt >> tField;
+    event->SetRedispatchCount(tField);
 
     std::set<int32_t>::size_type nPressed;
     pkt >> nPressed;

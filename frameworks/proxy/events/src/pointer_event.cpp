@@ -691,6 +691,7 @@ PointerEvent::PointerEvent(const PointerEvent& other)
       fingerprintDistanceX_(other.fingerprintDistanceX_), fingerprintDistanceY_(other.fingerprintDistanceY_),
 #endif // OHOS_BUILD_ENABLE_FINGERPRINT
       dispatchTimes_(other.dispatchTimes_),
+      redispatchCount_(other.redispatchCount_),
 #ifdef OHOS_BUILD_ENABLE_SECURITY_COMPONENT
       enhanceData_(other.enhanceData_),
 #endif // OHOS_BUILD_ENABLE_SECURITY_COMPONENT
@@ -730,6 +731,7 @@ void PointerEvent::Reset()
     fingerCount_ = 0;
     zOrder_ = -1.0f;
     dispatchTimes_ = 0;
+    redispatchCount_ = 0;
     axes_ = 0U;
     axisValues_.fill(0.0);
     velocity_ = 0.0;
@@ -1249,6 +1251,7 @@ bool PointerEvent::WriteToParcel(Parcel &out) const
     WRITEBOOL(out, autoToVirtualScreen_);
     WRITESTRING(out, signature_);
     WRITEUINT64(out, distributeEventTime_);
+    WRITEINT32(out, redispatchCount_);
     return true;
 }
 
@@ -1344,6 +1347,7 @@ bool PointerEvent::ReadFromParcel(Parcel &in)
     READBOOL(in, autoToVirtualScreen_);
     READSTRING(in, signature_);
     READUINT64(in, distributeEventTime_);
+    READINT32(in, redispatchCount_);
     return true;
 }
 
@@ -1664,6 +1668,16 @@ int32_t PointerEvent::GetDispatchTimes() const
 void PointerEvent::SetDispatchTimes(int32_t dispatchTimes)
 {
     dispatchTimes_ = dispatchTimes;
+}
+
+int32_t PointerEvent::GetRedispatchCount() const
+{
+    return redispatchCount_;
+}
+
+void PointerEvent::SetRedispatchCount(int32_t redispatchCount)
+{
+    redispatchCount_ = redispatchCount;
 }
 
 void PointerEvent::SetHandlerEventType(HandleEventType eventType)

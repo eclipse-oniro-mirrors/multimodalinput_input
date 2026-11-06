@@ -6653,6 +6653,7 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
 {
     pointerEvent->SetTargetWindowId(-1);
     pointerEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_REDISPATCH);
+    pointerEvent->SetRedispatchCount(pointerEvent->GetRedispatchCount() + 1);
     if (IsRedispatchExcludedEvent(pointerEvent)) {
         MMI_HILOGI("Redispatch discard excluded event, action:%{public}d, id:%{public}d",
             pointerEvent->GetPointerAction(), pointerEvent->GetId());
@@ -6732,8 +6733,8 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
             MMI_HILOGE("Unsupported sourceType:%{public}d", pointerEvent->GetSourceType());
             return RET_ERR;
     }
-    MMI_HILOGD("Redispatch, id:%{public}d, source:%{public}d",
-        pointerEvent->GetId(), pointerEvent->GetSourceType());
+    MMI_HILOGD("Redispatch, id:%{public}d, source:%{public}d, redispatchCount:%{public}d",
+        pointerEvent->GetId(), pointerEvent->GetSourceType(), pointerEvent->GetRedispatchCount());
     return RET_OK;
 }
 

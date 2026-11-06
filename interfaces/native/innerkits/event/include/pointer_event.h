@@ -2007,6 +2007,21 @@ public:
     void SetDispatchTimes(int32_t dispatchTimes);
 
     /**
+     * @brief The number of times the input event is redispatched via RedispatchInputEvent.
+     * @return Return the event redispatch count.
+     * @since 24
+     */
+    int32_t GetRedispatchCount() const;
+
+    /**
+     * @brief Sets the number of times the input event is redispatched via RedispatchInputEvent.
+     * @param redispatchCount Indicates the redispatch count to set.
+     * @return void
+     * @since 24
+     */
+    void SetRedispatchCount(int32_t redispatchCount);
+
+    /**
     * @brief Set the handlerEventType for pointerEvent
     * @return void
     * @since 12
@@ -2163,6 +2178,7 @@ private:
     double fingerprintDistanceY_ { 0.0 };
 #endif // OHOS_BUILD_ENABLE_FINGERPRINT
     int32_t dispatchTimes_ { 0 };
+    int32_t redispatchCount_ { 0 };
 #ifdef OHOS_BUILD_ENABLE_SECURITY_COMPONENT
     std::vector<uint8_t> enhanceData_;
 #endif // OHOS_BUILD_ENABLE_SECURITY_COMPONENT
