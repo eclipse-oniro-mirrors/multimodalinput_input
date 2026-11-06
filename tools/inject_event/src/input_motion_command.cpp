@@ -537,15 +537,6 @@ int32_t InputMotionCommand::HandleReset()
     FingerStateMap stateMap;
     if (LoadState(stateMap) != MOTION_EXIT_SUCCESS) {
         std::cerr << "failed to load state file: " << MOTION_STATE_FILE_PATH << ", clearing" << std::endl;
-        FingerStateMap emptyMap;
-        for (int32_t fingerId = MIN_FINGER_ID; fingerId <= MAX_FINGER_ID; ++fingerId) {
-            std::shared_ptr<PointerEvent> pointerEvent = BuildPointerEvent(PointerEvent::POINTER_ACTION_UP, 0, 0,
-                fingerId, DEFAULT_SCREEN_ID, emptyMap, GetSysClockTime(), 0);
-            if ((pointerEvent != nullptr) &&
-                (InputManager::GetInstance()->SimulateInputEvent(pointerEvent) != RET_OK)) {
-                std::cerr << "inject event failed for finger " << fingerId << std::endl;
-            }
-        }
         stateMap.clear();
         if (SaveState(stateMap) != MOTION_EXIT_SUCCESS) {
             ReleaseLock();

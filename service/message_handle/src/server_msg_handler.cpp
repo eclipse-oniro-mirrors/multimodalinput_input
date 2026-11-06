@@ -372,9 +372,12 @@ void ServerMsgHandler::DealGesturePointers(std::shared_ptr<PointerEvent> pointer
     }
     MMI_HILOGI("Check : current PointerEvent's info :Id=>%{public}d, pointerId=>%{public}d",
         pointerEvent->GetId(), pointerEvent->GetPointerId());
+    if (IsRawPointerIdEvent(pointerEvent)) {
+        return;
+    }
     std::shared_ptr<PointerEvent> touchEvent = WIN_MGR->GetLastPointerEventForGesture();
     CHKPV(touchEvent);
-    if ((IsControllerTouchEvent(pointerEvent) || IsRawPointerIdEvent(pointerEvent)) &&
+    if (IsControllerTouchEvent(pointerEvent) &&
         pointerEvent->GetDeviceId() != touchEvent->GetDeviceId()) {
         return;
     }

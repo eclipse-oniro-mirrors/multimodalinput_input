@@ -580,7 +580,7 @@ HWTEST_F(InputMotionCommandTest, MotionUp_OrderViolation_NoPressedFinger, TestSi
 
 /**
  * @tc.name: Reset_CorruptedStateFile_SelfHeals
- * @tc.desc: Test motion_reset self-heals corrupted state file with blind UP sweep
+ * @tc.desc: Test motion_reset self-heals corrupted state file by clearing it
  * @tc.type: FUNC
  * @tc.require: RR-30090858
  */
@@ -600,15 +600,7 @@ HWTEST_F(InputMotionCommandTest, Reset_CorruptedStateFile_SelfHeals, TestSize.Le
         EXPECT_EQ(InputMotionCommand::Handle(2, argv), 0);
         EXPECT_NE(redirect.Content().find(", clearing"), std::string::npos);
     }
-    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 10);
-    const auto &events = MOCKHANDLER->simulatedPointerEvents;
-    ASSERT_EQ(events.size(), 10u);
-    for (int32_t i = 0; i < 10; ++i) {
-        std::shared_ptr<PointerEvent> event = events[static_cast<size_t>(i)];
-        ASSERT_NE(event, nullptr);
-        EXPECT_EQ(event->GetPointerAction(), PointerEvent::POINTER_ACTION_UP);
-        EXPECT_EQ(event->GetPointerId(), i);
-    }
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 0);
     FingerStateMap states = LoadStateForVerify();
     EXPECT_TRUE(states.empty());
     unlink(stateFilePath.c_str());
