@@ -244,9 +244,11 @@ void InputWindowsManager::DeviceStatusChanged(int32_t deviceId, const std::strin
         pendingBinds_.erase(deviceId);
         CancelPendingBindTimer(deviceId);
         TouchDispatchEventCache().ClearDeviceEvents(deviceId);
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
         ClearTouchArbitrationStateByDevice(deviceId);
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
     }
 }
 
@@ -6286,12 +6288,14 @@ void InputWindowsManager::ClearTouchTargetState(int32_t displayId, int32_t devic
 }
 #endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 void InputWindowsManager::ClearTouchArbitrationStateByDevice(int32_t deviceId)
 {
     touchArbitration_.ClearTouchArbitrationStateByDevice(deviceId);
 }
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
 
 int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent)
 {
@@ -6320,13 +6324,15 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         MMI_HILOG_DISPATCHE("Can't find pointer item, pointer:%{public}d", pointerId);
         return RET_ERR;
     }
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     if (pointerEvent->GetPointerAction() != PointerEvent::POINTER_ACTION_DOWN) {
         if (touchArbitration_.HandleClosedTouchArbitrationStream(pointerEvent)) {
             return RET_OK;
         }
     }
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
     double physicalX = pointerItem.GetDisplayXPos();
     double physicalY = pointerItem.GetDisplayYPos();
 
@@ -6955,12 +6961,14 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         TouchLastTouchInfos()[touch] = lastInfo;
         ClearExtraData();
     }
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN) {
         touchArbitration_.HandleTouchSourceDownArbitration(pointerEvent);
     }
     touchArbitration_.UpdateTouchArbitrationState(pointerEvent);
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && (defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT))
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
     return ERR_OK;
 }
 
