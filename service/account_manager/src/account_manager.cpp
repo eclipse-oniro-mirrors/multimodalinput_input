@@ -630,6 +630,7 @@ void AccountManager::OnSwitchUser(const EventFwk::CommonEventData &data)
     INPUT_SETTING_MANAGER->OnSwitchUser(accountId);
     auto dispatchHandler = InputHandler->GetEventDispatchHandler();
     if (dispatchHandler != nullptr) {
+        MMI_HILOGI("Preload agent app status triggered by user switch, userId:%{public}d", accountId);
         dispatchHandler->PreloadAgentAppStatus();
     }
 #ifdef OHOS_BUILD_ENABLE_TRIPLE_FINGER_SNAPSHOT
