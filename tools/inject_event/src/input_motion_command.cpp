@@ -85,12 +85,6 @@ void PrintUsage()
     std::cerr << "       uinput motion_reset" << std::endl;
 }
 
-void PrintCoordinateHint()
-{
-    std::cout << "If the command does not work as expected, check whether the specified coordinates exceed"
-        " the screen boundary" << std::endl;
-}
-
 bool ParseNumber(const std::string &text, int32_t &value)
 {
     if (text.empty()) {
@@ -172,6 +166,20 @@ bool ParseOptions(int32_t argc, char** argv, MotionOptions &options)
     }
     return true;
 }
+
+bool ParseFingerStateLine(const std::string &line, FingerState &state)
+{
+    std::istringstream lineStream(line);
+    int32_t isDown = 0;
+    if (!(lineStream >> state.fingerId >> state.screenId >> state.x >> state.y >> isDown)) {
+        return false;
+    }
+    state.isDown = (isDown != 0);
+    int64_t downTime = 0;
+    lineStream >> downTime;
+    state.downTime = downTime;
+    return true;
+}
 } // namespace
 
 int32_t InputMotionCommand::Handle(int32_t argc, char** argv)
@@ -231,8 +239,12 @@ int32_t InputMotionCommand::AcquireLock()
         return MOTION_EXIT_FAILURE;
     }
     if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
-        std::cerr << "state file is locked by another process, please retry later or run motion_reset"
-            << std::endl;
+        if (errno == EWOULDBLOCK) {
+            std::cerr << "state file is locked by another process, please retry later or run motion_reset"
+                << std::endl;
+        } else {
+            std::cerr << "failed to lock state file: " << MOTION_STATE_LOCK_PATH << ", errno=" << errno << std::endl;
+        }
         close(fd);
         return MOTION_EXIT_FAILURE;
     }
@@ -284,16 +296,10 @@ int32_t InputMotionCommand::LoadState(FingerStateMap &stateMap)
             continue;
         }
         FingerState state {};
-        int32_t isDown = 0;
-        std::istringstream lineStream(line);
-        if (!(lineStream >> state.fingerId >> state.screenId >> state.x >> state.y >> isDown)) {
+        if (!ParseFingerStateLine(line, state)) {
             std::cerr << "failed to parse state file: " << MOTION_STATE_FILE_PATH << std::endl;
             return MOTION_EXIT_FAILURE;
         }
-        state.isDown = (isDown != 0);
-        int64_t downTime = 0;
-        lineStream >> downTime;
-        state.downTime = downTime;
         if (!IsValidFingerState(state)) {
             continue;
         }
@@ -440,7 +446,6 @@ int32_t InputMotionCommand::HandleDown(int32_t x, int32_t y, int32_t fingerId, i
         return MOTION_EXIT_FAILURE;
     }
     ReleaseLock();
-    PrintCoordinateHint();
     return MOTION_EXIT_SUCCESS;
 }
 
@@ -482,7 +487,6 @@ int32_t InputMotionCommand::HandleMove(int32_t x, int32_t y, int32_t fingerId, i
         return MOTION_EXIT_FAILURE;
     }
     ReleaseLock();
-    PrintCoordinateHint();
     return MOTION_EXIT_SUCCESS;
 }
 
@@ -525,7 +529,6 @@ int32_t InputMotionCommand::HandleUp(int32_t x, int32_t y, int32_t fingerId, int
         return MOTION_EXIT_FAILURE;
     }
     ReleaseLock();
-    PrintCoordinateHint();
     return MOTION_EXIT_SUCCESS;
 }
 

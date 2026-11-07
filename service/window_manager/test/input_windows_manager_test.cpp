@@ -17275,7 +17275,7 @@ void SetupAncoExtraDataAndFlags(AncoHideCursorTestContext& ctx, const AncoHideCu
     if (cfg.flagMode == AncoHideCursorTestConfig::CLEAR) {
         ctx.pointerEvent->ClearFlag();
     } else if (cfg.flagMode == AncoHideCursorTestConfig::ADD_SHOW_CURSOR) {
-        ctx.pointerEvent->AddFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH);
+        ctx.pointerEvent->AddFlag(InputEvent::EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH);
     } else if (cfg.flagMode == AncoHideCursorTestConfig::ADD_SIMULATE) {
         ctx.pointerEvent->AddFlag(InputEvent::EVENT_FLAG_SIMULATE);
     }
@@ -17452,7 +17452,7 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_UpdateTouchScreenTarge
 
 /**
  * @tc.name: InputWindowsManagerTest_UpdateTouchScreenTarget_AncoHideCursor_008
- * @tc.desc: Test anco touch hide cursor when EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH is set, timer not added
+ * @tc.desc: Test anco touch hide cursor when EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH is set, timer not added
  * @tc.type: FUNC
  * @tc.require:
  */
