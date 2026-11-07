@@ -7327,6 +7327,17 @@ bool InputWindowsManager::IsLeaveWindowTriggered(const std::shared_ptr<PointerEv
     return false;
 }
 
+bool InputWindowsManager::IsRedispatchDownUpEvent(const std::shared_ptr<PointerEvent> pointerEvent)
+{
+    if (pointerEvent == nullptr) {
+        return false;
+    }
+    auto pointerAction = pointerEvent->GetPointerAction();
+    return pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH) &&
+        ((pointerAction == PointerEvent::POINTER_ACTION_DOWN) ||
+        (pointerAction == PointerEvent::POINTER_ACTION_UP));
+}
+
 void InputWindowsManager::SetDelayLevitateEventStatus(bool needDelay)
 {
     isDelayLevitateEvent_ = needDelay;
@@ -7381,13 +7392,14 @@ void InputWindowsManager::HandleLevitateInOutEvent(int32_t logicalX, int32_t log
         MMI_HILOG_DISPATCHE("PointerEvent is nullptr");
         return;
     }
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH)) {
-        MMI_HILOG_DISPATCHI("Skip levitate in/out for redispatch event, action:%{public}d, id:%{public}d",
-            pointerEvent->GetPointerAction(), pointerEvent->GetId());
+    auto pointerAction = pointerEvent->GetPointerAction();
+    // Gesture-window redispatched DOWN/UP events shall not trigger LEVITATE_IN/LEVITATE_OUT.
+    if (IsRedispatchDownUpEvent(pointerEvent)) {
+        MMI_HILOG_DISPATCHI("Skip levitate in/out triggered by gesture window redispatched down/up event"
+            ", action:%{public}d, id:%{public}d", pointerAction, pointerEvent->GetId());
         return;
     }
-    if (auto pointerAction = pointerEvent->GetPointerAction();
-        pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_MOVE) {
+    if (pointerAction == PointerEvent::POINTER_ACTION_LEVITATE_MOVE) {
         if (IsLeaveWindowTriggered(pointerEvent, touchWindow)) {
             MMI_HILOG_DISPATCHI("Levitate out by horizon");
             DispatchLevitateOutEvent(pointerEvent);
