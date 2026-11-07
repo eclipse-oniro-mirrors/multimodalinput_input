@@ -6589,7 +6589,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
                     (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_PULL_UP);
                 if ((!checkExtraData) && (!(extraData_.appended &&
                     extraData_.sourceType == PointerEvent::SOURCE_TYPE_MOUSE)) &&
-                    !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH) &&
+                    !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH) &&
                     timerId_ == DEFAULT_VALUE) {
                     bool gestureInject = false;
                     if ((pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SIMULATE)) &&
@@ -6778,7 +6778,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
             if (isPenLevitateMove){
                 MMI_HILOGD("Skip hide-cursor timer for pen levitate-move");
             }
-            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH) &&
+            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH) &&
                 (timerId_ == DEFAULT_VALUE) && !isPenLevitateMove) {
                 timerId_ = TimerMgr->AddTimer(REPEAT_COOLING_TIME, REPEAT_ONCE, [this, gestureInject]() {
                     DispatchPointer(PointerEvent::POINTER_ACTION_LEAVE_WINDOW);
