@@ -54,6 +54,7 @@ class AssetCheckerImpl : public AssetChecker {
 public:
     bool HandleEvent(const std::shared_ptr<InputEvent>& event) override;
     void Dump(int32_t fd) override;
+    void PreloadAgentAppStatus() override;
 
 private:
     bool ResolveApp(AppIdentity& cache, int32_t uid, uint32_t tokenId);
@@ -203,6 +204,17 @@ void AssetCheckerImpl::Dump(int32_t fd)
     mprintf(fd, "  target: uid=%d type=%d bundle=%s index=%d\n",
         target_.uid, static_cast<int32_t>(target_.tokenType),
         target_.appInfo.bundleName.c_str(), target_.appInfo.index);
+}
+
+void AssetCheckerImpl::PreloadAgentAppStatus()
+{
+    MMI_HILOGI("AssetCheckerImpl::PreloadAgentAppStatus start");
+    int32_t ret = OHOS::Security::SAF::SafGuiFence::PreloadAgentAppStatus();
+    if (ret != 0) {
+        MMI_HILOGW("PreloadAgentAppStatus failed, ret:%{public}d", ret);
+    } else {
+        MMI_HILOGI("PreloadAgentAppStatus success");
+    }
 }
 
 } // namespace MMI
