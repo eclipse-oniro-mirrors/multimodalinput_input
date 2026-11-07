@@ -566,6 +566,10 @@ void MMIService::OnStart()
     };
     MMI_HILOGI("Run periodical task success");
     InitPrintClientInfo();
+    auto dispatchHandler = InputHandler->GetEventDispatchHandler();
+    if (dispatchHandler != nullptr) {
+        dispatchHandler->PreloadAgentAppStatus();
+    }
     // LCOV_EXCL_STOP
 }
 

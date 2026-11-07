@@ -33,6 +33,8 @@ public:
     {
         mprintf(fd, "AssetChecker: not enabled (stub)\n");
     }
+
+    void PreloadAgentAppStatus() override {}
 };
 } // namespace
 

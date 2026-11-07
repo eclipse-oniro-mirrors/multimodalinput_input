@@ -34,6 +34,8 @@
 #endif // OHOS_BUILD_ENABLE_DFX_RADAR
 
 #include "i_setting_manager.h"
+#include "event_dispatch_handler.h"
+#include "input_event_handler.h"
 #include "multimodal_input_plugin_manager.h"
 #include "parameters.h"
 
@@ -626,6 +628,10 @@ void AccountManager::OnSwitchUser(const EventFwk::CommonEventData &data)
     // display user (e.g. the passenger in the cockpit multi-user scenario) also gets
     // its setting data loaded and applied.
     INPUT_SETTING_MANAGER->OnSwitchUser(accountId);
+    auto dispatchHandler = InputHandler->GetEventDispatchHandler();
+    if (dispatchHandler != nullptr) {
+        dispatchHandler->PreloadAgentAppStatus();
+    }
 #ifdef OHOS_BUILD_ENABLE_TRIPLE_FINGER_SNAPSHOT
     TripleFingerSnapshotManager::GetInstance().RegisterSwitchObserver(currentAccountId_);
 #endif // OHOS_BUILD_ENABLE_TRIPLE_FINGER_SNAPSHOT

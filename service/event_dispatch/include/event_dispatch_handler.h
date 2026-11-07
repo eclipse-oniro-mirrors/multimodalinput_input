@@ -36,6 +36,7 @@ public:
     virtual ~AssetChecker() = default;
     virtual bool HandleEvent(const std::shared_ptr<InputEvent>& event) = 0;
     virtual void Dump(int32_t fd) = 0;
+    virtual void PreloadAgentAppStatus() = 0;
     static std::unique_ptr<AssetChecker> Create();
 };
 
@@ -87,6 +88,7 @@ public:
     std::chrono::high_resolution_clock::now();
     void SendWindowStateError(int32_t userId, int32_t pid, int32_t windowId);
     void DumpAssetChecker(int32_t fd);
+    void PreloadAgentAppStatus();
 private:
     void DispatchPointerEventInner(std::shared_ptr<PointerEvent> point, int32_t fd);
     void LogBlockedPointerEvent(const std::shared_ptr<PointerEvent>& point);

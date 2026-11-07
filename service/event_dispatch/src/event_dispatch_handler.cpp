@@ -65,6 +65,13 @@ void EventDispatchHandler::DumpAssetChecker(int32_t fd)
     }
 }
 
+void EventDispatchHandler::PreloadAgentAppStatus()
+{
+    if (assetChecker_) {
+        assetChecker_->PreloadAgentAppStatus();
+    }
+}
+
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
 void EventDispatchHandler::HandleKeyEvent(const std::shared_ptr<KeyEvent> keyEvent)
 {
