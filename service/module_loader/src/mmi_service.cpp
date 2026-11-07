@@ -568,7 +568,7 @@ void MMIService::OnStart()
     InitPrintClientInfo();
     auto dispatchHandler = InputHandler->GetEventDispatchHandler();
     if (dispatchHandler != nullptr) {
-        MMI_HILOGI("Preload agent app status triggered by service start");
+        MMI_HILOGI("OnStart PreloadAgentAppStatus");
         dispatchHandler->PreloadAgentAppStatus();
     }
     // LCOV_EXCL_STOP
