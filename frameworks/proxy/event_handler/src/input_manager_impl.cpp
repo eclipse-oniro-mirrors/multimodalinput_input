@@ -3646,6 +3646,9 @@ int32_t InputManagerImpl::RedispatchInputEvent(std::shared_ptr<PointerEvent> poi
         MMI_HILOGE("pointerEvent is null");
         return RET_ERR;
     }
+    MMI_HILOGD("Client redispatch event, pointerAction:%{public}d, id:%{public}d, pointerId:%{public}d, "
+        "redispatchCount:%{public}d", pointerEvent->GetPointerAction(), pointerEvent->GetId(),
+        pointerEvent->GetPointerId(), pointerEvent->GetRedispatchCount());
     int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->RedispatchInputEvent(pointerEvent);
     if (ret != RET_OK) {
         MMI_HILOGE("Redispatch pointerEvent failed, ret: %{public}d", ret);

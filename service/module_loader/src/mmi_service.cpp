@@ -6714,6 +6714,13 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
             if (WIN_MGR->AbandonTouchRedispatch(pointerEvent)) {
                 return RET_ERR;
             }
+#ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+            auto inputEventHook = InputHandler->GetInputEventHook();
+            if (inputEventHook != nullptr) {
+                inputEventHook->HandleTouchEvent(pointerEvent);
+                break;
+            }
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
             eventDispatchHandler->HandleTouchEvent(pointerEvent);
             break;
         }
@@ -6725,6 +6732,13 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
             if (WIN_MGR->AbandonMouseRedispatch(pointerEvent)) {
                 return RET_ERR;
             }
+#ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+            auto inputEventHook = InputHandler->GetInputEventHook();
+            if (inputEventHook != nullptr) {
+                inputEventHook->HandlePointerEvent(pointerEvent);
+                break;
+            }
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
             eventDispatchHandler->HandlePointerEvent(pointerEvent);
             break;
         }
@@ -6733,8 +6747,10 @@ int32_t MMIService::RedispatchInputEventInner(std::shared_ptr<PointerEvent> poin
             MMI_HILOGE("Unsupported sourceType:%{public}d", pointerEvent->GetSourceType());
             return RET_ERR;
     }
-    MMI_HILOGD("Redispatch, id:%{public}d, source:%{public}d, redispatchCount:%{public}d",
-        pointerEvent->GetId(), pointerEvent->GetSourceType(), pointerEvent->GetRedispatchCount());
+    MMI_HILOGD("Redispatch, id:%{public}d, source:%{public}d, pointerAction:%{public}d, "
+        "pointerId:%{public}d, redispatchCount:%{public}d", pointerEvent->GetId(),
+        pointerEvent->GetSourceType(), pointerEvent->GetPointerAction(), pointerEvent->GetPointerId(),
+        pointerEvent->GetRedispatchCount());
     return RET_OK;
 }
 

@@ -460,6 +460,7 @@ void HandleOneHandMode(const OLD::DisplayInfo &displayInfo, std::shared_ptr<Poin
     bool IsTabletToolEvent(const PointerEvent::PointerItem &pointerItem);
     bool IsEnterWindowTriggered(const std::shared_ptr<PointerEvent> pointerEvent, const WindowInfo* touchWindow);
     bool IsLeaveWindowTriggered(const std::shared_ptr<PointerEvent> pointerEvent, const WindowInfo* touchWindow);
+    bool IsRedispatchDownUpEvent(const std::shared_ptr<PointerEvent> pointerEvent);
     void DispatchLevitateInEvent(const std::shared_ptr<PointerEvent> pointerEvent);
     void DispatchLevitateOutEvent(const std::shared_ptr<PointerEvent> pointerEvent);
     void HandleLevitateInOutEvent(int32_t logicalX, int32_t logicalY, const std::shared_ptr<PointerEvent> pointerEvent,
