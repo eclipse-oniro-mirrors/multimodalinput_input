@@ -202,7 +202,7 @@ int32_t InputMotionCommand::Handle(int32_t argc, char** argv)
     if (!ParseOptions(argc, argv, options)) {
         return MOTION_EXIT_FAILURE;
     }
-    if (ValidateParams(options.x, options.y, options.fingerId) != MOTION_EXIT_SUCCESS) {
+    if (ValidateParams(options.x, options.y, options.fingerId, options.screenId) != MOTION_EXIT_SUCCESS) {
         return MOTION_EXIT_FAILURE;
     }
     if (subCommand == "motion_down") {
@@ -214,7 +214,7 @@ int32_t InputMotionCommand::Handle(int32_t argc, char** argv)
     return command.HandleUp(options.x, options.y, options.fingerId, options.screenId);
 }
 
-int32_t InputMotionCommand::ValidateParams(int32_t x, int32_t y, int32_t fingerId)
+int32_t InputMotionCommand::ValidateParams(int32_t x, int32_t y, int32_t fingerId, int32_t screenId)
 {
     if ((fingerId < MIN_FINGER_ID) || (fingerId > MAX_FINGER_ID)) {
         std::cerr << "invalid fingerId, range is 0-9" << std::endl;
@@ -222,6 +222,10 @@ int32_t InputMotionCommand::ValidateParams(int32_t x, int32_t y, int32_t fingerI
     }
     if ((x < 0) || (y < 0)) {
         std::cerr << "Coordinate value must be greater or equal than 0" << std::endl;
+        return MOTION_EXIT_FAILURE;
+    }
+    if (screenId < 0) {
+        std::cerr << "invalid displayId" << std::endl;
         return MOTION_EXIT_FAILURE;
     }
     return MOTION_EXIT_SUCCESS;

@@ -296,6 +296,294 @@ HWTEST_F(InputMotionCommandTest, InvalidParameter_TooManyPositionals, TestSize.L
 }
 
 /**
+ * @tc.name: InvalidParameter_NegativeScreenId
+ * @tc.desc: Test motion_down with negative screenId is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, InvalidParameter_NegativeScreenId, TestSize.Level1)
+{
+    const char* injectArgvs[] = { "uinput", "motion_down", "500", "800", "-s", "-1" };
+    char** argv = const_cast<char**>(injectArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(6, argv), 1);
+    EXPECT_NE(redirect.Content().find("invalid displayId"), std::string::npos);
+}
+
+/**
+ * @tc.name: Handle_NullArgv
+ * @tc.desc: Test Handle with null argv returns failure
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, Handle_NullArgv, TestSize.Level1)
+{
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(2, nullptr), 1);
+    EXPECT_NE(redirect.Content().find("usage"), std::string::npos);
+}
+
+/**
+ * @tc.name: Handle_AgcTooSmall
+ * @tc.desc: Test Handle with argc below minimum returns failure
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, Handle_AgcTooSmall, TestSize.Level1)
+{
+    const char* injectArgvs[] = { "uinput" };
+    char** argv = const_cast<char**>(injectArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(1, argv), 1);
+    EXPECT_NE(redirect.Content().find("usage"), std::string::npos);
+}
+
+/**
+ * @tc.name: ParseOptions_MissingOptionValue
+ * @tc.desc: Test motion_down with -f but no value is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, ParseOptions_MissingOptionValue, TestSize.Level1)
+{
+    const char* injectArgvs[] = { "uinput", "motion_down", "100", "100", "-f" };
+    char** argv = const_cast<char**>(injectArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(5, argv), 1);
+    EXPECT_NE(redirect.Content().find("missing value for option: -f"), std::string::npos);
+}
+
+/**
+ * @tc.name: ParseOptions_ScreenOnly_NoCoordinates
+ * @tc.desc: Test motion_down with only -s option and no x/y is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, ParseOptions_ScreenOnly_NoCoordinates, TestSize.Level1)
+{
+    const char* injectArgvs[] = { "uinput", "motion_down", "-s", "0" };
+    char** argv = const_cast<char**>(injectArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(4, argv), 1);
+    EXPECT_NE(redirect.Content().find("too few arguments"), std::string::npos);
+}
+
+/**
+ * @tc.name: LoadState_WithoutLock
+ * @tc.desc: Test LoadState fails when lock not acquired
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, LoadState_WithoutLock, TestSize.Level1)
+{
+    InputMotionCommand command;
+    FingerStateMap states;
+    StderrRedirect redirect;
+    EXPECT_EQ(command.LoadState(states), 1);
+    EXPECT_NE(redirect.Content().find("not locked"), std::string::npos);
+}
+
+/**
+ * @tc.name: SaveState_WithoutLock
+ * @tc.desc: Test SaveState fails when lock not acquired
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, SaveState_WithoutLock, TestSize.Level1)
+{
+    InputMotionCommand command;
+    FingerStateMap states;
+    StderrRedirect redirect;
+    EXPECT_EQ(command.SaveState(states), 1);
+    EXPECT_NE(redirect.Content().find("not locked"), std::string::npos);
+}
+
+/**
+ * @tc.name: AcquireLock_DoubleAcquire
+ * @tc.desc: Test AcquireLock fails when already held
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, AcquireLock_DoubleAcquire, TestSize.Level1)
+{
+    InputMotionCommand command;
+    EXPECT_EQ(command.AcquireLock(), 0);
+    {
+        StderrRedirect redirect;
+        EXPECT_EQ(command.AcquireLock(), 1);
+        EXPECT_NE(redirect.Content().find("already held"), std::string::npos);
+    }
+    command.ReleaseLock();
+}
+
+/**
+ * @tc.name: ReleaseLock_WithoutLock
+ * @tc.desc: Test ReleaseLock is no-op when lock not held
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, ReleaseLock_WithoutLock, TestSize.Level1)
+{
+    InputMotionCommand command;
+    command.ReleaseLock();
+    SUCCEED();
+}
+
+/**
+ * @tc.name: BoundaryFingerId_MinAndMax
+ * @tc.desc: Test fingerId boundary values 0 and 9 are accepted
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, BoundaryFingerId_MinAndMax, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* argv0[] = { "uinput", "motion_down", "100", "100", "-f", "0" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(argv0)), 0);
+    const char* argv9[] = { "uinput", "motion_down", "200", "200", "-f", "9" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(argv9)), 0);
+    FingerStateMap states = LoadStateForVerify();
+    ASSERT_EQ(states.count(0), 1u);
+    EXPECT_EQ(states[0].size(), 2u);
+    EXPECT_EQ(states[0][0].fingerId, 0);
+    EXPECT_EQ(states[0][1].fingerId, 9);
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: MultiScreen_StateIsolation
+ * @tc.desc: Test finger states are isolated per screen
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, MultiScreen_StateIsolation, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* downS0[] = { "uinput", "motion_down", "100", "100", "-f", "0", "-s", "0" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(downS0)), 0);
+    const char* downS1[] = { "uinput", "motion_down", "200", "200", "-f", "1", "-s", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(downS1)), 0);
+
+    FingerStateMap states = LoadStateForVerify();
+    ASSERT_EQ(states.size(), 2u);
+    ASSERT_EQ(states[0].size(), 1u);
+    EXPECT_EQ(states[0][0].fingerId, 0);
+    ASSERT_EQ(states[1].size(), 1u);
+    EXPECT_EQ(states[1][0].fingerId, 1);
+
+    // finger0 move on screen0 should not affect finger1 on screen1
+    const char* moveS0[] = { "uinput", "motion_move", "150", "150", "-f", "0", "-s", "0" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(moveS0)), 0);
+    states = LoadStateForVerify();
+    EXPECT_EQ(states[0][0].x, 150);
+    EXPECT_EQ(states[1][0].x, 200);
+
+    // finger1 up on screen1 should not affect finger0 on screen0
+    const char* upS1[] = { "uinput", "motion_up", "200", "200", "-f", "1", "-s", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(upS1)), 0);
+    states = LoadStateForVerify();
+    EXPECT_EQ(states.count(1), 0u);
+    ASSERT_EQ(states[0].size(), 1u);
+    EXPECT_EQ(states[0][0].fingerId, 0);
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: MotionReset_MultiScreen
+ * @tc.desc: Test motion_reset handles fingers across multiple screens
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, MotionReset_MultiScreen, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* downS0f0[] = { "uinput", "motion_down", "100", "100", "-f", "0", "-s", "0" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(downS0f0)), 0);
+    const char* downS0f1[] = { "uinput", "motion_down", "200", "200", "-f", "1", "-s", "0" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(downS0f1)), 0);
+    const char* downS1f2[] = { "uinput", "motion_down", "300", "300", "-f", "2", "-s", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(8, const_cast<char**>(downS1f2)), 0);
+
+    const char* resetArgvs[] = { "uinput", "motion_reset" };
+    EXPECT_EQ(InputMotionCommand::Handle(2, const_cast<char**>(resetArgvs)), 0);
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 6); // 3 down + 3 up
+
+    FingerStateMap states = LoadStateForVerify();
+    EXPECT_TRUE(states.empty());
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: StateFile_EmptyFile
+ * @tc.desc: Test LoadState with an empty (0-byte) state file returns empty map
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, StateFile_EmptyFile, TestSize.Level1)
+{
+    const std::string stateFilePath = "/data/local/tmp/uinput_motion_state";
+    unlink(stateFilePath.c_str());
+    FILE* file = fopen(stateFilePath.c_str(), "w");
+    ASSERT_NE(file, nullptr);
+    fclose(file);
+    InputMotionCommand command;
+    EXPECT_EQ(command.AcquireLock(), 0);
+    FingerStateMap loaded;
+    EXPECT_EQ(command.LoadState(loaded), 0);
+    command.ReleaseLock();
+    EXPECT_TRUE(loaded.empty());
+    unlink(stateFilePath.c_str());
+}
+
+/**
+ * @tc.name: HandleDown_AfterCorruptedReset
+ * @tc.desc: Test motion_down works after reset cleared a corrupted file
+ * @tc.type: FUNC
+ * @tc.require: RR-3009058
+ */
+HWTEST_F(InputMotionCommandTest, HandleDown_AfterCorruptedReset, TestSize.Level1)
+{
+    const std::string stateFilePath = "/data/local/tmp/uinput_motion_state";
+    unlink(stateFilePath.c_str());
+    FILE* file = fopen(stateFilePath.c_str(), "w");
+    ASSERT_NE(file, nullptr);
+    fprintf(file, "garbage data here\n");
+    fclose(file);
+    ResetMock();
+    const char* resetArgvs[] = { "uinput", "motion_reset" };
+    EXPECT_EQ(InputMotionCommand::Handle(2, const_cast<char**>(resetArgvs)), 0);
+    const char* downArgvs[] = { "uinput", "motion_down", "100", "200", "-f", "3" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(downArgvs)), 0);
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 1);
+    FingerStateMap states = LoadStateForVerify();
+    ASSERT_EQ(states.count(0), 1u);
+    ASSERT_EQ(states[0].size(), 1u);
+    EXPECT_EQ(states[0][0].fingerId, 3);
+    unlink(stateFilePath.c_str());
+}
+
+/**
+ * @tc.name: MotionMove_OrderViolation
+ * @tc.desc: Test motion_move without prior motion_down is rejected
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, MotionMove_OrderViolation, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* moveArgvs[] = { "uinput", "motion_move", "100", "100", "-f", "2" };
+    char** argv = const_cast<char**>(moveArgvs);
+    StderrRedirect redirect;
+    EXPECT_EQ(InputMotionCommand::Handle(6, argv), 1);
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 0);
+    EXPECT_NE(redirect.Content().find("finger 2 is not pressed, cannot move"), std::string::npos);
+}
+
+/**
  * @tc.name: InjectFailed_DownRolledBack
  * @tc.desc: Test motion_down rolls back state when injection is rejected
  * @tc.type: FUNC
@@ -481,6 +769,85 @@ HWTEST_F(InputMotionCommandTest, MotionDown_BasicInput, TestSize.Level1)
     EXPECT_EQ(states[0][0].x, 500);
     EXPECT_EQ(states[0][0].y, 800);
     EXPECT_TRUE(states[0][0].isDown);
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: MotionDown_SecondFingerCarriesFirst
+ * @tc.desc: Test second motion_down event includes the first pressed finger
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, MotionDown_SecondFingerCarriesFirst, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* down1[] = { "uinput", "motion_down", "100", "200", "-f", "0" };
+    const char* down2[] = { "uinput", "motion_down", "300", "400", "-f", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(down1)), 0);
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(down2)), 0);
+    EXPECT_EQ(MOCKHANDLER->simulateInputEventCallCount, 2);
+
+    // first down event: only finger0
+    std::shared_ptr<PointerEvent> firstEvent = MOCKHANDLER->simulatedPointerEvents[0];
+    ASSERT_NE(firstEvent, nullptr);
+    EXPECT_EQ(firstEvent->GetPointerAction(), PointerEvent::POINTER_ACTION_DOWN);
+    EXPECT_EQ(firstEvent->GetPointerId(), 0);
+    EXPECT_EQ(firstEvent->GetPointerCount(), 1);
+
+    // second down event: must contain finger0 (history) and finger1 (current)
+    std::shared_ptr<PointerEvent> secondEvent = MOCKHANDLER->simulatedPointerEvents[1];
+    ASSERT_NE(secondEvent, nullptr);
+    EXPECT_EQ(secondEvent->GetPointerAction(), PointerEvent::POINTER_ACTION_DOWN);
+    EXPECT_EQ(secondEvent->GetPointerId(), 1);
+    EXPECT_EQ(secondEvent->GetPointerCount(), 2);
+    PointerEvent::PointerItem item0;
+    ASSERT_TRUE(secondEvent->GetPointerItem(0, item0));
+    EXPECT_EQ(item0.GetDisplayX(), 100);
+    EXPECT_EQ(item0.GetDisplayY(), 200);
+    EXPECT_TRUE(item0.IsPressed());
+    EXPECT_EQ(item0.GetDeviceId(), -2);
+    PointerEvent::PointerItem item1;
+    ASSERT_TRUE(secondEvent->GetPointerItem(1, item1));
+    EXPECT_EQ(item1.GetDisplayX(), 300);
+    EXPECT_EQ(item1.GetDisplayY(), 400);
+    EXPECT_TRUE(item1.IsPressed());
+    unlink(STATE_FILE_PATH);
+}
+
+/**
+ * @tc.name: MotionUp_SecondFingerLeavesFirst
+ * @tc.desc: Test motion_up for finger1 keeps finger0 in the event
+ * @tc.type: FUNC
+ * @tc.require: RR-30090858
+ */
+HWTEST_F(InputMotionCommandTest, MotionUp_SecondFingerLeavesFirst, TestSize.Level1)
+{
+    unlink(STATE_FILE_PATH);
+    ResetMock();
+    const char* down0[] = { "uinput", "motion_down", "100", "200", "-f", "0" };
+    const char* down1[] = { "uinput", "motion_down", "300", "400", "-f", "1" };
+    const char* up1[] = { "uinput", "motion_up", "300", "400", "-f", "1" };
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(down0)), 0);
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(down1)), 0);
+    EXPECT_EQ(InputMotionCommand::Handle(6, const_cast<char**>(up1)), 0);
+
+    // third event (up finger1): finger0 still pressed, finger1 lifted
+    std::shared_ptr<PointerEvent> upEvent = MOCKHANDLER->simulatedPointerEvents[2];
+    ASSERT_NE(upEvent, nullptr);
+    EXPECT_EQ(upEvent->GetPointerAction(), PointerEvent::POINTER_ACTION_UP);
+    EXPECT_EQ(upEvent->GetPointerId(), 1);
+    EXPECT_EQ(upEvent->GetPointerCount(), 2);
+    PointerEvent::PointerItem item0;
+    ASSERT_TRUE(upEvent->GetPointerItem(0, item0));
+    EXPECT_EQ(item0.GetDisplayX(), 100);
+    EXPECT_EQ(item0.GetDisplayY(), 200);
+    EXPECT_TRUE(item0.IsPressed());
+    PointerEvent::PointerItem item1;
+    ASSERT_TRUE(upEvent->GetPointerItem(1, item1));
+    EXPECT_EQ(item1.GetDisplayX(), 300);
+    EXPECT_EQ(item1.GetDisplayY(), 400);
+    EXPECT_FALSE(item1.IsPressed());
     unlink(STATE_FILE_PATH);
 }
 

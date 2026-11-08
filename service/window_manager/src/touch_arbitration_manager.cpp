@@ -213,7 +213,7 @@ bool TouchArbitrationManager::HandleClosedTouchArbitrationStream(
     if (!IsClosedTouchArbitrationStream(pointerEvent)) {
         return false;
     }
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
+    if (IsVirtualTouchEvent(pointerEvent)) {
         MarkClosedPointerItemsCanceled(pointerEvent);
     } else {
         PointerEvent::PointerItem pointerItem;
@@ -281,7 +281,7 @@ void TouchArbitrationManager::UpdateTouchArbitrationState(const std::shared_ptr<
     if (source == TouchArbitrationSource::OTHER) {
         return;
     }
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
+    if (IsVirtualTouchEvent(pointerEvent)) {
         MarkClosedPointerItemsCanceled(pointerEvent);
     }
     const int32_t action = pointerEvent->GetPointerAction();

@@ -28,12 +28,12 @@ namespace MMI {
 class PointerEvent;
 
 struct FingerState {
-    int32_t fingerId;
-    int32_t screenId;
-    int32_t x;
-    int32_t y;
-    bool isDown;
-    int64_t downTime;
+    int32_t fingerId { 0 };
+    int32_t screenId { 0 };
+    int32_t x { 0 };
+    int32_t y { 0 };
+    bool isDown { false };
+    int64_t downTime { 0 };
 };
 
 using FingerStateMap = std::map<int32_t, std::vector<FingerState>>;
@@ -51,7 +51,7 @@ public:
     int32_t LoadState(FingerStateMap &stateMap);
     int32_t SaveState(const FingerStateMap &stateMap);
 private:
-    static int32_t ValidateParams(int32_t x, int32_t y, int32_t fingerId);
+    static int32_t ValidateParams(int32_t x, int32_t y, int32_t fingerId, int32_t screenId);
     static std::shared_ptr<PointerEvent> BuildPointerEvent(int32_t pointerAction, int32_t x, int32_t y,
         int32_t fingerId, int32_t screenId, const FingerStateMap &stateMap, int64_t actionTime, int64_t downTime);
     void RollbackState(FingerStateMap &stateMap, int32_t screenId, int32_t fingerId);
