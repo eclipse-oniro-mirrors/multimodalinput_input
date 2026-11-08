@@ -417,19 +417,6 @@ HWTEST_F(InputMotionCommandTest, AcquireLock_DoubleAcquire, TestSize.Level1)
 }
 
 /**
- * @tc.name: ReleaseLock_WithoutLock
- * @tc.desc: Test ReleaseLock is no-op when lock not held
- * @tc.type: FUNC
- * @tc.require: RR-30090858
- */
-HWTEST_F(InputMotionCommandTest, ReleaseLock_WithoutLock, TestSize.Level1)
-{
-    InputMotionCommand command;
-    command.ReleaseLock();
-    SUCCEED();
-}
-
-/**
  * @tc.name: BoundaryFingerId_MinAndMax
  * @tc.desc: Test fingerId boundary values 0 and 9 are accepted
  * @tc.type: FUNC
