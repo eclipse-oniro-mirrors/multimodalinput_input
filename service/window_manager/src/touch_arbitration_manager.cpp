@@ -372,7 +372,7 @@ void TouchArbitrationManager::CancelConflictingTouchSource(int32_t displayId, To
 {
     const auto cancelInfos = ResolveConflictingTouchPointers(displayId, source);
     for (const auto &cancelInfo : cancelInfos) {
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
         if (cancelInfo.currentEvent != nullptr) {
             auto cancelEvent = std::make_shared<PointerEvent>(*cancelInfo.currentEvent);
             inputWindowsManager_.DispatchTouchSourceCancel(cancelInfo.pointerId, cancelEvent);
@@ -392,7 +392,7 @@ void TouchArbitrationManager::CancelConflictingTouchSource(int32_t displayId, To
         inputWindowsManager_.ClearTouchTargetState(displayId, cancelInfo.deviceId, cancelInfo.pointerId);
 #else
         (void)cancelInfo;
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     }
 }
 } // namespace MMI
