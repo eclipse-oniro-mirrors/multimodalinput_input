@@ -273,6 +273,16 @@ int32_t MouseEventInterface::GetMouseScrollRows(int32_t userId) const
     return MousePreferenceAccessor::GetMouseScrollRows(*env, userId);
 }
 
+int32_t MouseEventInterface::GetTouchpadScrollRows(int32_t userId) const
+{
+    auto env = GetEnv();
+    if (env == nullptr) {
+        MMI_HILOGE("No input service context");
+        return RET_ERR;
+    }
+    return MousePreferenceAccessor::GetTouchpadScrollRows(*env, userId);
+}
+
 int32_t MouseEventInterface::SetMousePrimaryButton(int32_t userId, int32_t primaryButton)
 {
     auto env = GetEnv();

@@ -86,6 +86,7 @@ public:
     int32_t SetPointerSpeed(int32_t userId, int32_t speed);
     int32_t GetPointerSpeed(int32_t userId) const;
     int32_t GetTouchpadSpeed(int32_t userId) const;
+    int32_t GetTouchpadScrollRows(int32_t userId) const;
     int32_t SetTouchpadScrollSwitch(int32_t userId, int32_t pid, bool switchFlag) const;
     void GetTouchpadScrollSwitch(int32_t userId, bool &switchFlag) const;
     int32_t SetTouchpadScrollDirection(int32_t userId, bool state) const;
