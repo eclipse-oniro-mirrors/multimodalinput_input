@@ -365,7 +365,8 @@ void TouchDrawingHandler::DrawBubble()
             MMI_HILOGE("Can't find pointer item, pointer:%{public}d", pointerId);
             return;
         }
-        if (pointerEvent_->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER) && pointerItem.IsCanceled()) {
+        if ((pointerEvent_->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER) ||
+            pointerEvent_->HasFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID)) && pointerItem.IsCanceled()) {
             MMI_HILOGI("Skip canceled pointer bubble draw, pointerId:%{public}d", pointerId);
             continue;
         }

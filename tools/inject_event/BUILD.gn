@@ -19,6 +19,7 @@ ohos_source_set("input-manager") {
   sources = [
     "src/input_enable_key_status_command.cpp",
     "src/input_manager_command.cpp",
+    "src/input_motion_command.cpp",
     "src/input_sendevent_command.cpp",
   ]
   if (input_feature_event_recorder) {
@@ -166,10 +167,38 @@ ohos_unittest("QueryMouseInfoCommandTest") {
   ]
 }
 
+ohos_unittest("InputMotionCommandTest") {
+  module_out_path = module_output_path
+  configs = [ "${mmi_path}:coverage_flags" ]
+  include_dirs = [ "include" ]
+
+  sources = [
+    "test/input_motion_command_test.cpp",
+    "test/mock.cpp",
+  ]
+
+  deps = [
+    "${mmi_path}/frameworks/proxy:libmmi-client",
+    "${mmi_path}/service/custom_config_parser:mmi_custom_config_parser",
+    "${mmi_path}/tools/inject_event:input-manager",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utils",
+    "eventhandler:libeventhandler",
+    "googletest:gtest_main",
+    "hilog:libhilog",
+    "image_framework:image_native",
+    "ipc:ipc_core",
+  ]
+}
+
 group("inject_event") {
   testonly = true
   deps = [
     ":InjectEventTest",
+    ":InputMotionCommandTest",
     ":QueryMouseInfoCommandTest",
   ]
 }

@@ -53,7 +53,8 @@ bool TouchArbitrationManager::IsVirtualTouchEvent(const std::shared_ptr<PointerE
     }
     return pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN &&
         pointerEvent->GetDeviceId() == VIRTUAL_TOUCH_DEVICE_ID &&
-        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER);
+        (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER) ||
+        pointerEvent->HasFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID));
 }
 
 TouchArbitrationSource TouchArbitrationManager::GetTouchArbitrationSource(
@@ -212,7 +213,7 @@ bool TouchArbitrationManager::HandleClosedTouchArbitrationStream(
     if (!IsClosedTouchArbitrationStream(pointerEvent)) {
         return false;
     }
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
+    if (IsVirtualTouchEvent(pointerEvent)) {
         MarkClosedPointerItemsCanceled(pointerEvent);
     } else {
         PointerEvent::PointerItem pointerItem;
@@ -280,7 +281,7 @@ void TouchArbitrationManager::UpdateTouchArbitrationState(const std::shared_ptr<
     if (source == TouchArbitrationSource::OTHER) {
         return;
     }
-    if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_CONTROLLER)) {
+    if (IsVirtualTouchEvent(pointerEvent)) {
         MarkClosedPointerItemsCanceled(pointerEvent);
     }
     const int32_t action = pointerEvent->GetPointerAction();
@@ -371,7 +372,7 @@ void TouchArbitrationManager::CancelConflictingTouchSource(int32_t displayId, To
 {
     const auto cancelInfos = ResolveConflictingTouchPointers(displayId, source);
     for (const auto &cancelInfo : cancelInfos) {
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
         if (cancelInfo.currentEvent != nullptr) {
             auto cancelEvent = std::make_shared<PointerEvent>(*cancelInfo.currentEvent);
             inputWindowsManager_.DispatchTouchSourceCancel(cancelInfo.pointerId, cancelEvent);
@@ -391,7 +392,7 @@ void TouchArbitrationManager::CancelConflictingTouchSource(int32_t displayId, To
         inputWindowsManager_.ClearTouchTargetState(displayId, cancelInfo.deviceId, cancelInfo.pointerId);
 #else
         (void)cancelInfo;
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     }
 }
 } // namespace MMI

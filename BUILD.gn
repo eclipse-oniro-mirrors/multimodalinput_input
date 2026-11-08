@@ -285,6 +285,7 @@ group("mmi_tests") {
     "test/unittest/interfaces:InputNativeHotkeyTest",
     "test/unittest/interfaces:InputNativeTest",
     "tools/inject_event:InjectEventTest",
+    "tools/inject_event:InputMotionCommandTest",
     "util:UdsClientTest",
     "util/common:InputEventDataTransformationTest",
     "util/common:ResourceDecompressTest",

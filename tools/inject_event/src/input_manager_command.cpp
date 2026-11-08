@@ -2798,6 +2798,14 @@ void InputManagerCommand::ShowUsage()
     PrintEnableKeyStatusRecordUsage();
     std::cout << std::endl;
 
+    std::cout << "The motion subcommands are:                    " << std::endl;
+    std::cout << "motion_down <x> <y> [-f fingerId] [-s screenId]  -inject atomic touchscreen down event" << std::endl;
+    std::cout << "motion_move <x> <y> [-f fingerId] [-s screenId]  -inject atomic touchscreen move event" << std::endl;
+    std::cout << "motion_up <x> <y> [-f fingerId] [-s screenId]    -inject atomic touchscreen up event" << std::endl;
+    std::cout << "motion_reset                                     -lift all pressed fingers and clear state"
+        << std::endl;
+    std::cout << std::endl;
+
     std::cout << "-?  --help                                                    " << std::endl;
 }
 } // namespace MMI

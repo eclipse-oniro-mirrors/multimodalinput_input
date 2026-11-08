@@ -134,15 +134,19 @@ public:
      *
      * @since 25
      */
-    static constexpr uint32_t EVENT_FLAG_CALIBRATE_POSITION = 0x00000800;
+    static constexpr uint32_t EVENT_FLAG_CALIBRATE_POSITION = 0x04000000;
 
     static constexpr uint32_t EVENT_FLAG_GENERATE_FROM_REAL = 0x00000400;
+
+    /**
+     * The pointer id of the injected touchscreen event keeps its original
+     * value, without the simulate pointer id offset.
+     */
+    static constexpr uint32_t EVENT_FLAG_RAW_POINTER_ID = 0x20000000;
     
-    static constexpr uint32_t EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH = 0x00000600;
+    static constexpr uint32_t EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH = 0x00000800;
 
     static constexpr uint32_t EVENT_FLAG_VIRTUAL_TOUCHPAD_POINTER = 0x00001000;
-
-    static constexpr uint32_t EVENT_FLAG_SIMULATE_LEFT_RIGHT_ANTI_AXIS_MOVE = 0x00100000;
 
     /**
      * The multimodal input event for device enter focus flag.
@@ -207,7 +211,7 @@ public:
      * Flag indicating an injected event requires security check before dispatch.
      * @since 26
      */
-    static constexpr uint32_t EVENT_FLAG_PENDING_CHECK = 0x04000000;
+    static constexpr uint32_t EVENT_FLAG_PENDING_CHECK = 0x40000000;
 
     /**
      * Flag indicating an injected event that should refresh the last input time,

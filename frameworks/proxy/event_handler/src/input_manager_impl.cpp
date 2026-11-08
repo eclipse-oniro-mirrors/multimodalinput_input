@@ -1373,12 +1373,20 @@ static bool IsControllerTouchEvent(const std::shared_ptr<PointerEvent> &pointerE
 #endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
 }
 
+static bool IsRawPointerIdEvent(const std::shared_ptr<PointerEvent> &pointerEvent)
+{
+    CHKPF(pointerEvent);
+    return pointerEvent->HasFlag(InputEvent::EVENT_FLAG_RAW_POINTER_ID) &&
+        pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_TOUCHSCREEN;
+}
+
 void InputManagerImpl::HandleSimulateInputEvent(std::shared_ptr<PointerEvent> pointerEvent)
 {
     CALL_DEBUG_ENTER;
     int maxPointerId = SIMULATE_EVENT_START_ID;
     CHKPV(pointerEvent);
     bool isControllerTouchEvent = IsControllerTouchEvent(pointerEvent);
+    bool keepRawPointerId = IsRawPointerIdEvent(pointerEvent);
     std::list<PointerEvent::PointerItem> pointerItems = pointerEvent->GetAllPointerItems();
     for (auto &pointerItem : pointerItems) {
         int32_t pointerId = pointerItem.GetPointerId();
@@ -1389,7 +1397,7 @@ void InputManagerImpl::HandleSimulateInputEvent(std::shared_ptr<PointerEvent> po
         maxPointerId += 1;
         pointerItem.SetPointerId(maxPointerId);
     }
-    if (!isControllerTouchEvent) {
+    if (!isControllerTouchEvent && !keepRawPointerId) {
         for (auto &pointerItem : pointerItems) {
             int32_t pointerId = pointerItem.GetPointerId();
             if (pointerId < SIMULATE_EVENT_START_ID) {
@@ -1406,7 +1414,8 @@ void InputManagerImpl::HandleSimulateInputEvent(std::shared_ptr<PointerEvent> po
         pointerEvent->SetPointerId(pointerItems.front().GetPointerId());
         MMI_HILOGD("Simulate pointer event id:%{public}d", pointerEvent->GetPointerId());
     }
-    if (!isControllerTouchEvent && pointerEvent->GetPointerId() < SIMULATE_EVENT_START_ID) {
+    if (!isControllerTouchEvent && !keepRawPointerId &&
+        pointerEvent->GetPointerId() < SIMULATE_EVENT_START_ID) {
         pointerEvent->SetPointerId(pointerEvent->GetPointerId() + SIMULATE_EVENT_START_ID);
     }
 }

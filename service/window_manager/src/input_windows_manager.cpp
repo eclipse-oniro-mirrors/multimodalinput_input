@@ -196,9 +196,9 @@ void InputWindowsManager::InitWindowInfo(WindowInfo& info)
 }
 
 InputWindowsManager::InputWindowsManager() : bindInfo_(BIND_CFG_FILE_NAME)
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     , touchArbitration_(*this)
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 {
     MMI_HILOGD("Bind cfg file name:%{private}s", BIND_CFG_FILE_NAME.c_str());
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
@@ -244,9 +244,11 @@ void InputWindowsManager::DeviceStatusChanged(int32_t deviceId, const std::strin
         pendingBinds_.erase(deviceId);
         CancelPendingBindTimer(deviceId);
         TouchDispatchEventCache().ClearDeviceEvents(deviceId);
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
         ClearTouchArbitrationStateByDevice(deviceId);
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
     }
 }
 
@@ -6222,7 +6224,7 @@ std::map<int32_t, std::map<int32_t, WindowInfoEX>>& InputWindowsManager::TouchIt
         ? touchRedispatchStore_.GetTouchItemDownInfos() : touchItemDownInfos_;
 }
 
-#ifdef OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 void InputWindowsManager::DispatchTouchSourceCancel(int32_t pointerId, std::shared_ptr<PointerEvent> cancelEvent)
 {
     if (cancelEvent == nullptr) {
@@ -6284,14 +6286,16 @@ void InputWindowsManager::ClearTouchTargetState(int32_t displayId, int32_t devic
         firstTouchInfos.erase(firstIter);
     }
 }
-#endif // OHOS_BUILD_ENABLE_CONTROLLER_INJECT
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
 void InputWindowsManager::ClearTouchArbitrationStateByDevice(int32_t deviceId)
 {
     touchArbitration_.ClearTouchArbitrationStateByDevice(deviceId);
 }
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
 
 int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEvent> pointerEvent)
 {
@@ -6320,13 +6324,15 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         MMI_HILOG_DISPATCHE("Can't find pointer item, pointer:%{public}d", pointerId);
         return RET_ERR;
     }
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     if (pointerEvent->GetPointerAction() != PointerEvent::POINTER_ACTION_DOWN) {
         if (touchArbitration_.HandleClosedTouchArbitrationStream(pointerEvent)) {
             return RET_OK;
         }
     }
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
     double physicalX = pointerItem.GetDisplayXPos();
     double physicalY = pointerItem.GetDisplayYPos();
 
@@ -6728,7 +6734,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
                     (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_PULL_UP);
                 if ((!checkExtraData) && (!(extraData_.appended &&
                     extraData_.sourceType == PointerEvent::SOURCE_TYPE_MOUSE)) &&
-                    !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH) &&
+                    !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH) &&
                     timerId_ == DEFAULT_VALUE) {
                     bool gestureInject = false;
                     if ((pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SIMULATE)) &&
@@ -6803,11 +6809,6 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         pointerEvent->SetBuffer(extraData_.buffer);
         pointerEvent->SetPullId(extraData_.pullId);
         UpdatePointerAction(pointerEvent);
-        if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_CANCEL &&
-            pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SIMULATE_LEFT_RIGHT_ANTI_AXIS_MOVE)) {
-            MMI_HILOG_DISPATCHI("The cancel injected by the gesture window is converted to pull-cancel.");
-            pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_PULL_CANCEL);
-        }
         if (pointerAction != PointerEvent::POINTER_ACTION_PULL_OUT_WINDOW &&
             pointerAction != PointerEvent::POINTER_ACTION_PULL_IN_WINDOW) {
             PullEnterLeaveEvent(logicalX, logicalY, pointerEvent, touchWindow);
@@ -6912,7 +6913,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
             extraData_.sourceType == PointerEvent::SOURCE_TYPE_MOUSE &&
             IsSameDragUser(pointerEvent->GetTargetDisplayId())))) {
             MMI_HILOG_DISPATCHD("PointerAction is to leave the window");
-            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH) && timerId_ == DEFAULT_VALUE) {
+            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CURSOR_WITH_TOUCH) && timerId_ == DEFAULT_VALUE) {
                 timerId_ = TimerMgr->AddTimer(REPEAT_COOLING_TIME, REPEAT_ONCE, [this, gestureInject]() {
                     DispatchPointer(PointerEvent::POINTER_ACTION_LEAVE_WINDOW);
                     MMI_HILOGI("touch hide cursor, gestureInject=%{public}d", gestureInject);
@@ -6955,12 +6956,14 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
         TouchLastTouchInfos()[touch] = lastInfo;
         ClearExtraData();
     }
-#if defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#if defined(OHOS_BUILD_ENABLE_TOUCH)
+#if defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
     if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_DOWN) {
         touchArbitration_.HandleTouchSourceDownArbitration(pointerEvent);
     }
     touchArbitration_.UpdateTouchArbitrationState(pointerEvent);
-#endif // defined(OHOS_BUILD_ENABLE_TOUCH) && defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH_ARBITRATION) || defined(OHOS_BUILD_ENABLE_CONTROLLER_INJECT)
+#endif // defined(OHOS_BUILD_ENABLE_TOUCH)
     return ERR_OK;
 }
 
