@@ -155,6 +155,7 @@ static constexpr int32_t INVALID_INTERCEPTOR_ID = -1;
 static constexpr int32_t OCCUPIED_BY_SYSTEM = -3;
 static constexpr int32_t OCCUPIED_BY_OTHER = -4;
 static constexpr int32_t SIMULATE_POINTER_EVENT_START_ID { 30000 };
+static constexpr int32_t MOUSE_INJECT_POINTER_ID { 0 };
 static std::shared_ptr<OHOS::MMI::KeyEvent> g_keyEvent = OHOS::MMI::KeyEvent::Create();
 static std::shared_ptr<OHOS::MMI::PointerEvent> g_mouseEvent = OHOS::MMI::PointerEvent::Create();
 static std::shared_ptr<OHOS::MMI::PointerEvent> g_touchEvent = OHOS::MMI::PointerEvent::Create();
@@ -481,7 +482,10 @@ static int32_t HandleMouseButton(const struct Input_MouseEvent* mouseEvent)
     } else if (mouseEvent->action == MOUSE_ACTION_BUTTON_UP) {
         g_mouseEvent->DeleteReleaseButton(button);
     }
-    g_mouseEvent->SetButtonId(button);
+    if (mouseEvent->action == MOUSE_ACTION_BUTTON_DOWN || mouseEvent->action == MOUSE_ACTION_BUTTON_UP ||
+        g_mouseEvent->GetPressedButtons().empty()) {
+        g_mouseEvent->SetButtonId(button);
+    }
     return INPUT_SUCCESS;
 }
 
@@ -530,7 +534,7 @@ static int32_t HandleMouseProperty(const struct Input_MouseEvent* mouseEvent,
     int32_t screenX = mouseEvent->displayX;
     int32_t screenY = mouseEvent->displayY;
     g_mouseEvent->SetSourceType(OHOS::MMI::PointerEvent::SOURCE_TYPE_MOUSE);
-    item.SetPointerId(0);
+    item.SetPointerId(MOUSE_INJECT_POINTER_ID);
     item.SetDisplayX(screenX);
     item.SetDisplayY(screenY);
     item.SetDisplayXPos(screenX);
@@ -544,7 +548,7 @@ static int32_t HandleMouseProperty(const struct Input_MouseEvent* mouseEvent,
         item.SetGlobalX(DBL_MAX);
         item.SetGlobalY(DBL_MAX);
     }
-    g_mouseEvent->SetPointerId(0);
+    g_mouseEvent->SetPointerId(MOUSE_INJECT_POINTER_ID);
     g_mouseEvent->UpdatePointerItem(g_mouseEvent->GetPointerId(), item);
     return INPUT_SUCCESS;
 }
@@ -569,8 +573,7 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent)
     }
     g_mouseEvent->SetActionTime(time);
     OHOS::MMI::PointerEvent::PointerItem item;
-    int32_t pointerId = 10000;
-    g_mouseEvent->GetPointerItem(pointerId, item);
+    g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
     item.SetDownTime(time);
     int32_t result = HandleMouseAction(mouseEvent, item);
     if (result != 0) {
@@ -607,8 +610,7 @@ int32_t OH_Input_InjectMouseEventGlobal(const struct Input_MouseEvent* mouseEven
     }
     g_mouseEvent->SetActionTime(time);
     OHOS::MMI::PointerEvent::PointerItem item;
-    int32_t pointerId = 10000;
-    g_mouseEvent->GetPointerItem(pointerId, item);
+    g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
     item.SetDownTime(time);
     int32_t result = HandleMouseAction(mouseEvent, item);
     if (result != 0) {

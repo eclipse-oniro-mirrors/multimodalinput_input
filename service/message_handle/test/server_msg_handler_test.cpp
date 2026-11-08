@@ -38,6 +38,8 @@
 #include "running_process_info.h"
 #include "server_msg_handler.h"
 #include "stream_buffer.h"
+#include "i_input_service_context.h"
+#include "mouse_event_interface.h"
 
 #undef MMI_LOG_TAG
 #define MMI_LOG_TAG "ServerMsgHandlerTest"
@@ -235,6 +237,252 @@ HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_OnInjectPointerEvent, TestSi
     int32_t result = servermsghandler.OnInjectPointerEvent(
         userId, pointerEvent, pid, isNativeInject, false, PointerEvent::DISPLAY_COORDINATE);
     EXPECT_EQ(result, COMMON_PERMISSION_CHECK_ERROR);
+}
+
+class ScrollRowsCursorComponent : public ICursorDrawingComponent {
+public:
+    void SetPointerLocation(int32_t x, int32_t y, uint64_t displayId) override {}
+};
+
+class ScrollRowsSettingManager : public ISettingManager {
+public:
+    ScrollRowsSettingManager() = default;
+    ~ScrollRowsSettingManager() override = default;
+    void Initialize() override {}
+    bool SetIntValue(int32_t userId, const std::string& settingKey, const std::string& field, int32_t value) override
+    {
+        return true;
+    }
+    bool GetIntValue(int32_t userId, const std::string& settingKey, const std::string& field, int32_t& value) override
+    {
+        value = scrollRows;
+        return true;
+    }
+    bool SetBoolValue(int32_t userId, const std::string& settingKey, const std::string& field, bool value) override
+    {
+        return true;
+    }
+    bool GetBoolValue(int32_t userId, const std::string& settingKey, const std::string& field, bool& value) override
+    {
+        return true;
+    }
+    void OnDataShareReady() override {}
+    void OnSwitchUser(int32_t userId) override {}
+    void OnAddUser(int32_t userId) override {}
+    void OnRemoveUser(int32_t userId) override {}
+    bool IsUserConfigLoaded(int32_t userId) const override
+    {
+        return true;
+    }
+    bool IsDatabaseReady() const override
+    {
+        return true;
+    }
+    int32_t scrollRows { 6 };
+};
+
+class ScrollRowsServiceContext : public IInputServiceContext {
+public:
+    ScrollRowsServiceContext() = default;
+    ~ScrollRowsServiceContext() override = default;
+    std::shared_ptr<IDelegateInterface> GetDelegateInterface() const override
+    {
+        return nullptr;
+    }
+    IUdsServer* GetUDSServer() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IInputEventHandler> GetEventNormalizeHandler() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IInputEventHandler> GetMonitorHandler() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IInputEventHandler> GetDispatchHandler() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<ITimerManager> GetTimerManager() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IInputWindowsManager> GetInputWindowsManager() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IInputDeviceManager> GetDeviceManager() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IKeyMapManager> GetKeyMapManager() const override
+    {
+        return nullptr;
+    }
+    std::shared_ptr<IPreferenceManager> GetPreferenceManager() const override
+    {
+        return nullptr;
+    }
+    ICursorDrawingComponent& GetCursorDrawingComponent() const override
+    {
+        return cursorComponent_;
+    }
+    std::shared_ptr<ISettingManager> GetSettingManager() const override
+    {
+        return settingManager_;
+    }
+    std::shared_ptr<ScrollRowsSettingManager> settingManager_ = std::make_shared<ScrollRowsSettingManager>();
+    mutable ScrollRowsCursorComponent cursorComponent_;
+};
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_001
+ * @tc.desc: Test UpdateAxisScrollRows with unsupported source type
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_UPDATE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 0);
+}
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_002
+ * @tc.desc: Test UpdateAxisScrollRows with non-axis action
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 0);
+}
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_003
+ * @tc.desc: Test UpdateAxisScrollRows with mouse axis event but no service context
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_UPDATE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 0);
+}
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_004
+ * @tc.desc: Test UpdateAxisScrollRows with touchpad axis event but no service context
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_UPDATE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 0);
+}
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_005
+ * @tc.desc: Test UpdateAxisScrollRows writes mouse scroll rows with service context
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_005, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto context = std::make_shared<ScrollRowsServiceContext>();
+    ASSERT_NE(context, nullptr);
+    context->settingManager_->scrollRows = 6;
+    MouseEventHdr->AttachInputServiceContext(context);
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_UPDATE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 6);
+    MouseEventHdr->AttachInputServiceContext(nullptr);
+}
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_006
+ * @tc.desc: Test UpdateAxisScrollRows writes touchpad scroll rows with service context
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_006, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto context = std::make_shared<ScrollRowsServiceContext>();
+    ASSERT_NE(context, nullptr);
+    context->settingManager_->scrollRows = 5;
+    MouseEventHdr->AttachInputServiceContext(context);
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_UPDATE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 5);
+    MouseEventHdr->AttachInputServiceContext(nullptr);
+}
+
+/**
+ * @tc.name: ServerMsgHandlerTest_UpdateAxisScrollRows_007
+ * @tc.desc: Test UpdateAxisScrollRows with axis begin and end actions
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(ServerMsgHandlerTest, ServerMsgHandlerTest_UpdateAxisScrollRows_007, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ServerMsgHandler servermsghandler;
+    auto context = std::make_shared<ScrollRowsServiceContext>();
+    ASSERT_NE(context, nullptr);
+    context->settingManager_->scrollRows = 4;
+    MouseEventHdr->AttachInputServiceContext(context);
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_BEGIN);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 4);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_END);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 4);
+    context->settingManager_->scrollRows = 8;
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_ROTATE_UPDATE);
+    servermsghandler.UpdateAxisScrollRows(pointerEvent);
+    EXPECT_EQ(pointerEvent->GetScrollRows(), 4);
+    MouseEventHdr->AttachInputServiceContext(nullptr);
 }
 
 /**

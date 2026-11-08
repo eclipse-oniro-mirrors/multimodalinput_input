@@ -5062,6 +5062,71 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_002, T
 }
 
 /**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEvent_DownMoveUp_001
+ * @tc.desc: Test down/move/up sequence keeps pressed branches reachable
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_DownMoveUp_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_MouseEvent mouseEvent;
+    mouseEvent.actionTime = 100;
+    mouseEvent.displayX = 100;
+    mouseEvent.displayY = 100;
+    mouseEvent.displayId = 0;
+    mouseEvent.action = MOUSE_ACTION_BUTTON_DOWN;
+    mouseEvent.button = MOUSE_BUTTON_LEFT;
+    int32_t ret = OH_Input_InjectMouseEvent(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+    mouseEvent.action = MOUSE_ACTION_MOVE;
+    mouseEvent.button = MOUSE_BUTTON_NONE;
+    mouseEvent.displayX = 120;
+    mouseEvent.displayY = 120;
+    ret = OH_Input_InjectMouseEvent(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+    mouseEvent.action = MOUSE_ACTION_BUTTON_UP;
+    mouseEvent.button = MOUSE_BUTTON_LEFT;
+    ret = OH_Input_InjectMouseEvent(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+    mouseEvent.action = MOUSE_ACTION_MOVE;
+    mouseEvent.button = MOUSE_BUTTON_NONE;
+    ret = OH_Input_InjectMouseEvent(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEventGlobal_DownMove_001
+ * @tc.desc: Test global down/move sequence with held button
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEventGlobal_DownMove_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_MouseEvent mouseEvent;
+    mouseEvent.actionTime = 100;
+    mouseEvent.globalX = 100;
+    mouseEvent.globalY = 100;
+    mouseEvent.displayX = 100;
+    mouseEvent.displayY = 100;
+    mouseEvent.action = MOUSE_ACTION_BUTTON_DOWN;
+    mouseEvent.button = MOUSE_BUTTON_RIGHT;
+    int32_t ret = OH_Input_InjectMouseEventGlobal(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+    mouseEvent.action = MOUSE_ACTION_MOVE;
+    mouseEvent.button = MOUSE_BUTTON_RIGHT;
+    mouseEvent.globalX = 140;
+    mouseEvent.globalY = 140;
+    ret = OH_Input_InjectMouseEventGlobal(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+    mouseEvent.action = MOUSE_ACTION_BUTTON_UP;
+    mouseEvent.button = MOUSE_BUTTON_RIGHT;
+    ret = OH_Input_InjectMouseEventGlobal(&mouseEvent);
+    EXPECT_EQ(ret, INPUT_PERMISSION_DENIED);
+}
+
+/**
  * @tc.name: OHInputManagerTest_OH_Input_DestroyMouseEvent_001
  * @tc.desc: Test OH_Input_DestroyMouseEvent with null parameters
  * @tc.type: FUNC
