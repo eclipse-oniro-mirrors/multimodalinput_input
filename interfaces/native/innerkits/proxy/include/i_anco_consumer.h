@@ -102,10 +102,31 @@ struct AncoExcludedKeyEventWindow : public Parcelable {
 
 struct AncoTripleFingerSnapshotState : public Parcelable {
     bool enabled;
- 
+
     bool Marshalling(Parcel &parcel) const;
     bool ReadFromParcel(Parcel &parcel);
     static AncoTripleFingerSnapshotState* Unmarshalling(Parcel &parcel);
+};
+
+enum class AncoCustomMessageType : uint32_t {
+    PUBLISH_DISABLE_DISPATCH_STATE = 0,
+};
+
+struct AncoDisableState {
+    bool disable { false };
+
+    bool Marshalling(std::vector<uint8_t> &payload) const;
+};
+
+constexpr uint32_t MAX_CUSTOM_MESSAGE_PAYLOAD_SIZE { 64 * 1024 };
+
+struct CustomMessage : public Parcelable {
+    uint32_t msgType { 0 };
+    std::vector<uint8_t> payload;
+
+    bool Marshalling(Parcel &parcel) const;
+    bool ReadFromParcel(Parcel &parcel);
+    static CustomMessage* Unmarshalling(Parcel &parcel);
 };
 
 class IAncoConsumer {
@@ -122,6 +143,7 @@ public:
         const AncoExcludedKeyEventWindow &excludedKeyEventWindow) = 0;
     virtual int32_t UpdateTripleFingerSnapshotState(
         const AncoTripleFingerSnapshotState &snapshotState) = 0;
+    virtual int32_t SendCustomMessage(const CustomMessage &message) = 0;
 };
 } // namespace MMI
 } // namespace OHOS
