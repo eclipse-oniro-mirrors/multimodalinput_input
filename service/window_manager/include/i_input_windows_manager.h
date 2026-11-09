@@ -260,6 +260,7 @@ public:
     virtual std::vector<PluginDisplayGroupInfo> GetDisplayGroupInfos() = 0;
     virtual int32_t GetDisplayId(std::shared_ptr<InputEvent> inputEvent) const = 0;
     virtual int32_t FindDisplayGroupId(int32_t displayId) const = 0;
+    virtual void PublishEduInputDisabledState(bool state) {}
 private:
     static std::mutex mutex_;
     static std::shared_ptr<IInputWindowsManager> instance_;
