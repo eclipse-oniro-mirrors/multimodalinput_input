@@ -869,11 +869,11 @@ bool ServerMsgHandler::UpdateTouchEvent(std::shared_ptr<PointerEvent> pointerEve
 
 void ServerMsgHandler::DrawInjectedTouch(const std::shared_ptr<PointerEvent>& pointerEvent)
 {
-    if (pointerEvent != nullptr) {
+    if (pointerEvent == nullptr) {
         return;
     }
 #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
-    auto displayId = pointerEvent->GetTargetDisplayId();
+    int32_t displayId = pointerEvent->GetTargetDisplayId();
     if (displayId >= 0) {
         auto physiciDisplayInfo = WIN_MGR->GetPhysicalDisplay(displayId);
         if (physiciDisplayInfo != nullptr && physiciDisplayInfo->rsId != TOUCH_DRAWING_MGR->GetDisplayRsId()) {
