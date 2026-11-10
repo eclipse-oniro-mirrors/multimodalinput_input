@@ -170,6 +170,7 @@ private:
         const std::map<InjectionTouch, int32_t>& targetWindowIdMap, int32_t useCoordinate,
         bool bNeedResetPointerId = false, int32_t diffPointerId = 0);
     bool UpdateTouchEvent(std::shared_ptr<PointerEvent> pointerEvent, int32_t action, int32_t targetWindowId);
+    void DrawInjectedTouch(const std::shared_ptr<PointerEvent>& pointerEvent);
 #endif // OHOS_BUILD_ENABLE_TOUCH
     void LaunchAbility();
 #if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)

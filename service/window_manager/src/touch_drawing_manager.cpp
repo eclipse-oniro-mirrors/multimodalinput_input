@@ -97,6 +97,11 @@ void TouchDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo)
     }
 }
 
+uint64_t TouchDrawingManager::GetDisplayRsId()
+{
+    return displayInfo_.rsId;
+}
+
 void TouchDrawingManager::GetOriginalTouchScreenCoordinates(Direction direction, int32_t width, int32_t height,
     int32_t &physicalX, int32_t &physicalY)
 {

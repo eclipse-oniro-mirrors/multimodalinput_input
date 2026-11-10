@@ -455,9 +455,7 @@ int32_t ServerMsgHandler::OnInjectPointerEventExt(int32_t userId,
             if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_ACCESSIBILITY) &&
                 !(IsCastInject(pointerEvent->GetDeviceId())) &&
                 !IsNavigationWindowInjectEvent(pointerEvent)) {
-#ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
-                TOUCH_DRAWING_MGR->TouchDrawHandler(pointerEvent);
-#endif // #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
+                DrawInjectedTouch(pointerEvent);
             }
 #endif // OHOS_BUILD_ENABLE_TOUCH
             break;
@@ -867,6 +865,24 @@ bool ServerMsgHandler::UpdateTouchEvent(std::shared_ptr<PointerEvent> pointerEve
     pointerItem.SetTargetWindowId(targetWindowId);
     pointerEvent->UpdatePointerItem(pointerId, pointerItem);
     return true;
+}
+
+void ServerMsgHandler::DrawInjectedTouch(const std::shared_ptr<PointerEvent>& pointerEvent)
+{
+    if (pointerEvent != nullptr) {
+        return;
+    }
+#ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
+    auto displayId = pointerEvent->GetTargetDisplayId();
+    if (displayId >= 0) {
+        auto physiciDisplayInfo = WIN_MGR->GetPhysicalDisplay(displayId);
+        if (physiciDisplayInfo != nullptr && physiciDisplayInfo->rsId != TOUCH_DRAWING_MGR->GetDisplayRsId()) {
+            TOUCH_DRAWING_MGR->UpdateDisplayInfo(*physiciDisplayInfo);
+            MMI_HILOGI("Update displayId:%{public}d", displayId);
+        }
+    }
+    TOUCH_DRAWING_MGR->TouchDrawHandler(pointerEvent);
+#endif // #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
 }
 
 void ServerMsgHandler::UpdateOthersTouchEvent(std::shared_ptr<PointerEvent> pointerEvent,

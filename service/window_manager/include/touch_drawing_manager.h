@@ -38,6 +38,7 @@ public:
     void Initialize();
     void TouchDrawHandler(std::shared_ptr<PointerEvent> pointerEvent);
     void UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo);
+    uint64_t GetDisplayRsId();
     void GetOriginalTouchScreenCoordinates(Direction direction, int32_t width, int32_t height,
         int32_t &physicalX, int32_t &physicalY);
     void Dump(int32_t fd, const std::vector<std::string> &args);
