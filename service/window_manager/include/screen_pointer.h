@@ -112,12 +112,10 @@ public:
     // while the pool is empty, and without this guard the re-init would never retry.
     bool IsPoolEmpty() const;
 
-    // Resolves the buffer side this screen requires from its current mode and off-screen state.
-    // Mirror screens and off-screen-rendering extended screens scale the cursor up (GetScale() > 1),
-    // so the upscaled glyph no longer fits a 256 buffer and 512 is required; every other screen
-    // follows const.multimodalinput.support_blur_cursor. Evaluated on every mode/display-info change
-    // rather than once in Init(), because the off-screen flag and the mode both arrive after
-    // construction.
+    // Resolves the buffer side this screen requires. No mode upgrades the tier any more: every
+    // screen follows const.multimodalinput.support_blur_cursor, so mirrors resolve the same side
+    // as every other screen. Kept as a per-screen member so the re-init gates in the drawing
+    // manager keep comparing the pool against a single resolution point.
     uint32_t ResolveBufferSide();
 
     uint32_t GetScreenWidth() const

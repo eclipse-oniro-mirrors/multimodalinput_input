@@ -2159,10 +2159,9 @@ sptr<OHOS::SurfaceBuffer> PointerDrawingManager::GetSurfaceBuffer(sptr<OHOS::Sur
         // lay out for a 512 buffer while the hotspot was computed for a 256 one: a constant
         // (128,128) misalignment.
         //
-        // The side comes from the owning ScreenPointer: it is per-screen now that mirror and
-        // off-screen extended screens resolve 512 while others follow the boot-fixed switch.
-        // Falling back to the global here would size a mirror screen's placeholder 256 while its
-        // hotspot, animation pivot and node bounds were all computed for 512.
+        // The side comes from the owning ScreenPointer's resolved tier; keeping the placeholder
+        // sized from the same resolution as the hotspot and node bounds means the set can never
+        // disagree, whatever the blur switch resolves to.
         int32_t hardSide = (bufferSide > 0) ? bufferSide : GetCursorBufferSize();
         width = hardSide;
         height = hardSide;

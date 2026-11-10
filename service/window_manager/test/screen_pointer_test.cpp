@@ -2531,6 +2531,46 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetBufferSize_001, TestSize.Level1
 }
 
 /**
+ * @tc.name: ScreenPointerTest_ResolveBufferSide_001
+ * @tc.desc: No mode upgrades the tier any more. Mirror screens were excluded before -- their
+ *           upscaled glyph (GetScale() > 1) was assumed not to fit a 256 buffer -- but the glyph
+ *           is clamped to the buffer side, so every screen (main, extend with off-screen
+ *           rendering and offRenderScale_ > 1, mirror with or without off-screen rendering)
+ *           resolves to the boot-fixed GetCursorBufferSize(). Assertions compare against the
+ *           shared resolver instead of pinning a tier, so the test passes on both blur-switch
+ *           configurations.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_ResolveBufferSide_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    OLD::DisplayInfo di;
+    auto screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+    ASSERT_NE(screenpointer, nullptr);
+
+    // Extend with off-screen rendering and an upscaled scale must still follow the blur switch.
+    screenpointer->mode_ = mode_t::SCREEN_EXTEND;
+    screenpointer->isCurrentOffScreenRendering_ = true;
+    screenpointer->offRenderScale_ = 2.0;
+    EXPECT_EQ(screenpointer->ResolveBufferSide(), static_cast<uint32_t>(GetCursorBufferSize()));
+
+    // Main with off-screen rendering: same rule.
+    screenpointer->mode_ = mode_t::SCREEN_MAIN;
+    EXPECT_EQ(screenpointer->ResolveBufferSide(), static_cast<uint32_t>(GetCursorBufferSize()));
+
+    // Mirror follows the same boot-fixed switch, with or without off-screen rendering.
+    screenpointer->mode_ = mode_t::SCREEN_MIRROR;
+    EXPECT_EQ(screenpointer->ResolveBufferSide(), static_cast<uint32_t>(GetCursorBufferSize()));
+    screenpointer->isCurrentOffScreenRendering_ = false;
+    screenpointer->offRenderScale_ = 1.0;
+    EXPECT_EQ(screenpointer->ResolveBufferSide(), static_cast<uint32_t>(GetCursorBufferSize()));
+}
+
+/**
  * @tc.name: ScreenPointerTest_UpdateHotspotInBuffer_001
  * @tc.desc: The hard and soft cursor paths run on different threads with their own RenderConfig
  *           (the soft path renders at the screen dpi and carries its own direction), so each must

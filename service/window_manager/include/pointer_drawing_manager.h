@@ -217,10 +217,10 @@ private:
     int32_t CreatePointerWindowForScreenPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY);
     int32_t CreatePointerWindowForNoScreenPointer(uint64_t rsId, int32_t physicalX, int32_t physicalY);
     sptr<OHOS::Surface> GetLayer();
-    // bufferSide is the side resolved by the owning ScreenPointer (which differs per screen:
-    // mirror and off-screen extended screens use 512, others follow the blur switch). Passing it
-    // in keeps the placeholder layer the same side as the hotspot and node bounds computed for
-    // that same screen; the boot-fixed global would disagree on a mirror screen with blur off.
+    // bufferSide is the side resolved by the owning ScreenPointer (every screen follows the
+    // boot-fixed blur switch). Passing it in keeps the placeholder layer the same side as the
+    // hotspot and node bounds computed for that same screen rather than re-resolving the tier
+    // through a second path.
     sptr<OHOS::SurfaceBuffer> GetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide = 0);
     sptr<OHOS::SurfaceBuffer> RetryGetSurfaceBuffer(sptr<OHOS::Surface> layer, int32_t bufferSide = 0);
     void DoDraw(uint8_t *addr, uint32_t width, uint32_t height, const MOUSE_ICON mouseStyle = MOUSE_ICON::DEFAULT);

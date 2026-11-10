@@ -202,10 +202,9 @@ ScreenPointer::~ScreenPointer()
 
 bool ScreenPointer::Init(PointerRenderer &render, bool needDrawPointer)
 {
-    // Mirror screens and off-screen-rendering extended screens scale the cursor up
-    // (GetScale() > 1), so the upscaled glyph no longer fits a 256 buffer. The tier can change
-    // after construction -- the off-screen flag and the screen mode both arrive later -- so
-    // rebuild the pool whenever the resolved side differs from the one it was built at.
+    // The tier is boot-fixed and bufferSize_ is initialised from the same resolver, so the sides
+    // normally match; the rebuild stays as a cheap guard so the pool can never silently disagree
+    // with the resolved side.
     // InitCommonBuffer only tops the pool up to DEFAULT_BUFFER_SIZE, so without this the eight
     // common buffers would keep their old side while default/transparent were rebuilt, leaving
     // the hotspot (computed from bufferSize_) out of step with the pixels actually drawn.
@@ -570,9 +569,7 @@ void ScreenPointer::UpdateScreenInfo(sptr<OHOS::Rosen::ScreenInfo> si, bool need
     CHKPV(si);
     // Update all screen metadata unconditionally — mode_, width_, height_, dpi_ etc. must
     // reflect the current screen regardless of whether the surface node exists.  If a previous
-    // Init() failed and left the node null, the IsPoolEmpty() gate will trigger a retry; that
-    // retry must see the correct mode or it will rebuild a 512 pool for a mirror that has since
-    // reverted to extend mode.
+    // Init() failed and left the node null, the IsPoolEmpty() gate will trigger a retry.
     screenId_ = si->GetRsId();
     mode_ = si->GetSourceMode();
     dpi_ = si->GetVirtualPixelRatio();
@@ -767,13 +764,9 @@ int32_t GetCursorBufferSize()
 
 uint32_t ScreenPointer::ResolveBufferSide()
 {
-    // Mirror screens and off-screen-rendering extended screens scale the cursor up
-    // (GetScale() > 1) to match the target resolution, so the upscaled glyph no longer fits a
-    // 256 buffer: a 200x200 icon at scale 2.0 becomes 400x400. Those two therefore require 512.
-    // Every other screen follows the boot-fixed blur switch.
-    if (IsMirror() || (IsExtend() && GetIsCurrentOffScreenRendering())) {
-        return static_cast<uint32_t>(BLUR_CURSOR_SIZE);
-    }
+    // Every screen follows the boot-fixed blur switch; no mode upgrades the tier any more.
+    // Mirrors were excluded before (their upscaled glyph was assumed not to fit a 256 buffer),
+    // but the glyph is clamped to the buffer side, so mirrors resolve the same tier as the rest.
     return static_cast<uint32_t>(GetCursorBufferSize());
 }
 
