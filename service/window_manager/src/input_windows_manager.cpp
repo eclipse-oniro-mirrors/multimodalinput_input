@@ -6773,13 +6773,7 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
             extraData_.sourceType == PointerEvent::SOURCE_TYPE_MOUSE &&
             IsSameDragUser(pointerEvent->GetTargetDisplayId())))) {
             MMI_HILOG_DISPATCHD("PointerAction is to leave the window");
-            bool isPenLevitateMove = pointerItem.GetToolType() == PointerEvent::TOOL_TYPE_PEN &&
-                pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_LEVITATE_MOVE;
-            if (isPenLevitateMove){
-                MMI_HILOGD("Skip hide-cursor timer for pen levitate-move");
-            }
-            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH) &&
-                (timerId_ == DEFAULT_VALUE) && !isPenLevitateMove) {
+            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_SHOW_CUSOR_WITH_TOUCH) && timerId_ == DEFAULT_VALUE) {
                 timerId_ = TimerMgr->AddTimer(REPEAT_COOLING_TIME, REPEAT_ONCE, [this, gestureInject]() {
                     DispatchPointer(PointerEvent::POINTER_ACTION_LEAVE_WINDOW);
                     MMI_HILOGI("touch hide cursor, gestureInject=%{public}d", gestureInject);
