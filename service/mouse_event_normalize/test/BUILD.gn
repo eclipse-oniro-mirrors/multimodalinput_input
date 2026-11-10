@@ -157,6 +157,7 @@ ohos_unittest("MouseEventNormalizeTest") {
     "window_manager:libwm",
     "ability_runtime:ability_manager",
     "icu:shared_icuuc",
+    "samgr:samgr_proxy",
   ]
 }
 
@@ -269,6 +270,7 @@ ohos_unittest("MouseTransformProcessorEXTest") {
     "window_manager:libwm",
     "init:libbegetutil",
     "graphic_2d:librender_service_client",
+    "samgr:samgr_proxy",
   ]
 }
 

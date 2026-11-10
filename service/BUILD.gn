@@ -1592,6 +1592,7 @@ ohos_unittest("PointerDrawingManagerHardCursorTest") {
     "init:libbegetutil",
     "libinput:libinput-third-mmi",
     "preferences:native_preferences",
+    "samgr:samgr_proxy",
     "window_manager:libdm_lite",
     "window_manager:libwmutil",
     "ability_runtime:dataobs_manager",
@@ -2635,6 +2636,7 @@ ohos_unittest("SubscriberTest") {
     "ipc:ipc_core",
     "libinput:libinput-third-mmi",
     "preferences:native_preferences",
+    "samgr:samgr_proxy",
   ]
 
   if (call_manager_service_enabled) {
@@ -3797,6 +3799,8 @@ ohos_unittest("LibinputAdapterTest") {
     "-Dprotected=public",
   ]
 
+  cflags_cc = [ "-Wno-string-conversion" ]
+
   sources = [ "libinput_adapter/test/libinput_adapter_test.cpp" ]
 
   deps = [
@@ -3876,6 +3880,7 @@ ohos_unittest("ServerMsgHandlerTest") {
     "napi:ace_napi",
     "node:node_header_notice",
     "preferences:native_preferences",
+    "samgr:samgr_proxy",
     "window_manager:libwm",
   ]
 
