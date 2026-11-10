@@ -875,9 +875,9 @@ void ServerMsgHandler::DrawInjectedTouch(const std::shared_ptr<PointerEvent>& po
 #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
     int32_t displayId = pointerEvent->GetTargetDisplayId();
     if (displayId >= 0) {
-        auto physiciDisplayInfo = WIN_MGR->GetPhysicalDisplay(displayId);
-        if (physiciDisplayInfo != nullptr && physiciDisplayInfo->rsId != TOUCH_DRAWING_MGR->GetDisplayRsId()) {
-            TOUCH_DRAWING_MGR->UpdateDisplayInfo(*physiciDisplayInfo);
+        auto physicalDisplayInfo = WIN_MGR->GetPhysicalDisplay(displayId);
+        if (physicalDisplayInfo != nullptr && physicalDisplayInfo->rsId != TOUCH_DRAWING_MGR->GetDisplayRsId()) {
+            TOUCH_DRAWING_MGR->UpdateDisplayInfo(*physicalDisplayInfo);
             MMI_HILOGI("Update displayId:%{public}d", displayId);
         }
     }

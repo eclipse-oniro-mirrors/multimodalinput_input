@@ -97,7 +97,7 @@ void TouchDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo)
     }
 }
 
-uint64_t TouchDrawingManager::GetDisplayRsId()
+uint64_t TouchDrawingManager::GetDisplayRsId() const
 {
     return displayInfo_.rsId;
 }
