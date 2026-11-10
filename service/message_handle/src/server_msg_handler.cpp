@@ -340,6 +340,7 @@ int32_t ServerMsgHandler::OnInjectTouchPadEventExt(int32_t userId, const std::sh
             return ret;
         }
         UpdatePointerEvent(pointerEvent);
+        UpdateAxisScrollRows(pointerEvent);
         inputEventNormalizeHandler->HandlePointerEvent(pointerEvent);
         CHKPR(pointerEvent, ERROR_NULL_POINTER);
         pointerEvent->HasFlag(InputEvent::EVENT_FLAG_ACCESSIBILITY);
@@ -706,7 +707,11 @@ void ServerMsgHandler::UpdateAxisScrollRows(std::shared_ptr<PointerEvent> pointe
         (pointerAction > PointerEvent::POINTER_ACTION_AXIS_END)) {
         return;
     }
-    int32_t userId = WIN_MGR->FindDisplayUserId(pointerEvent->GetTargetDisplayId());
+    int32_t targetDisplayId = pointerEvent->GetTargetDisplayId();
+    if (targetDisplayId < 0) {
+        targetDisplayId = 0;
+    }
+    int32_t userId = WIN_MGR->FindDisplayUserId(targetDisplayId);
     int32_t scrollRows = (sourceType == PointerEvent::SOURCE_TYPE_TOUCHPAD) ?
         MouseEventHdr->GetTouchpadScrollRows(userId) : MouseEventHdr->GetMouseScrollRows(userId);
     if (scrollRows <= 0) {
