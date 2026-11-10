@@ -708,9 +708,7 @@ void ServerMsgHandler::UpdateAxisScrollRows(std::shared_ptr<PointerEvent> pointe
         return;
     }
     int32_t targetDisplayId = pointerEvent->GetTargetDisplayId();
-    if (targetDisplayId < 0) {
-        targetDisplayId = 0;
-    }
+    WIN_MGR->UpdateDisplayId(targetDisplayId);
     int32_t userId = WIN_MGR->FindDisplayUserId(targetDisplayId);
     int32_t scrollRows = (sourceType == PointerEvent::SOURCE_TYPE_TOUCHPAD) ?
         MouseEventHdr->GetTouchpadScrollRows(userId) : MouseEventHdr->GetMouseScrollRows(userId);
