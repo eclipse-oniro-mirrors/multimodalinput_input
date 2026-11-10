@@ -440,7 +440,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_009, Te
 
 /**
  * @tc.name: InputWindowsManagerTest_SetDisplayBind_010
- * @tc.desc: Test SetDisplayBind
+ * @tc.desc: SetDisplayBind rejects a display that is not in the physical display list with
+ *           ERR_DISPLAY_NOT_EXIST
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -449,17 +450,101 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_010, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
-    std::string msg = "There is in InputWindowsManagerTest_GetDisplayIdNames_009";
-    //std::shared_ptr<BindInfos> infos_ = std::make_shared<BindInfos>();
-    int32_t deviceId = 2;
-    int32_t displayId = 3;
-    BindInfo infos_;
-    infos_.inputDeviceId_ = 3;
-    infos_.inputNodeName_ = 4;
-    infos_.inputDeviceName_ = 5;
-    infos_.displayId_ = 6;
-    infos_.displayName_= "abc";
-    ASSERT_EQ(WIN_MGR->SetDisplayBind(deviceId, displayId, msg), RET_ERR);
+    std::string msg;
+    constexpr int32_t deviceId = 2;
+    constexpr int32_t displayId = 3;
+    // Display 3 is never registered, so GetPhysicalDisplay returns nullptr and the call fails
+    // before any bind relation is touched.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(deviceId, displayId, msg), ERR_DISPLAY_NOT_EXIST);
+    EXPECT_EQ(msg, "The specified display does not exist.");
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_011
+ * @tc.desc: SetDisplayBind fails up front for a display outside the authoritative physical display
+ *           list, even when the id itself is a plausible non-negative value
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_011, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    constexpr int32_t deviceId = 2;
+    constexpr int32_t displayId = 999;
+    std::string msg;
+    // Display 999 was never registered via UpdateDisplayInfo, so GetPhysicalDisplay returns
+    // nullptr and no bind relation is consulted.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(deviceId, displayId, msg), ERR_DISPLAY_NOT_EXIST);
+    EXPECT_EQ(msg, "The specified display does not exist.");
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_012
+ * @tc.desc: SetDisplayBind delegates to the BindToDisplay path when the display exists, so an
+ *           unknown device id is rejected with ERR_BIND_DEVICE_NOT_EXIST
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_012, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    constexpr int32_t deviceId = 2;
+    constexpr int32_t displayId = 1;
+    std::string msg;
+    // Display 1 exists (registered by SetUp), so the call reaches bindInfo_.BindToDisplay.
+    // Device 2 was never registered, so binding is rejected with ERR_BIND_DEVICE_NOT_EXIST.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(deviceId, displayId, msg), ERR_BIND_DEVICE_NOT_EXIST);
+    EXPECT_EQ(msg, "The specified input device does not exist.");
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_013
+ * @tc.desc: SetDisplayBind succeeds for a registered device bound to a display that has no bind
+ *           entry yet (display validated against the physical display list, not the bind relations)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_013, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    constexpr int32_t devId { 8811 };
+    // Register the device into bindInfo_ so BindToDisplay can resolve it by id.
+    WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
+    constexpr int32_t displayId = 1;
+    std::string msg;
+    // Display 1 exists physically but carries no bind entry, which the legacy config-driven path
+    // rejected; the new path must accept it.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), displayId);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_014
+ * @tc.desc: Re-binding the same device-display pair through SetDisplayBind is an idempotent no-op
+ *           that returns RET_OK instead of an error
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_014, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    constexpr int32_t devId { 8812 };
+    WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
+    constexpr int32_t displayId = 1;
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
+    // The legacy path returned an error for an already-bound pair; the new path treats it as
+    // a successful no-op.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), displayId);
 }
 
 /**
@@ -715,8 +800,9 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetDisplayBindInfo_001
     int32_t displayId = 2;
     DisplayBindInfos infos;
     std::string msg;
+    // Display 2 is not in the physical display list, so SetDisplayBind fails up front.
     int32_t ret = WIN_MGR->SetDisplayBind(deviceId, displayId, msg);
-    EXPECT_EQ(ret, -1);
+    EXPECT_EQ(ret, ERR_DISPLAY_NOT_EXIST);
     ret = WIN_MGR->GetDisplayBindInfo(infos);
     EXPECT_EQ(ret, 0);
 }

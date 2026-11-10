@@ -1167,7 +1167,13 @@ int32_t InputWindowsManager::SetDisplayBind(int32_t deviceId, int32_t displayId,
 {
     CALL_DEBUG_ENTER;
     MMI_HILOGD("deviceId:%{public}d, displayId:%{public}d", deviceId, displayId);
-    return bindInfo_.SetDisplayBind(deviceId, displayId, msg);
+    const auto *displayInfo = GetPhysicalDisplay(displayId);
+    if (displayInfo == nullptr) {
+        msg = "The specified display does not exist.";
+        MMI_HILOGE("%s", msg.c_str());
+        return ERR_DISPLAY_NOT_EXIST;
+    }
+    return bindInfo_.BindToDisplay(deviceId, displayId, displayInfo->rsId, displayInfo->uniq, msg);
 }
 
 int32_t InputWindowsManager::BindToDisplay(int32_t deviceId, int32_t displayId, std::string &msg)
