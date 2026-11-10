@@ -71,6 +71,11 @@ int32_t InputManager::GetWindowPid(int32_t windowId)
     return InputMgrImpl.GetWindowPid(windowId);
 }
 
+int32_t InputManager::EnableTouchpadRawEvent(bool enable)
+{
+    return InputMgrImpl.EnableTouchpadRawEvent(enable);
+}
+
 int32_t InputManager::UpdateDisplayInfo(const UserScreenInfo &userScreenInfo)
 {
     return InputMgrImpl.UpdateDisplayInfo(userScreenInfo);

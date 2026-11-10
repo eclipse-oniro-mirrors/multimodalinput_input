@@ -344,6 +344,10 @@ int32_t InputEventDataTransformation::Marshalling(std::shared_ptr<PointerEvent> 
         MMI_HILOGE("serializeDragSecurityData fail");
         return RET_ERR;
     }
+    if (!SerializeTouchpadRawExt(event, pkt)) {
+        MMI_HILOGE("SerializeTouchpadRawExt fail");
+        return RET_ERR;
+    }
     return RET_OK;
 }
 
@@ -515,6 +519,10 @@ int32_t InputEventDataTransformation::Unmarshalling(NetPacket &pkt, std::shared_
     }
     if (!DeserializeDragSecurityData(pkt, event)) {
         MMI_HILOGE("DeserializeDragSecurityData fail");
+        return RET_ERR;
+    }
+    if (!DeserializeTouchpadRawExt(pkt, event)) {
+        MMI_HILOGE("DeserializeTouchpadRawExt fail");
         return RET_ERR;
     }
     return RET_OK;
@@ -722,6 +730,56 @@ bool InputEventDataTransformation::DeserializeDragSecurityData(NetPacket &pkt, s
     event->SetSignature(signature);
 
     return !pkt.ChkRWError();
+}
+
+bool InputEventDataTransformation::SerializeTouchpadRawExt(std::shared_ptr<PointerEvent> event, NetPacket &pkt)
+{
+    if (!event->HasTouchpadRawExt()) {
+        pkt << static_cast<int8_t>(0);
+        return !pkt.ChkRWError();
+    }
+    const auto &ext = event->GetTouchpadRawExt();
+    pkt << static_cast<int8_t>(1) << ext.GetDeviceWidth() << ext.GetDeviceHeight() << ext.GetSeatSlot();
+    if (!pkt.Write(ext.GetRawPoints())) {
+        MMI_HILOGE("Packet write touchpad raw points failed");
+        return false;
+    }
+    return !pkt.ChkRWError();
+}
+
+bool InputEventDataTransformation::DeserializeTouchpadRawExt(NetPacket &pkt, std::shared_ptr<PointerEvent> event)
+{
+    // Packets written before the extension existed carry no presence flag, treat them as raw-event-free
+    if (pkt.UnreadSize() <= 0) {
+        return true;
+    }
+    int8_t hasExt = 0;
+    pkt >> hasExt;
+    if (pkt.ChkRWError()) {
+        return false;
+    }
+    if (hasExt == 0) {
+        return true;
+    }
+    PointerEvent::TouchpadRawExt ext;
+    double deviceWidth = 0.0;
+    double deviceHeight = 0.0;
+    int32_t seatSlot = -1;
+    pkt >> deviceWidth >> deviceHeight >> seatSlot;
+    ext.SetDeviceWidth(deviceWidth);
+    ext.SetDeviceHeight(deviceHeight);
+    ext.SetSeatSlot(seatSlot);
+    std::vector<PointerEvent::TouchpadRawPoint> rawPoints;
+    if (!pkt.Read(rawPoints)) {
+        MMI_HILOGE("Packet read touchpad raw points failed");
+        return false;
+    }
+    ext.SetRawPoints(rawPoints);
+    if (pkt.ChkRWError()) {
+        return false;
+    }
+    event->SetTouchpadRawExt(ext);
+    return true;
 }
 } // namespace MMI
 } // namespace OHOS

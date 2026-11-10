@@ -23,6 +23,7 @@ namespace {
 using namespace testing::ext;
 using namespace OHOS;
 constexpr int64_t TEST_KEY_DOWN_TIME { 100 };
+constexpr int64_t TEST_RAW_TIMESTAMP { 123456789 };
 } // namespace
 
 class InputEventDataTransformationTest : public testing::Test {
@@ -197,6 +198,101 @@ HWTEST_F(InputEventDataTransformationTest, KeyEventToNetPacket, TestSize.Level1)
     auto outItem = outEvent->GetKeyItem(KeyEvent::KEYCODE_A);
     ASSERT_TRUE(outItem.has_value());
     EXPECT_EQ(outItem->GetRawCode(), 30);
+}
+
+/**
+ * @tc.name: PointerEventTouchpadRawExt_001
+ * @tc.desc: Test pointer event marshalling and unmarshalling round trip with the touchpad raw extension
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventDataTransformationTest, PointerEventTouchpadRawExt_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto event = PointerEvent::Create();
+    ASSERT_NE(event, nullptr);
+    event->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
+    event->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
+    event->SetPointerId(1);
+    event->SetActionTime(TEST_RAW_TIMESTAMP);
+    PointerEvent::PointerItem item;
+    item.SetPointerId(1);
+    item.SetDisplayXPos(10.5);
+    item.SetDisplayYPos(20.5);
+    item.SetPressure(0.8);
+    item.SetWindowXPos(100.5);
+    item.SetWindowYPos(200.5);
+    event->AddPointerItem(item);
+    event->SetPressedKeys({ KeyEvent::KEYCODE_CTRL_LEFT });
+
+    PointerEvent::TouchpadRawExt ext;
+    ext.SetDeviceWidth(3200.0);
+    ext.SetDeviceHeight(2000.0);
+    ext.SetSeatSlot(1);
+    PointerEvent::TouchpadRawPoint firstPoint;
+    firstPoint.SetSeatSlot(1);
+    firstPoint.SetX(10.5);
+    firstPoint.SetY(20.5);
+    PointerEvent::TouchpadRawPoint secondPoint;
+    secondPoint.SetSeatSlot(2);
+    secondPoint.SetX(100.5);
+    secondPoint.SetY(200.5);
+    std::vector<PointerEvent::TouchpadRawPoint> rawPoints;
+    rawPoints.push_back(firstPoint);
+    rawPoints.push_back(secondPoint);
+    ext.SetRawPoints(rawPoints);
+    event->SetTouchpadRawExt(ext);
+
+    NetPacket pkt(MmiMessageId::ON_POINTER_EVENT);
+    ASSERT_EQ(InputEventDataTransformation::Marshalling(event, pkt), RET_OK);
+    auto outEvent = PointerEvent::Create();
+    ASSERT_NE(outEvent, nullptr);
+    ASSERT_EQ(InputEventDataTransformation::Unmarshalling(pkt, outEvent), RET_OK);
+
+    EXPECT_EQ(outEvent->GetSourceType(), PointerEvent::SOURCE_TYPE_TOUCHPAD);
+    EXPECT_EQ(outEvent->GetPointerAction(), PointerEvent::POINTER_ACTION_DOWN);
+    EXPECT_EQ(outEvent->GetPressedKeys(), event->GetPressedKeys());
+    EXPECT_TRUE(outEvent->HasTouchpadRawExt());
+    const auto &outExt = outEvent->GetTouchpadRawExt();
+    EXPECT_EQ(outExt.GetDeviceWidth(), ext.GetDeviceWidth());
+    EXPECT_EQ(outExt.GetDeviceHeight(), ext.GetDeviceHeight());
+    EXPECT_EQ(outExt.GetSeatSlot(), ext.GetSeatSlot());
+    const auto &outPoints = outExt.GetRawPoints();
+    ASSERT_EQ(outPoints.size(), rawPoints.size());
+    EXPECT_EQ(outPoints[0].GetSeatSlot(), rawPoints[0].GetSeatSlot());
+    EXPECT_EQ(outPoints[0].GetX(), rawPoints[0].GetX());
+    EXPECT_EQ(outPoints[0].GetY(), rawPoints[0].GetY());
+    EXPECT_EQ(outPoints[1].GetSeatSlot(), rawPoints[1].GetSeatSlot());
+    EXPECT_EQ(outPoints[1].GetX(), rawPoints[1].GetX());
+    EXPECT_EQ(outPoints[1].GetY(), rawPoints[1].GetY());
+}
+
+/**
+ * @tc.name: PointerEventTouchpadRawExt_002
+ * @tc.desc: Test pointer event round trip without the touchpad raw extension
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventDataTransformationTest, PointerEventTouchpadRawExt_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto event = PointerEvent::Create();
+    ASSERT_NE(event, nullptr);
+    event->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    event->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
+    event->SetPointerId(0);
+    PointerEvent::PointerItem item;
+    item.SetPointerId(0);
+    item.SetDisplayXPos(30.5);
+    item.SetDisplayYPos(40.5);
+    event->AddPointerItem(item);
+
+    NetPacket pkt(MmiMessageId::ON_POINTER_EVENT);
+    ASSERT_EQ(InputEventDataTransformation::Marshalling(event, pkt), RET_OK);
+    auto outEvent = PointerEvent::Create();
+    ASSERT_NE(outEvent, nullptr);
+    ASSERT_EQ(InputEventDataTransformation::Unmarshalling(pkt, outEvent), RET_OK);
+    EXPECT_FALSE(outEvent->HasTouchpadRawExt());
 }
 
 /**

@@ -278,6 +278,15 @@ int32_t ClientMsgHandler::OnPointerEvent(const UDSClient& client, NetPacket& pkt
             item.GetWindowXPos(), item.GetWindowYPos(),
             item.GetGlobalX(), item.GetGlobalY(), item.GetToolType());
     }
+    if (pointerEvent->HasTouchpadRawExt()) {
+        const auto &rawExt = pointerEvent->GetTouchpadRawExt();
+        MMI_HILOGD("Report touchpad raw ext,seatSlot:%{public}d,deviceWidth:%{private}f,deviceHeight:%{private}f",
+            rawExt.GetSeatSlot(), rawExt.GetDeviceWidth(), rawExt.GetDeviceHeight());
+        for (const auto &rawPoint : rawExt.GetRawPoints()) {
+            MMI_HILOGD("Report touchpad raw point,seatSlot:%{public}d,x:%{private}f,y:%{private}f",
+                rawPoint.GetSeatSlot(), rawPoint.GetX(), rawPoint.GetY());
+        }
+    }
     InputMgrImpl.OnPointerEvent(pointerEvent);
     if (pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_JOYSTICK) {
         pointerEvent->MarkProcessed();

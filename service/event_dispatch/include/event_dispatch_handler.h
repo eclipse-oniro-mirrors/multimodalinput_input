@@ -87,6 +87,9 @@ public:
     std::chrono::time_point<std::chrono::high_resolution_clock> LasteventBeginTime_ =
     std::chrono::high_resolution_clock::now();
     void SendWindowStateError(int32_t userId, int32_t pid, int32_t windowId);
+    // Dispatches a touchpad raw event, carried by a PointerEvent with the touchpad raw extension,
+    // to the session of the given pid over the regular ON_POINTER_EVENT channel.
+    int32_t DispatchRawTouchpadPointerEvent(std::shared_ptr<PointerEvent> pointerEvent, int32_t pid);
     void DumpAssetChecker(int32_t fd);
     void PreloadAgentAppStatus();
 private:

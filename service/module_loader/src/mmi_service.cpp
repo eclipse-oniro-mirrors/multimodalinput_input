@@ -5032,6 +5032,27 @@ ErrCode MMIService::SetCurrentUser(int32_t userId)
     return RET_OK;
 }
 
+ErrCode MMIService::SetTouchpadRawEventSwitch(bool enable)
+{
+    CALL_DEBUG_ENTER;
+    int32_t pid = GetCallingPid();
+    return delegateTasks_.PostSyncTask(
+        [this, pid, enable] {
+            return OnSetTouchpadRawEventSwitch(pid, enable);
+        }
+        );
+}
+
+int32_t MMIService::OnSetTouchpadRawEventSwitch(int32_t pid, bool enable)
+{
+    auto eventNormalizeHandler = InputHandler->GetEventNormalizeHandler();
+    if (eventNormalizeHandler == nullptr) {
+        MMI_HILOGE("eventNormalizeHandler is nullptr");
+        return RET_ERR;
+    }
+    return eventNormalizeHandler->SetTouchpadRawEventEnabled(pid, enable);
+}
+
 ErrCode MMIService::SetTouchpadThreeFingersTapSwitch(bool switchFlag)
 {
     CALL_DEBUG_ENTER;
@@ -5390,6 +5411,12 @@ void MMIService::OnSessionDelete(SessionPtr session)
         clientInfos_.erase(it);
         MMI_HILOGD("Clear the client info, programName:%{public}s", programName.c_str());
     }
+    auto eventNormalizeHandler = InputHandler->GetEventNormalizeHandler();
+    if (eventNormalizeHandler == nullptr) {
+        MMI_HILOGE("eventNormalizeHandler is nullptr");
+        return;
+    }
+    eventNormalizeHandler->RemoveTouchpadRawEventEnabled(session->GetPid());
 }
 
 ErrCode MMIService::SetClientInfo(int32_t pid, uint64_t readThreadId)

@@ -4010,6 +4010,21 @@ int32_t InputWindowsManager::GetFocusPid(int32_t groupId) const
     return -1;
 }
 
+bool InputWindowsManager::GetFocusedWindowInfo(WindowInfo &windowInfo, int32_t groupId) const
+{
+    auto iter = displayGroupInfoMap_.find(groupId);
+    if (iter == displayGroupInfoMap_.end()) {
+        return false;
+    }
+    for (const auto &item : iter->second.windowsInfo) {
+        if (item.id == iter->second.focusWindowId) {
+            windowInfo = item;
+            return true;
+        }
+    }
+    return false;
+}
+
 int32_t InputWindowsManager::GetMainDisplayId(int32_t groupId) const
 {
     auto iter = displayGroupInfoMap_.find(groupId);

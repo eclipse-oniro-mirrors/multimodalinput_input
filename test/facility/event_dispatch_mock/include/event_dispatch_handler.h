@@ -35,6 +35,7 @@ public:
     MOCK_METHOD(void, HandleKeyEvent, (const std::shared_ptr<KeyEvent>));
     MOCK_METHOD(void, HandlePointerEvent, (const std::shared_ptr<PointerEvent>));
     MOCK_METHOD(void, HandleTouchEvent, (const std::shared_ptr<PointerEvent>));
+    MOCK_METHOD(int32_t, DispatchRawTouchpadPointerEvent, (std::shared_ptr<PointerEvent>, int32_t));
 };
 } // namespace MMI
 } // namespace OHOS

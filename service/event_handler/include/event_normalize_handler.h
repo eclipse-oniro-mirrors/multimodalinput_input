@@ -16,10 +16,16 @@
 #ifndef EVENT_NORMALIZE_HANDLER_H
 #define EVENT_NORMALIZE_HANDLER_H
 
+#include <map>
+#include <mutex>
+#include <set>
+#include <vector>
+
 #include "i_input_event_handler.h"
 #include "key_event_normalize.h"
 #include "libinput.h"
 #include "plugin_stage.h"
+#include "window_info.h"
 
 namespace OHOS {
 namespace MMI {
@@ -28,6 +34,9 @@ public:
     EventNormalizeHandler() = default;
     ~EventNormalizeHandler() = default;
     void HandleEvent(libinput_event* event, int64_t frameTime);
+    int32_t SetTouchpadRawEventEnabled(int32_t pid, bool enable);
+    void RemoveTouchpadRawEventEnabled(int32_t pid);
+    void DumpTouchpadRawEventSwitch(int32_t fd);
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
     void HandleKeyEvent(const std::shared_ptr<KeyEvent> keyEvent) override;
     int32_t GetCurrentHandleKeyCode()
@@ -78,6 +87,18 @@ private:
     bool TouchPadKnuckleDoubleClickHandle(libinput_event* event);
     bool HandleTouchPadEdgeSwipe(libinput_event* event);
     bool HandleTouchpadSyncEvent(libinput_event* event);
+    bool IsTouchpadRawEventEnabled(int32_t pid);
+    void CollectRawTouchpadEvent(libinput_event* event, int32_t type);
+    PointerEvent::TouchpadRawPoint MakeRawTouchpadPoint(struct libinput_event_touch *touchpad, int32_t seatSlot);
+    void DispatchRawTouchpadEvent(int32_t pointerAction, struct libinput_device *device,
+        const WindowInfo &focusWindow, int64_t timestamp, int32_t seatSlot, double pressure);
+    void SendRawTouchpadCancel(libinput_event* event);
+    void SendFreetouchRawTouchpadCancel(libinput_event* event, int32_t fingerCount);
+    void DispatchTouchpadRawCancel(struct libinput_device *device, int32_t fingerCount, int64_t timestamp);
+    void FillRawPointerEvent(std::shared_ptr<PointerEvent> pointerEvent, int32_t pointerAction,
+        struct libinput_device *device, const WindowInfo &focusWindow, int64_t timestamp, int32_t seatSlot,
+        double pressure);
+    std::vector<int32_t> GetRawPressedKeys();
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
     int32_t HandleMouseEvent(libinput_event* event);
     bool AfterInputEventNormalized(const std::shared_ptr<PointerEvent> pointerEvent);
@@ -123,6 +144,18 @@ private:
     void TerminateAxis(libinput_event* event);
     void CancelTwoFingerAxis(libinput_event* event);
     bool IsAccessibilityEventWithZOrder(std::shared_ptr<PointerEvent> pointerEvent);
+    // All access happens on the mmi service event loop thread, no lock needed
+    std::map<int32_t, bool> rawTouchpadEnabled_;
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+    // Reused for every dispatched raw touchpad event within one contact sequence; reset once
+    // all fingers are released, so each dispatch only refreshes id and fields
+    std::shared_ptr<PointerEvent> rawTouchpadPointerEvent_ { nullptr };
+    std::map<int32_t, PointerEvent::TouchpadRawPoint> rawTouchpadPoints_;
+    // Slots whose DOWN event was dispatched and not yet closed by an UP or CANCEL,
+    // used to keep the CANCEL count equal to the DOWN count
+    std::set<int32_t> rawTouchpadDownedSlots_;
+    bool rawTouchpadPaused_ { false };
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 };
 } // namespace MMI
 } // namespace OHOS

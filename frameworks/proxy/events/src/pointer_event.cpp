@@ -706,7 +706,8 @@ PointerEvent::PointerEvent(const PointerEvent& other)
       handOption_(other.handOption_), fixedMode_(other.fixedMode_),
       rightButtonSource_(other.rightButtonSource_),
       signature_(other.signature_),
-      distributeEventTime_(other.distributeEventTime_)
+      distributeEventTime_(other.distributeEventTime_),
+      touchpadRawExt_(other.touchpadRawExt_), hasTouchpadRawExt_(other.hasTouchpadRawExt_)
       {}
 
 PointerEvent::~PointerEvent() {}
@@ -742,6 +743,8 @@ void PointerEvent::Reset()
     fingerprintDistanceY_ = 0.0;
 #endif // OHOS_BUILD_ENABLE_FINGERPRINT
     rightButtonSource_ = RightButtonSource::INVALID;
+    touchpadRawExt_ = TouchpadRawExt {};
+    hasTouchpadRawExt_ = false;
 }
 
 std::string PointerEvent::ToString()
@@ -1861,6 +1864,112 @@ void PointerEvent::SetSignature(const std::string &signature)
 std::string PointerEvent::GetSignature() const
 {
     return signature_;
+}
+
+void PointerEvent::TouchpadRawPoint::SetSeatSlot(int32_t seatSlot)
+{
+    seatSlot_ = seatSlot;
+}
+
+int32_t PointerEvent::TouchpadRawPoint::GetSeatSlot() const
+{
+    return seatSlot_;
+}
+
+void PointerEvent::TouchpadRawPoint::SetX(double x)
+{
+    x_ = x;
+}
+
+double PointerEvent::TouchpadRawPoint::GetX() const
+{
+    return x_;
+}
+
+void PointerEvent::TouchpadRawPoint::SetY(double y)
+{
+    y_ = y;
+}
+
+double PointerEvent::TouchpadRawPoint::GetY() const
+{
+    return y_;
+}
+
+void PointerEvent::TouchpadRawExt::SetDeviceWidth(double deviceWidth)
+{
+    deviceWidth_ = deviceWidth;
+}
+
+double PointerEvent::TouchpadRawExt::GetDeviceWidth() const
+{
+    return deviceWidth_;
+}
+
+void PointerEvent::TouchpadRawExt::SetDeviceHeight(double deviceHeight)
+{
+    deviceHeight_ = deviceHeight;
+}
+
+double PointerEvent::TouchpadRawExt::GetDeviceHeight() const
+{
+    return deviceHeight_;
+}
+
+void PointerEvent::TouchpadRawExt::SetSeatSlot(int32_t seatSlot)
+{
+    seatSlot_ = seatSlot;
+}
+
+int32_t PointerEvent::TouchpadRawExt::GetSeatSlot() const
+{
+    return seatSlot_;
+}
+
+void PointerEvent::TouchpadRawExt::SetRawPoints(const std::vector<TouchpadRawPoint> &rawPoints)
+{
+    rawPoints_ = rawPoints;
+}
+
+const std::vector<PointerEvent::TouchpadRawPoint> &PointerEvent::TouchpadRawExt::GetRawPoints() const
+{
+    return rawPoints_;
+}
+
+void PointerEvent::SetTouchpadRawExt(const TouchpadRawExt &touchpadRawExt)
+{
+    touchpadRawExt_ = touchpadRawExt;
+    hasTouchpadRawExt_ = true;
+}
+
+const PointerEvent::TouchpadRawExt &PointerEvent::GetTouchpadRawExt() const
+{
+    return touchpadRawExt_;
+}
+
+double PointerEvent::GetTouchpadDeviceWidth() const
+{
+    return touchpadRawExt_.GetDeviceWidth();
+}
+
+double PointerEvent::GetTouchpadDeviceHeight() const
+{
+    return touchpadRawExt_.GetDeviceHeight();
+}
+
+int32_t PointerEvent::GetTouchpadSeatSlot() const
+{
+    return touchpadRawExt_.GetSeatSlot();
+}
+
+const std::vector<PointerEvent::TouchpadRawPoint> &PointerEvent::GetTouchpadRawPoints() const
+{
+    return touchpadRawExt_.GetRawPoints();
+}
+
+bool PointerEvent::HasTouchpadRawExt() const
+{
+    return hasTouchpadRawExt_;
 }
 
 } // namespace MMI

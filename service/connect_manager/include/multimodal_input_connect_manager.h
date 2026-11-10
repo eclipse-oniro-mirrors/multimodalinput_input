@@ -170,6 +170,9 @@ public:
     void RemoveServiceWatcher(std::shared_ptr<IInputServiceWatcher> watcher);
     int32_t SetPixelMapData(int32_t infoId, void* pixelMap);
     int32_t SetCurrentUser(int32_t userId);
+    int32_t SetTouchpadRawEventSwitch(bool enable);
+    // Re-applies the cached touchpad raw event switch after the service reconnects
+    void RestoreRawEventSwitch();
     int32_t SetTouchpadThreeFingersTapSwitch(bool switchFlag);
     int32_t GetTouchpadThreeFingersTapSwitch(bool &switchFlag);
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
@@ -247,6 +250,7 @@ private:
     std::set<std::shared_ptr<IInputServiceWatcher>> watchers_;
     std::mutex displayBindMutex;
     std::unordered_map<int32_t, int32_t> displayBindCache;
+    bool rawEventSwitchCache_ { false };
 };
 } // namespace MMI
 } // namespace OHOS
