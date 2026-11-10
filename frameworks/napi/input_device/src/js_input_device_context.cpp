@@ -219,6 +219,7 @@ napi_value JsInputDeviceContext::Off(napi_env env, napi_callback_info info)
     auto jsInputDeviceMgr = jsIds->GetJsInputDeviceMgr();
     CHKPP(jsInputDeviceMgr);
     if (argc == 1) {
+        MMI_HILOGI("SubEvent op=off_all kit=inputKit event=%{public}s", type.c_str());
         jsInputDeviceMgr->UnregisterDevListener(env, type);
         return nullptr;
     }
