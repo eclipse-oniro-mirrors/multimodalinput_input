@@ -99,7 +99,6 @@ void TouchDrawingManager::UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo)
 
 uint64_t TouchDrawingManager::GetDisplayRsId() const
 {
-    CALL_DEBUG_ENTER;
     auto touchDrawingHandler = GetTouchDrawingHandler();
     if (touchDrawingHandler != nullptr) {
         return touchDrawingHandler->GetDisplayRsId();
