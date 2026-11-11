@@ -16,6 +16,7 @@
 #include "dfx_hisysevent.h"
 
 #include <fstream>
+#include <string>
 
 #include "bundle_name_parser.h"
 #include "i_input_windows_manager.h"
@@ -443,6 +444,58 @@ void DfxHisysevent::StatisticTouchpadGesture(std::shared_ptr<PointerEvent> point
     } else {
         MMI_HILOGW("HiviewDFX Statistic touchpad gesture is error, pointer action is invalid");
     }
+}
+
+int32_t DfxHisysevent::ReportOriginalInputEventIntervalStat(uint32_t below8ms, uint32_t below16ms,
+    uint32_t below33ms, uint32_t below50ms, uint32_t above50ms)
+{
+    const std::string intervalJson = "{\"BELOW8MS\":" + std::to_string(below8ms) +
+        ",\"BELOW16MS\":" + std::to_string(below16ms) +
+        ",\"BELOW33MS\":" + std::to_string(below33ms) +
+        ",\"BELOW50MS\":" + std::to_string(below50ms) +
+        ",\"ABOVE50MS\":" + std::to_string(above50ms) + "}";
+    int32_t ret = HiSysEventWrite(
+        OHOS::HiviewDFX::HiSysEvent::Domain::MULTI_MODAL_INPUT,
+        "ORIGINAL_INPUT_EVENT_INTERVAL",
+        OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC,
+        "MOUSE", intervalJson);
+    if (ret != RET_OK) {
+        MMI_HILOGE("HiviewDFX Write failed, ret:%{public}d", ret);
+    }
+    return ret;
+}
+
+int32_t DfxHisysevent::ReportOriginalEventDispatchLatencyStat(uint32_t below2ms, uint32_t below4ms,
+    uint32_t below8ms, uint32_t below16ms, uint32_t above16ms)
+{
+    const std::string latencyJson = "{\"BELOW2MS\":" + std::to_string(below2ms) +
+        ",\"BELOW4MS\":" + std::to_string(below4ms) +
+        ",\"BELOW8MS\":" + std::to_string(below8ms) +
+        ",\"BELOW16MS\":" + std::to_string(below16ms) +
+        ",\"ABOVE16MS\":" + std::to_string(above16ms) + "}";
+    int32_t ret = HiSysEventWrite(
+        OHOS::HiviewDFX::HiSysEvent::Domain::MULTI_MODAL_INPUT,
+        "ORIGINAL_EVENT_DISPATCH_LATENCY",
+        OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC,
+        "MOUSE", latencyJson);
+    if (ret != RET_OK) {
+        MMI_HILOGE("HiviewDFX Write failed, ret:%{public}d", ret);
+    }
+    return ret;
+}
+
+int32_t DfxHisysevent::ReportInputGestureStat(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount)
+{
+    int32_t ret = HiSysEventWrite(
+        OHOS::HiviewDFX::HiSysEvent::Domain::MULTI_MODAL_INPUT,
+        "INPUT_GESTURE",
+        OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC,
+        "TOUCH_PAD_2FINGER_TAP", twoFingerTapCount,
+        "TOUCH_PAD_PRESS_RIGHT_CLICK_AREA", pressRightClickAreaCount);
+    if (ret != RET_OK) {
+        MMI_HILOGE("HiviewDFX Write failed, ret:%{public}d", ret);
+    }
+    return ret;
 }
 
 void DfxHisysevent::ReportTouchpadSettingState(TOUCHPAD_SETTING_CODE settingCode, bool flag)

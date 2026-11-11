@@ -18,6 +18,7 @@
 #include "device_state_manager.h"
 #include "dfx_hisysevent.h"
 #include "event_log_helper.h"
+#include "input_event_statistics.h"
 #include "i_input_windows_manager.h"
 #include "i_preference_manager.h"
 #include "i_setting_manager.h"
@@ -1816,6 +1817,11 @@ void MouseTransformProcessor::TransTouchpadRightButton(struct libinput_event_poi
     }
     if (state == LIBINPUT_BUTTON_STATE_PRESSED) {
         pressedButton_ = button;
+        if (button == MouseDeviceState::LIBINPUT_BUTTON_CODE::LIBINPUT_RIGHT_BUTTON_CODE) {
+            // Gesture source split: a tap gesture counts as two-finger tap, a touchpad
+            // button press counts as press in the right-click area.
+            InputEventStatistics::RecordTouchpadRightClick(deviceId_, evenType == LIBINPUT_EVENT_POINTER_TAP);
+        }
         if (button < MouseDeviceState::LIBINPUT_BUTTON_CODE::LIBINPUT_LEFT_BUTTON_CODE) {
             MMI_HILOGE("button press from:%{public}d to :%{public}d, evenType:%{public}d, switchType:%{public}d",
                 button, btn, evenType, switchType);

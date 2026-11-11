@@ -157,6 +157,7 @@ declare_args() {
     "event_handler/src/key_event_value_transformation.cpp",
     "event_handler/src/key_map_manager.cpp",
     "event_handler/src/trigger_event_dispatcher.cpp",
+    "input_event_statistics/src/input_event_statistics.cpp",
     "libinput_adapter/src/hotplug_detector.cpp",
     "libinput_adapter/src/libinput_adapter.cpp",
     "libinput_adapter/src/property_reader.cpp",
