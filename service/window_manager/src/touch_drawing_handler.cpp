@@ -204,6 +204,11 @@ void TouchDrawingHandler::UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo)
     }
 }
 
+uint64_t TouchDrawingHandler::GetDisplayRsId() const
+{
+    return displayInfo_.rsId;
+}
+
 bool TouchDrawingHandler::IsValidScaleInfo()
 {
     if (scaleW_ != 0 && scaleH_ != 0) {

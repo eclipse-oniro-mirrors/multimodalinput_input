@@ -27,6 +27,7 @@ public:
     virtual ~ITouchDrawingHandler() = default;
 
     virtual void UpdateDisplayInfo(const OLD::DisplayInfo &displayInfo) = 0;
+    virtual uint64_t GetDisplayRsId() const = 0;
     virtual void TouchDrawHandler(std::shared_ptr<PointerEvent> pointerEvent) = 0;
     virtual void UpdateLabels(bool isOn) = 0;
     virtual bool IsValidScaleInfo() = 0;
