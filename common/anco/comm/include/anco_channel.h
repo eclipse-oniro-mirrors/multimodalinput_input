@@ -38,6 +38,7 @@ public:
         const AncoExcludedKeyEventWindow &excludedKeyEventWindow) override;
     ErrCode UpdateTripleFingerSnapshotState(
         const AncoTripleFingerSnapshotState &snapshotState) override;
+    ErrCode SendCustomMessage(const CustomMessage &message) override;
 
 private:
     std::shared_ptr<IAncoConsumer> consumer_;

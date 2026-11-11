@@ -208,6 +208,7 @@ public:
     MOCK_METHOD(std::vector<PluginDisplayGroupInfo>, GetDisplayGroupInfos, ());
     MOCK_METHOD(int32_t, GetDisplayId, (std::shared_ptr<InputEvent>), (const));
     MOCK_METHOD(int32_t, FindDisplayGroupId, (int32_t), (const));
+    MOCK_METHOD(void, PublishEduInputDisabledState, (bool));
     MOCK_METHOD(bool, HasPointerDeviceBoundToRsId, (uint64_t), (const));
     MOCK_METHOD(int32_t, FindGroupIdByRsId, (uint64_t), (const));
     MOCK_METHOD(bool, HasMultipleActiveUsers, (), (const));
