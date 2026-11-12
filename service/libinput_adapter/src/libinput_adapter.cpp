@@ -1083,6 +1083,8 @@ void LibinputAdapter::CalculatePenCoordinates(libinput_event_type eventType, int
         int32_t targetDisplayId = -1;
         PhysicalCoordinate coord { -1.0, -1.0 };
         PointerEvent::PointerItem pointerItem;
+        pointerItem.SetToolType(PointerEvent::TOOL_TYPE_PEN);
+        pointerItem.SetDeviceId(deviceId_);
         if (WIN_MGR->CalculateTipPoint(tabletEvent, targetDisplayId, coord, pointerItem, deviceId_)) {
             x = coord.x;
             y = coord.y;
