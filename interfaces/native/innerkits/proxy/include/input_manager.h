@@ -132,6 +132,18 @@ public:
         std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
 
     /**
+     * @brief Enables or disables the raw touchpad event reporting of the current process. Once enabled,
+     * the raw touchpad events are reported as PointerEvents carrying the touchpad raw extension and
+     * dispatched to the process through the standard event dispatching channel when one of its windows
+     * is focused. The switch is disabled by default and takes effect immediately.
+     * @param enable Indicates <b>true</b> to enable the reporting, or <b>false</b> to disable it.
+     * @return Returns <b>0</b> if success; returns <b>MMI_RAW_ERR_REPEAT_OPERATION</b> if the requested
+     * state is the same as the current one; returns <b>MMI_RAW_ERR_IPC_FAILED</b> if the IPC call fails.
+     * @since 26.1.0
+     */
+    int32_t EnableTouchpadRawEvent(bool enable);
+
+    /**
      * @brief Subscribes to the key input event that meets a specific condition. When such an event occurs,
      * the <b>callback</b> specified is invoked to process the event.
      * @param keyOption Indicates the condition of the key input event.

@@ -29,6 +29,7 @@
 #include "pointer_style.h"
 #include "struct_multimodal.h"
 #include "uds_server.h"
+#include "window_info.h"
 #include "old_display_info.h"
 #include "plugin_stage.h"
 #include "shift_info.h"
@@ -92,6 +93,12 @@ public:
     virtual void DumpPendingBindState(int32_t fd) {}
     virtual int32_t GetWindowPid(int32_t windowId) const = 0;
     virtual int32_t GetWindowAgentPid(int32_t windowId) const = 0;
+    // Returns the info of the focused window in the group. Non-pure with a default
+    // returning false so facility mocks need not override it.
+    virtual bool GetFocusedWindowInfo(WindowInfo &windowInfo, int32_t groupId = DEFAULT_GROUP_ID) const
+    {
+        return false;
+    }
     virtual int32_t SetMouseCaptureMode(int32_t windowId, bool isCaptureMode) = 0;
     virtual bool GetMouseIsCaptureMode() const = 0;
     virtual int32_t GetDisplayBindInfo(DisplayBindInfos &infos) = 0;

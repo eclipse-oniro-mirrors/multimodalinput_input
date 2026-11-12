@@ -200,6 +200,8 @@ public:
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
     ErrCode SetPixelMapData(int32_t infoId, const CursorPixelMap& curPixelMap) override;
     ErrCode SetCurrentUser(int32_t userId) override;
+    ErrCode SetTouchpadRawEventSwitch(bool enable) override;
+    int32_t OnSetTouchpadRawEventSwitch(int32_t pid, bool enable);
     ErrCode SetTouchpadThreeFingersTapSwitch(bool switchFlag) override;
     ErrCode GetTouchpadThreeFingersTapSwitch(bool &switchFlag) override;
     ErrCode AddVirtualInputDevice(const InputDevice& device, int32_t& deviceId) override;

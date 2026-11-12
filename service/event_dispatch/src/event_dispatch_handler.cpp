@@ -630,6 +630,26 @@ void EventDispatchHandler::DispatchPointerEventInner(std::shared_ptr<PointerEven
 }
 #endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_POINTER
 
+int32_t EventDispatchHandler::DispatchRawTouchpadPointerEvent(std::shared_ptr<PointerEvent> pointerEvent,
+    int32_t pid)
+{
+    CHKPR(pointerEvent, PARAM_INPUT_INVALID);
+    auto udsServer = InputHandler->GetUDSServer();
+    CHKPR(udsServer, ERROR_NULL_POINTER);
+    auto sess = udsServer->GetSessionByPid(pid);
+    CHKPR(sess, ERROR_NULL_POINTER);
+    NetPacket pkt(MmiMessageId::ON_POINTER_EVENT);
+    if (InputEventDataTransformation::Marshalling(pointerEvent, pkt) != RET_OK) {
+        MMI_HILOGE("Failed to serialize raw touchpad pointer event, errCode:%{public}d", MSG_SEND_FAIL);
+        return MSG_SEND_FAIL;
+    }
+    if (!udsServer->SendMsg(sess->GetFd(), pkt)) {
+        MMI_HILOGE("Sending raw touchpad pointer event failed! errCode:%{public}d", MSG_SEND_FAIL);
+        return MSG_SEND_FAIL;
+    }
+    return RET_OK;
+}
+
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
 int32_t EventDispatchHandler::DispatchKeyEventPid(UDSServer& udsServer, std::shared_ptr<KeyEvent> key)
 {

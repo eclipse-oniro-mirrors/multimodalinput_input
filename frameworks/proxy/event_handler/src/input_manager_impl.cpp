@@ -1943,6 +1943,7 @@ void InputManagerImpl::OnConnected()
     if (permissionType_ != 0) {
         MULTIMODAL_INPUT_CONNECT_MGR->SwitchScreenCapturePermission(permissionType_, permissionEnable_);
     }
+    MULTIMODAL_INPUT_CONNECT_MGR->RestoreRawEventSwitch();
     if (currentUserId_.load() == -1) {
         MMI_HILOGW("Current userId is not initialized");
         return;
@@ -3083,6 +3084,18 @@ int32_t InputManagerImpl::SetMoveEventFilters(bool flag)
     MMI_HILOGW("Set move event filters does not support");
     return ERROR_UNSUPPORT;
 #endif // OHOS_BUILD_ENABLE_MOVE_EVENT_FILTERS
+}
+
+int32_t InputManagerImpl::EnableTouchpadRawEvent(bool enable)
+{
+    CALL_DEBUG_ENTER;
+    MMI_HILOGI("EnableTouchpadRawEvent, enable:%{public}d", enable);
+    int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->SetTouchpadRawEventSwitch(enable);
+    if (ret != RET_OK) {
+        MMI_HILOGW("Failed to EnableTouchpadRawEvent, enable:%{public}d, ret:%{public}d", enable, ret);
+        return (ret == MMI_RAW_ERR_REPEAT_OPERATION) ? ret : MMI_RAW_ERR_IPC_FAILED;
+    }
+    return RET_OK;
 }
 
 int32_t InputManagerImpl::SetTouchpadThreeFingersTapSwitch(bool switchFlag)

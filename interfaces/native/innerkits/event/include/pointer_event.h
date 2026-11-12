@@ -28,6 +28,16 @@
 
 namespace OHOS {
 namespace MMI {
+/**
+ * @brief Error codes of the touchpad raw event interface.
+ *
+ * @since 26.1.0
+ */
+enum TouchpadRawEventErrCode : int32_t {
+    MMI_RAW_ERR_IPC_FAILED = 4900102,
+    MMI_RAW_ERR_REPEAT_OPERATION = 4900103,
+};
+
 class PointerEvent : public InputEvent {
 public:
     static constexpr int32_t POINTER_INITIAL_VALUE = -1;
@@ -1571,6 +1581,132 @@ public:
         std::vector<ExtensionData> extensionData_;
     };
 
+    /**
+     * @brief One raw contact point reported by the touchpad, in the touchpad device coordinate system.
+     *
+     * @since 26.1.0
+     */
+    class TouchpadRawPoint {
+    public:
+        /**
+         * @brief Sets the seat slot of the contact point.
+         * @param seatSlot Indicates the seat slot of the contact point.
+         * @since 26.1.0
+         */
+        void SetSeatSlot(int32_t seatSlot);
+
+        /**
+         * @brief Obtains the seat slot of the contact point.
+         * @return Returns the seat slot of the contact point.
+         * @since 26.1.0
+         */
+        int32_t GetSeatSlot() const;
+
+        /**
+         * @brief Sets the X coordinate of the contact point in touchpad device coordinates.
+         * @param x Indicates the X coordinate of the contact point.
+         * @since 26.1.0
+         */
+        void SetX(double x);
+
+        /**
+         * @brief Obtains the X coordinate of the contact point in touchpad device coordinates.
+         * @return Returns the X coordinate of the contact point.
+         * @since 26.1.0
+         */
+        double GetX() const;
+
+        /**
+         * @brief Sets the Y coordinate of the contact point in touchpad device coordinates.
+         * @param y Indicates the Y coordinate of the contact point.
+         * @since 26.1.0
+         */
+        void SetY(double y);
+
+        /**
+         * @brief Obtains the Y coordinate of the contact point in touchpad device coordinates.
+         * @return Returns the Y coordinate of the contact point.
+         * @since 26.1.0
+         */
+        double GetY() const;
+    private:
+        int32_t seatSlot_ { -1 };
+        double x_ { 0.0 };
+        double y_ { 0.0 };
+    };
+
+    /**
+     * @brief Optional extension carrying the touchpad raw reporting data. Its presence on a
+     * PointerEvent identifies the event as a touchpad raw event. The point coordinates and the device
+     * width and height share the same numeric type (double) and the same touchpad device coordinate system.
+     *
+     * @since 26.1.0
+     */
+    class TouchpadRawExt {
+    public:
+        /**
+         * @brief Sets the width of the touchpad in device coordinates.
+         * @param deviceWidth Indicates the width of the touchpad.
+         * @since 26.1.0
+         */
+        void SetDeviceWidth(double deviceWidth);
+
+        /**
+         * @brief Obtains the width of the touchpad in device coordinates.
+         * @return Returns the width of the touchpad.
+         * @since 26.1.0
+         */
+        double GetDeviceWidth() const;
+
+        /**
+         * @brief Sets the height of the touchpad in device coordinates.
+         * @param deviceHeight Indicates the height of the touchpad.
+         * @since 26.1.0
+         */
+        void SetDeviceHeight(double deviceHeight);
+
+        /**
+         * @brief Obtains the height of the touchpad in device coordinates.
+         * @return Returns the height of the touchpad.
+         * @since 26.1.0
+         */
+        double GetDeviceHeight() const;
+
+        /**
+         * @brief Sets the seat slot of the finger that triggered this event.
+         * @param seatSlot Indicates the seat slot, -1 when there is no single active finger.
+         * @since 26.1.0
+         */
+        void SetSeatSlot(int32_t seatSlot);
+
+        /**
+         * @brief Obtains the seat slot of the finger that triggered this event.
+         * @return Returns the seat slot, or -1 when there is no single active finger.
+         * @since 26.1.0
+         */
+        int32_t GetSeatSlot() const;
+
+        /**
+         * @brief Sets the raw contact points reported by the touchpad.
+         * @param rawPoints Indicates the raw contact points.
+         * @since 26.1.0
+         */
+        void SetRawPoints(const std::vector<TouchpadRawPoint> &rawPoints);
+
+        /**
+         * @brief Obtains the raw contact points reported by the touchpad.
+         * @return Returns the raw contact points.
+         * @since 26.1.0
+         */
+        const std::vector<TouchpadRawPoint> &GetRawPoints() const;
+    private:
+        double deviceWidth_ { 0.0 };
+        double deviceHeight_ { 0.0 };
+        // Seat slot of the finger that triggered this event, -1 when there is no single active one
+        int32_t seatSlot_ { -1 };
+        std::vector<TouchpadRawPoint> rawPoints_;
+    };
+
 public:
     /**
      * @brief Copy constructor function for PointerEvent
@@ -2132,6 +2268,56 @@ public:
     void SetSignature(const std::string &signature);
     std::string GetSignature() const;
 
+    /**
+     * @brief Sets the optional touchpad raw extension, marking the event as a touchpad raw event.
+     * @param touchpadRawExt Indicates the touchpad raw extension to set.
+     * @since 26.1.0
+     */
+    void SetTouchpadRawExt(const TouchpadRawExt &touchpadRawExt);
+
+    /**
+     * @brief Obtains the optional touchpad raw extension.
+     * @return Returns the touchpad raw extension; meaningful only when HasTouchpadRawExt() is true.
+     * @since 26.1.0
+     */
+    const TouchpadRawExt &GetTouchpadRawExt() const;
+
+    /**
+     * @brief Obtains the width of the touchpad in device coordinates.
+     * @return Returns the width of the touchpad; meaningful only when HasTouchpadRawExt() is true.
+     * @since 26.1.0
+     */
+    double GetTouchpadDeviceWidth() const;
+
+    /**
+     * @brief Obtains the height of the touchpad in device coordinates.
+     * @return Returns the height of the touchpad; meaningful only when HasTouchpadRawExt() is true.
+     * @since 26.1.0
+     */
+    double GetTouchpadDeviceHeight() const;
+
+    /**
+     * @brief Obtains the seat slot of the finger that triggered this event.
+     * @return Returns the seat slot, or -1 when there is no single active finger;
+     * meaningful only when HasTouchpadRawExt() is true.
+     * @since 26.1.0
+     */
+    int32_t GetTouchpadSeatSlot() const;
+
+    /**
+     * @brief Obtains the raw contact points reported by the touchpad.
+     * @return Returns the raw contact points; meaningful only when HasTouchpadRawExt() is true.
+     * @since 26.1.0
+     */
+    const std::vector<TouchpadRawPoint> &GetTouchpadRawPoints() const;
+
+    /**
+     * @brief Checks whether the event carries the touchpad raw extension.
+     * @return Returns <b>true</b> if the event is a touchpad raw event.
+     * @since 26.1.0
+     */
+    bool HasTouchpadRawExt() const;
+
 protected:
     /**
      * @brief Constructs an input event object by using the specified input event type. Generally, this method
@@ -2196,6 +2382,8 @@ private:
     RightButtonSource rightButtonSource_ { RightButtonSource::INVALID };
     std::string signature_;
     uint64_t distributeEventTime_ = 0;
+    TouchpadRawExt touchpadRawExt_ {};
+    bool hasTouchpadRawExt_ { false };
 };
 
 inline bool PointerEvent::HasAxis(AxisType axis) const

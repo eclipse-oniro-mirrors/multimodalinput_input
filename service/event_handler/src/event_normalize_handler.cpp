@@ -46,6 +46,7 @@
 #include "time_cost_chk.h"
 #include "timer_manager.h"
 #include "touch_event_normalize.h"
+#include "util_ex.h"
 #ifdef OHOS_BUILD_ENABLE_POINTER
 #include "account_manager.h"
 #endif // OHOS_BUILD_ENABLE_POINTER
@@ -69,6 +70,11 @@ namespace MMI {
 namespace {
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
 constexpr int32_t FINGER_NUM { 2 };
+constexpr int64_t USEC_TO_NSEC { 1000 };
+constexpr int32_t MIN_RAW_CANCEL_FINGER_COUNT { 3 };
+constexpr int32_t EDGE_SWIPE_FINGER_COUNT { 1 };
+constexpr int32_t SINGLE_KNUCKLE_FINGER_COUNT { 1 };
+constexpr int32_t DOUBLE_KNUCKLE_FINGER_COUNT { 2 };
 constexpr int32_t SWIPE_INWARD_FINGER_ONE { 1 };
 constexpr int32_t USELIB_ABS_MT_POSITION_X { 0x35 };
 constexpr int32_t USELIB_ABS_MT_POSITION_Y { 0x36 };
@@ -773,10 +779,16 @@ int32_t EventNormalizeHandler::HandleTouchPadEvent(libinput_event* event)
     auto touchpad = libinput_event_get_touchpad_event(event);
     CHKPR(touchpad, ERROR_NULL_POINTER);
     auto type = libinput_event_get_type(event);
-    if ((type == LIBINPUT_EVENT_TOUCHPAD_DOWN || type == LIBINPUT_EVENT_TOUCHPAD_MOTION ||
-            type == LIBINPUT_EVENT_TOUCHPAD_UP) &&
-        (TouchPadKnuckleDoubleClickHandle(event) || HandleTouchPadEdgeSwipe(event))) {
-        return RET_OK;
+    CollectRawTouchpadEvent(event, type);
+    if (type == LIBINPUT_EVENT_TOUCHPAD_DOWN || type == LIBINPUT_EVENT_TOUCHPAD_MOTION ||
+            type == LIBINPUT_EVENT_TOUCHPAD_UP) {
+        if (TouchPadKnuckleDoubleClickHandle(event)) {
+            return RET_OK;
+        }
+        if (HandleTouchPadEdgeSwipe(event)) {
+            SendFreetouchRawTouchpadCancel(event, EDGE_SWIPE_FINGER_COUNT);
+            return RET_OK;
+        }
     }
     int32_t seatSlot = libinput_event_touchpad_get_seat_slot(touchpad);
     MULTI_FINGERTAP_HDR->HandleMulFingersTap(touchpad, type);
@@ -843,6 +855,9 @@ int32_t EventNormalizeHandler::HandleGestureEvent(libinput_event* event)
     EventStatistic::PushPointerEvent(pointerEvent);
     nextHandler_->HandlePointerEvent(pointerEvent);
     auto type = libinput_event_get_type(event);
+    if (type == LIBINPUT_EVENT_GESTURE_SWIPE_BEGIN) {
+        SendRawTouchpadCancel(event);
+    }
     if (type == LIBINPUT_EVENT_GESTURE_SWIPE_END || type == LIBINPUT_EVENT_GESTURE_PINCH_END) {
         pointerEvent->RemovePointerItem(pointerEvent->GetPointerId());
         MMI_HILOGD("This touch pad event is up remove this finger");
@@ -1482,6 +1497,7 @@ bool EventNormalizeHandler::TouchPadKnuckleDoubleClickHandle(libinput_event* eve
         MMI_HILOGI("Current is touchPad single knuckle double click action");
         nextHandler_->HandleKeyEvent(keyEvent);
         DfxHisysevent::ReportTouchpadKnuckleDoubleClickEvent(1);
+        SendFreetouchRawTouchpadCancel(event, SINGLE_KNUCKLE_FINGER_COUNT);
         return true;
     }
     if (value == DOUBLE_KNUCKLE_ABS_PRESSURE_VALUE &&
@@ -1490,6 +1506,7 @@ bool EventNormalizeHandler::TouchPadKnuckleDoubleClickHandle(libinput_event* eve
         MMI_HILOGI("Current is touchPad double knuckle double click action");
         nextHandler_->HandleKeyEvent(keyEvent);
         DfxHisysevent::ReportTouchpadKnuckleDoubleClickEvent(2); // 2 fingers knuckle double click event
+        SendFreetouchRawTouchpadCancel(event, DOUBLE_KNUCKLE_FINGER_COUNT);
         return true;
     }
 #ifdef OHOS_BUILD_ENABLE_POINTER
@@ -1638,6 +1655,325 @@ void EventNormalizeHandler::BypassChainAndDispatchDirectly(std::shared_ptr<Point
         MMI_HILOGW("Unsupported sourceType:%{public}d", sourceType);
     }
     MMI_HILOGD("Dispatch directly, id:%{public}d", pointerEvent->GetId());
+}
+
+int32_t EventNormalizeHandler::SetTouchpadRawEventEnabled(int32_t pid, bool enable)
+{
+    auto it = rawTouchpadEnabled_.find(pid);
+    bool alreadyEnabled = (it != rawTouchpadEnabled_.end()) && it->second;
+    if (enable) {
+        if (alreadyEnabled) {
+            MMI_HILOGW("Touchpad raw event has been enabled, pid:%{public}d", pid);
+            return MMI_RAW_ERR_REPEAT_OPERATION;
+        }
+        rawTouchpadEnabled_[pid] = true;
+    } else {
+        if (!alreadyEnabled) {
+            MMI_HILOGW("Touchpad raw event has not been enabled, pid:%{public}d", pid);
+            return MMI_RAW_ERR_REPEAT_OPERATION;
+        }
+        rawTouchpadEnabled_.erase(it);
+    }
+    MMI_HILOGI("EnableTouchpadRawEvent: pid=%{public}d, enable=%{public}s", pid, enable ? "true" : "false");
+    return RET_OK;
+}
+
+void EventNormalizeHandler::RemoveTouchpadRawEventEnabled(int32_t pid)
+{
+    if (rawTouchpadEnabled_.erase(pid) > 0) {
+        MMI_HILOGI("EnableTouchpadRawEvent: pid=%{public}d removed", pid);
+    }
+}
+
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+bool EventNormalizeHandler::IsTouchpadRawEventEnabled(int32_t pid)
+{
+    auto it = rawTouchpadEnabled_.find(pid);
+    return (it != rawTouchpadEnabled_.end()) && it->second;
+}
+
+void EventNormalizeHandler::CollectRawTouchpadEvent(libinput_event* event, int32_t type)
+{
+    if (event == nullptr) {
+        MMI_HILOGE("event is nullptr");
+        return;
+    }
+    if ((type != LIBINPUT_EVENT_TOUCHPAD_DOWN) && (type != LIBINPUT_EVENT_TOUCHPAD_MOTION) &&
+        (type != LIBINPUT_EVENT_TOUCHPAD_UP)) {
+        return;
+    }
+    auto touchpad = libinput_event_get_touchpad_event(event);
+    if (touchpad == nullptr) {
+        MMI_HILOGE("touchpad is nullptr");
+        return;
+    }
+    auto device = libinput_event_get_device(event);
+    if (device == nullptr) {
+        MMI_HILOGE("device is nullptr");
+        return;
+    }
+    int32_t deviceId = INPUT_DEV_MGR->FindInputDeviceId(device);
+    int32_t displayId = WIN_MGR->GetBindDisplayIdByInputDevice(deviceId);
+    int32_t groupId = WIN_MGR->FindDisplayGroupId(displayId);
+    if (!IsTouchpadRawEventEnabled(WIN_MGR->GetFocusPid(groupId))) {
+        return;
+    }
+    WindowInfo focusWindow;
+    if (!WIN_MGR->GetFocusedWindowInfo(focusWindow, groupId)) {
+        return;
+    }
+    int32_t seatSlot = libinput_event_touchpad_get_seat_slot(touchpad);
+    int64_t timestamp = static_cast<int64_t>(libinput_event_touchpad_get_time_usec(touchpad));
+    if (type == LIBINPUT_EVENT_TOUCHPAD_UP) {
+        if (!rawTouchpadPaused_) {
+            rawTouchpadPoints_[seatSlot] = MakeRawTouchpadPoint(touchpad, seatSlot);
+            DispatchRawTouchpadEvent(PointerEvent::POINTER_ACTION_UP, device, focusWindow, timestamp, seatSlot,
+                libinput_event_touchpad_get_pressure(touchpad));
+        }
+        rawTouchpadPoints_.erase(seatSlot);
+        rawTouchpadDownedSlots_.erase(seatSlot);
+        if (rawTouchpadPoints_.empty()) {
+            MMI_HILOGD("All fingers released, resume touchpad raw event");
+            rawTouchpadPaused_ = false;
+            if (rawTouchpadPointerEvent_ != nullptr) {
+                rawTouchpadPointerEvent_->Reset();
+            }
+        }
+        return;
+    }
+    if (rawTouchpadPaused_) {
+        return;
+    }
+    rawTouchpadPoints_[seatSlot] = MakeRawTouchpadPoint(touchpad, seatSlot);
+    if (type == LIBINPUT_EVENT_TOUCHPAD_DOWN) {
+        rawTouchpadDownedSlots_.insert(seatSlot);
+    }
+    auto pointerAction = (type == LIBINPUT_EVENT_TOUCHPAD_DOWN) ? PointerEvent::POINTER_ACTION_DOWN
+        : PointerEvent::POINTER_ACTION_MOVE;
+    DispatchRawTouchpadEvent(pointerAction, device, focusWindow, timestamp, seatSlot,
+        libinput_event_touchpad_get_pressure(touchpad));
+}
+
+PointerEvent::TouchpadRawPoint EventNormalizeHandler::MakeRawTouchpadPoint(
+    struct libinput_event_touch *touchpad, int32_t seatSlot)
+{
+    PointerEvent::TouchpadRawPoint rawPoint;
+    rawPoint.SetSeatSlot(seatSlot);
+    rawPoint.SetX(libinput_event_touchpad_get_x(touchpad));
+    rawPoint.SetY(libinput_event_touchpad_get_y(touchpad));
+    return rawPoint;
+}
+
+void EventNormalizeHandler::DispatchRawTouchpadEvent(int32_t pointerAction, struct libinput_device *device,
+    const WindowInfo &focusWindow, int64_t timestamp, int32_t seatSlot, double pressure)
+{
+    if (rawTouchpadPointerEvent_ == nullptr) {
+        rawTouchpadPointerEvent_ = PointerEvent::Create();
+        if (rawTouchpadPointerEvent_ == nullptr) {
+            MMI_HILOGE("pointerEvent is nullptr");
+            return;
+        }
+    }
+    auto pointerEvent = rawTouchpadPointerEvent_;
+    pointerEvent->UpdateId();
+    FillRawPointerEvent(pointerEvent, pointerAction, device, focusWindow, timestamp, seatSlot, pressure);
+    MMI_HILOGD("Dispatch raw touchpad event, action:%{public}d, fingerCount:%{public}zu, pid:%{public}d",
+        pointerAction, pointerEvent->GetTouchpadRawExt().GetRawPoints().size(), focusWindow.pid);
+    auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
+    if (eventDispatchHandler == nullptr) {
+        MMI_HILOGE("eventDispatchHandler is nullptr");
+        return;
+    }
+    eventDispatchHandler->DispatchRawTouchpadPointerEvent(pointerEvent, focusWindow.pid);
+}
+
+void EventNormalizeHandler::SendRawTouchpadCancel(libinput_event* event)
+{
+    if (event == nullptr) {
+        MMI_HILOGE("event is nullptr");
+        return;
+    }
+    auto gesture = libinput_event_get_gesture_event(event);
+    if (gesture == nullptr) {
+        MMI_HILOGE("gesture is nullptr");
+        return;
+    }
+    int32_t fingerCount = libinput_event_gesture_get_finger_count(gesture);
+    if (fingerCount < MIN_RAW_CANCEL_FINGER_COUNT) {
+        return;
+    }
+    auto device = libinput_event_get_device(event);
+    int64_t timestamp = MS2US(static_cast<int64_t>(libinput_event_gesture_get_time(gesture)));
+    DispatchTouchpadRawCancel(device, fingerCount, timestamp);
+}
+
+void EventNormalizeHandler::SendFreetouchRawTouchpadCancel(libinput_event* event, int32_t fingerCount)
+{
+    if (event == nullptr) {
+        MMI_HILOGE("event is nullptr");
+        return;
+    }
+    auto touchpad = libinput_event_get_touchpad_event(event);
+    if (touchpad == nullptr) {
+        MMI_HILOGE("touchpad is nullptr");
+        return;
+    }
+    auto device = libinput_event_get_device(event);
+    int64_t timestamp = static_cast<int64_t>(libinput_event_touchpad_get_time_usec(touchpad));
+    DispatchTouchpadRawCancel(device, fingerCount, timestamp);
+}
+
+void EventNormalizeHandler::DispatchTouchpadRawCancel(struct libinput_device *device, int32_t fingerCount,
+    int64_t timestamp)
+{
+    if (rawTouchpadPaused_) {
+        return;
+    }
+    if (device == nullptr) {
+        MMI_HILOGE("device is nullptr");
+        return;
+    }
+    int32_t deviceId = INPUT_DEV_MGR->FindInputDeviceId(device);
+    int32_t displayId = WIN_MGR->GetBindDisplayIdByInputDevice(deviceId);
+    int32_t groupId = WIN_MGR->FindDisplayGroupId(displayId);
+    if (!IsTouchpadRawEventEnabled(WIN_MGR->GetFocusPid(groupId))) {
+        return;
+    }
+    WindowInfo focusWindow;
+    if (!WIN_MGR->GetFocusedWindowInfo(focusWindow, groupId)) {
+        return;
+    }
+    MMI_HILOGI("Global gesture formed, cancel touchpad raw event, fingerCount:%{public}d, cancelCount:%{public}zu",
+        fingerCount, rawTouchpadDownedSlots_.size());
+    rawTouchpadPaused_ = true;
+    // One CANCEL per dispatched-but-unclosed DOWN keeps the cancel count equal to the down count
+    for (size_t i = 0; i < rawTouchpadDownedSlots_.size(); ++i) {
+        DispatchRawTouchpadEvent(PointerEvent::POINTER_ACTION_CANCEL, device, focusWindow, timestamp, -1, 0.0);
+    }
+    rawTouchpadDownedSlots_.clear();
+}
+
+void EventNormalizeHandler::FillRawPointerEvent(std::shared_ptr<PointerEvent> pointerEvent, int32_t pointerAction,
+    struct libinput_device *device, const WindowInfo &focusWindow, int64_t timestamp, int32_t seatSlot,
+    double pressure)
+{
+    PointerEvent::TouchpadRawExt ext;
+    // The point coordinates from libinput_event_touchpad_get_x/y are converted to mm with the
+    // axis resolution, so report the physical size in mm to keep the same unit.
+    double deviceWidth = 0.0;
+    double deviceHeight = 0.0;
+    if (libinput_device_get_size(device, &deviceWidth, &deviceHeight) != 0) {
+        MMI_HILOGW("FillRawPointerEvent failed: get touchpad physic size error");
+    }
+    ext.SetDeviceWidth(deviceWidth);
+    ext.SetDeviceHeight(deviceHeight);
+    ext.SetSeatSlot(seatSlot);
+    // The single item reports the cursor position; the raw device coordinates and seat slots
+    // of the contacts travel in the touchpad raw extension.
+    double cursorDisplayX = -1.0;
+    double cursorDisplayY = -1.0;
+    double cursorGlobalX = -1.0;
+    double cursorGlobalY = -1.0;
+    bool hasCursorGlobal = false;
+    double cursorWindowX = -1.0;
+    double cursorWindowY = -1.0;
+#if defined(OHOS_BUILD_ENABLE_POINTER) || defined(OHOS_BUILD_ENABLE_TOUCH)
+    auto cursorPos = WIN_MGR->GetCursorPos();
+    cursorDisplayX = cursorPos.cursorPos.x;
+    cursorDisplayY = cursorPos.cursorPos.y;
+    cursorWindowX = cursorDisplayX - focusWindow.area.x;
+    cursorWindowY = cursorDisplayY - focusWindow.area.y;
+    auto physicalDisplayInfo = WIN_MGR->GetPhysicalDisplay(cursorPos.displayId);
+    if (physicalDisplayInfo != nullptr) {
+        hasCursorGlobal = true;
+        cursorGlobalX = cursorDisplayX + physicalDisplayInfo->x;
+        cursorGlobalY = cursorDisplayY + physicalDisplayInfo->y;
+        // Window coordinates share the global (logical) space of window.area, so subtract
+        // the window area from the cursor global position.
+        cursorWindowX = cursorGlobalX - focusWindow.area.x;
+        cursorWindowY = cursorGlobalY - focusWindow.area.y;
+        if (!focusWindow.transform.empty()) {
+            auto windowXY = WIN_MGR->TransformWindowXY(focusWindow, cursorGlobalX, cursorGlobalY);
+            cursorWindowX = windowXY.first;
+            cursorWindowY = windowXY.second;
+        }
+    }
+#endif // OHOS_BUILD_ENABLE_POINTER || OHOS_BUILD_ENABLE_TOUCH
+    std::vector<PointerEvent::TouchpadRawPoint> rawPoints;
+    for (const auto &item : rawTouchpadPoints_) {
+        rawPoints.push_back(item.second);
+    }
+    ext.SetRawPoints(rawPoints);
+    PointerEvent::PointerItem pointerItem;
+    pointerItem.SetPointerId(0);
+    pointerItem.SetToolType(PointerEvent::TOOL_TYPE_TOUCHPAD);
+    pointerItem.SetPressure(pressure);
+    pointerItem.SetDisplayX(static_cast<int32_t>(cursorDisplayX));
+    pointerItem.SetDisplayY(static_cast<int32_t>(cursorDisplayY));
+    pointerItem.SetDisplayXPos(cursorDisplayX);
+    pointerItem.SetDisplayYPos(cursorDisplayY);
+    if (hasCursorGlobal) {
+        pointerItem.SetGlobalX(cursorGlobalX);
+        pointerItem.SetGlobalY(cursorGlobalY);
+    }
+    pointerItem.SetWindowX(static_cast<int32_t>(cursorWindowX));
+    pointerItem.SetWindowY(static_cast<int32_t>(cursorWindowY));
+    pointerItem.SetWindowXPos(cursorWindowX);
+    pointerItem.SetWindowYPos(cursorWindowY);
+    // The event object is reused within one contact sequence, so update the existing cursor
+    // item instead of appending a duplicate every dispatch
+    PointerEvent::PointerItem existingItem;
+    if (pointerEvent->GetPointerItem(0, existingItem)) {
+        pointerEvent->UpdatePointerItem(0, pointerItem);
+    } else {
+        pointerEvent->AddPointerItem(pointerItem);
+    }
+    pointerEvent->SetTouchpadRawExt(ext);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
+    pointerEvent->SetPointerAction(pointerAction);
+    pointerEvent->SetPointerId(0);
+    pointerEvent->SetDeviceId(INPUT_DEV_MGR->FindInputDeviceId(device));
+    pointerEvent->SetActionTime(timestamp * USEC_TO_NSEC);
+    pointerEvent->SetActionStartTime(timestamp * USEC_TO_NSEC);
+    pointerEvent->SetTargetWindowId(focusWindow.id);
+    pointerEvent->SetAgentWindowId(focusWindow.agentWindowId);
+    pointerEvent->SetTargetDisplayId(focusWindow.displayId);
+    pointerEvent->SetPressedKeys(GetRawPressedKeys());
+}
+
+std::vector<int32_t> EventNormalizeHandler::GetRawPressedKeys()
+{
+#ifdef OHOS_BUILD_ENABLE_KEYBOARD
+    std::vector<int32_t> pressedKeys;
+    if (KeyEventHdr != nullptr) {
+        const auto &keyEvent = KeyEventHdr->GetKeyEvent();
+        if (keyEvent != nullptr) {
+            for (auto keycode : keyEvent->GetPressedKeys()) {
+                if ((keycode == KeyEvent::KEYCODE_CTRL_LEFT) || (keycode == KeyEvent::KEYCODE_CTRL_RIGHT) ||
+                    (keycode == KeyEvent::KEYCODE_ALT_LEFT) || (keycode == KeyEvent::KEYCODE_ALT_RIGHT) ||
+                    (keycode == KeyEvent::KEYCODE_SHIFT_LEFT) || (keycode == KeyEvent::KEYCODE_SHIFT_RIGHT) ||
+                    (keycode == KeyEvent::KEYCODE_META_LEFT) || (keycode == KeyEvent::KEYCODE_META_RIGHT)) {
+                    pressedKeys.push_back(keycode);
+                }
+            }
+        }
+    }
+    return pressedKeys;
+#else
+    return {};
+#endif // OHOS_BUILD_ENABLE_KEYBOARD
+}
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
+
+void EventNormalizeHandler::DumpTouchpadRawEventSwitch(int32_t fd)
+{
+    mprintf(fd, "Touchpad raw event switch:\n");
+    if (rawTouchpadEnabled_.empty()) {
+        mprintf(fd, "  no process enabled\n");
+    }
+    for (const auto &item : rawTouchpadEnabled_) {
+        mprintf(fd, "  pid:%d, enable:%s\n", item.first, item.second ? "true" : "false");
+    }
 }
 } // namespace MMI
 } // namespace OHOS
