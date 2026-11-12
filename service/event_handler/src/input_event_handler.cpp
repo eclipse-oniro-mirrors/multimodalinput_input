@@ -292,6 +292,10 @@ bool InputEventHandler::IsTouchpadButtonMistouch(libinput_event* event)
     if (buttonState == LIBINPUT_BUTTON_STATE_PRESSED) {
         auto touchpadDevice = libinput_event_get_device(event); // guaranteed valid during event lifetime
         CHKPF(touchpadDevice);
+        if (libinput_device_has_capability(touchpadDevice, LIBINPUT_DEVICE_CAP_TABLET_TOOL)) {
+            MMI_HILOGD("Skip DWT button mistouch for tablet_tool device");
+            return false;
+        }
         double touchpadSizeX;
         double touchpadSizeY;
         if (libinput_device_get_size(touchpadDevice, &touchpadSizeX, &touchpadSizeY) != 0) {
@@ -324,6 +328,10 @@ bool InputEventHandler::IsTouchpadTapMistouch(libinput_event* event)
     if (state == LIBINPUT_BUTTON_STATE_PRESSED) {
         auto touchpadDevice = libinput_event_get_device(event); // guaranteed valid during event lifetime
         CHKPF(touchpadDevice);
+        if (libinput_device_has_capability(touchpadDevice, LIBINPUT_DEVICE_CAP_TABLET_TOOL)) {
+            MMI_HILOGD("Skip DWT tap mistouch for tablet_tool device");
+            return false;
+        }
         double touchpadSizeX;
         double touchpadSizeY;
         if (libinput_device_get_size(touchpadDevice, &touchpadSizeX, &touchpadSizeY) != 0) {
@@ -392,6 +400,10 @@ bool InputEventHandler::IsTouchpadPointerMotionMistouch(libinput_event *event)
     CHKPF(pointerEvent);
     auto touchpadDevice = libinput_event_get_device(event); // guaranteed valid during event lifetime
     CHKPF(touchpadDevice);
+    if (libinput_device_has_capability(touchpadDevice, LIBINPUT_DEVICE_CAP_TABLET_TOOL)) {
+            MMI_HILOGD("Skip DWT pointer motion mistouch for tablet_tool device");
+            return false;
+    }
     double touchpadSizeX;
     double touchpadSizeY;
     if (libinput_device_get_size(touchpadDevice, &touchpadSizeX, &touchpadSizeY) != 0) {
