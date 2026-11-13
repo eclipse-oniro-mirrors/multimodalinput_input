@@ -14,6 +14,7 @@
  */
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <vector>
@@ -1686,6 +1687,321 @@ HWTEST_F(PointerRendererTest, PointerRendererTest_SoftBufferSide_001, TestSize.L
     big.size = 1;
     big.dpi = 8.0f;
     EXPECT_GT(big.GetImageSize(), 256) << "the oversized-cursor case no longer overflows";
+}
+
+/**
+ * @tc.name: PointerRendererTest_GetFocus_003
+ * @tc.desc: Pins the E/S/W/N/SE/NE truth table of GetFocusX/GetFocusY, covering the
+ *           ANGLE_W/ANGLE_SE/ANGLE_NE label that returns the clamped width as X
+ *           (pointer_renderer.cpp:267) together with the matching Y labels.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_GetFocus_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    RenderConfig probe;
+    probe.align_ = ICON_TYPE::ANGLE_CENTER;
+    probe.size = MAX_POINTER_SIZE;
+    probe.dpi = MAX_DPI;
+    const uint32_t c = static_cast<uint32_t>(probe.GetClampedImageSize(BUFFER_SIDE));
+    ASSERT_GT(c, 0u);
+    const uint32_t half = c - static_cast<uint32_t>(c / CALCULATE_IMAGE_MIDDLE_OLD);
+    struct FocusCase {
+        ICON_TYPE align;
+        uint32_t expectX;
+        uint32_t expectY;
+    };
+    const FocusCase cases[] = {
+        { ICON_TYPE::ANGLE_E, 0, half },
+        { ICON_TYPE::ANGLE_S, half, 0 },
+        { ICON_TYPE::ANGLE_W, c, c },
+        { ICON_TYPE::ANGLE_N, half, c },
+        { ICON_TYPE::ANGLE_SE, c, c },
+        { ICON_TYPE::ANGLE_NE, c, 0 },
+    };
+    for (const auto &item : cases) {
+        RenderConfig config;
+        config.align_ = item.align;
+        config.size = MAX_POINTER_SIZE;
+        config.dpi = MAX_DPI;
+        EXPECT_EQ(config.GetFocusX(BUFFER_SIDE), item.expectX)
+            << "align=" << static_cast<int32_t>(item.align);
+        EXPECT_EQ(config.GetFocusY(BUFFER_SIDE), item.expectY)
+            << "align=" << static_cast<int32_t>(item.align);
+    }
+}
+
+/**
+ * @tc.name: PointerRendererTest_GetFocus_004
+ * @tc.desc: An align outside the ICON_TYPE enum range falls into the default labels of
+ *           GetFocusX (pointer_renderer.cpp:281) and GetFocusY (pointer_renderer.cpp:309),
+ *           both of which return 0.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_GetFocus_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    RenderConfig config;
+    config.align_ = static_cast<ICON_TYPE>(100);
+    config.size = MAX_POINTER_SIZE;
+    config.dpi = MAX_DPI;
+    EXPECT_EQ(config.GetFocusX(BUFFER_SIDE), 0u);
+    EXPECT_EQ(config.GetFocusY(BUFFER_SIDE), 0u);
+}
+
+/**
+ * @tc.name: PointerRendererTest_GetPlacedImageSize_002
+ * @tc.desc: A user icon whose decoded size is invalid (width <= 0 or height <= 0) must fall back
+ *           to the clamped system size in GetPlacedImageSize (pointer_renderer.cpp:73-75) and to
+ *           ratio 1.0 in UserIconScaleRatio (pointer_renderer.cpp:96-98).
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_GetPlacedImageSize_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    RenderConfig config;
+    config.size = 1;
+    config.dpi = MAX_DPI;
+    const int32_t clamped = config.GetClampedImageSize(BUFFER_SIDE);
+    ASSERT_GT(clamped, 0);
+
+    // Without a user icon the placed size follows the system gear and the ratio is 1.0.
+    EXPECT_EQ(config.GetPlacedImageSize(BUFFER_SIDE), clamped);
+    EXPECT_FLOAT_EQ(config.UserIconScaleRatio(BUFFER_SIDE), 1.0f);
+
+    pixelmap_ptr_t pixelMap = std::make_shared<OHOS::Media::PixelMap>();
+    ASSERT_NE(pixelMap, nullptr);
+    Media::ImageInfo imageInfo;
+    imageInfo.pixelFormat = Media::PixelFormat::RGBA_8888;
+    imageInfo.alphaType = Media::AlphaType::IMAGE_ALPHA_TYPE_PREMUL;
+    imageInfo.colorSpace = Media::ColorSpace::SRGB;
+    imageInfo.size.width = 0;
+    imageInfo.size.height = 64;
+    pixelMap->SetImageInfo(imageInfo);
+    config.userIconPixelMap = pixelMap;
+    EXPECT_EQ(config.GetPlacedImageSize(BUFFER_SIDE), clamped);
+    EXPECT_FLOAT_EQ(config.UserIconScaleRatio(BUFFER_SIDE), 1.0f);
+
+    // The mirror case: width valid, height invalid.
+    imageInfo.size.width = 64;
+    imageInfo.size.height = 0;
+    pixelMap->SetImageInfo(imageInfo);
+    EXPECT_EQ(config.GetPlacedImageSize(BUFFER_SIDE), clamped);
+    EXPECT_FLOAT_EQ(config.UserIconScaleRatio(BUFFER_SIDE), 1.0f);
+}
+
+/**
+ * @tc.name: PointerRendererTest_GetClampedImageSize_002
+ * @tc.desc: A zero buffer side is invalid and must return the raw image size instead of clamping
+ *           (pointer_renderer.cpp:158-160).
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_GetClampedImageSize_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    RenderConfig config;
+    config.align_ = ICON_TYPE::ANGLE_CENTER;
+    config.size = 1;
+    config.dpi = 8.0f;
+    ASSERT_EQ(config.GetImageSize(), 320);
+    EXPECT_EQ(config.GetClampedImageSize(0), 320);
+    EXPECT_EQ(config.GetClampedImageSize(SOFT_CURSOR_SIZE), 320);
+    EXPECT_LT(config.GetClampedImageSize(HARD_CURSOR_SIZE), 320);
+}
+
+/**
+ * @tc.name: PointerRendererTest_AdjustIncreaseRatio_002
+ * @tc.desc: Operand coverage of the guard in AdjustIncreaseRatio (pointer_renderer.cpp:176).
+ *           Negative zero takes the fabs branch; a negative dpi evaluates the == 0 operand as
+ *           false; NaN fails every comparison and reaches the suppression exponent. The
+ *           == 0 operand can never be the deciding condition: any +/-0 already satisfies
+ *           fabs(originDpi) < EPSILON, so its true side is logically unreachable.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_AdjustIncreaseRatio_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    RenderConfig config;
+    EXPECT_FLOAT_EQ(config.AdjustIncreaseRatio(-0.0f), 1.22f);
+    EXPECT_FLOAT_EQ(config.AdjustIncreaseRatio(-1.0f), 1.22f);
+    EXPECT_TRUE(std::isnan(config.AdjustIncreaseRatio(std::nanf(""))));
+}
+
+/**
+ * @tc.name: PointerRendererTest_UserIconScale_002
+ * @tc.desc: Covers UserIconScale (pointer_renderer.cpp:322-348) with a real decoded icon: the
+ *           zero-width and zero-height guards return the icon untouched, a fitting icon takes the
+ *           ratio >= 1 branch at native size, and an oversized icon goes through the
+ *           marshalling/scale path.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_UserIconScale_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    const std::string iconPath = "/data/service/el1/public/multimodalinput/mouse_icon/Default.svg";
+    auto decodeIcon = [&iconPath](int32_t side) -> pixelmap_ptr_t {
+        OHOS::Media::SourceOptions opts;
+        uint32_t ret = 0;
+        auto imageSource = OHOS::Media::ImageSource::CreateImageSource(iconPath, opts, ret);
+        if (imageSource == nullptr) {
+            return nullptr;
+        }
+        OHOS::Media::DecodeOptions decodeOpts;
+        decodeOpts.desiredSize = { .width = side, .height = side };
+        return imageSource->CreatePixelMap(decodeOpts, ret);
+    };
+    PointerRenderer renderer;
+    RenderConfig config;
+    config.style_ = MOUSE_ICON::AECH_DEVELOPER_DEFINED_ICON;
+    config.align_ = ICON_TYPE::ANGLE_NW;
+
+    config.userIconPixelMap = decodeIcon(64);
+    ASSERT_NE(config.userIconPixelMap, nullptr);
+    // Zero-sized buffers take the early guard and hand back the original icon.
+    EXPECT_NE(renderer.UserIconScale(0, 64, config), nullptr);
+    EXPECT_NE(renderer.UserIconScale(64, 0, config), nullptr);
+    // Icons that fit (ratio >= 1) are drawn at native size.
+    EXPECT_NE(renderer.UserIconScale(64, 64, config), nullptr);
+    EXPECT_NE(renderer.UserIconScale(BUFFER_SIDE, BUFFER_SIDE, config), nullptr);
+
+    // An oversized icon is marshalled, copied and scaled down to the buffer.
+    config.userIconPixelMap = decodeIcon(400);
+    ASSERT_NE(config.userIconPixelMap, nullptr);
+    image_ptr_t scaled = renderer.UserIconScale(BUFFER_SIDE, BUFFER_SIDE, config);
+    ASSERT_NE(scaled, nullptr);
+}
+
+/**
+ * @tc.name: PointerRendererTest_SetupBlurBitmap_001
+ * @tc.desc: A zero buffer side must fail Bitmap::Build and take the error branch in
+ *           SetupBlurBitmap (pointer_renderer.cpp:410); the renderer survives and the frame
+ *           fails at memcpy instead of crashing.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_SetupBlurBitmap_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerRenderer renderer;
+    RenderConfig config;
+    config.style_ = MOUSE_ICON::DEFAULT;
+    EXPECT_NO_FATAL_FAILURE(renderer.SetupBlurBitmap(0, 100, config));
+    EXPECT_EQ(renderer.defaultInit_, false);
+
+    config.isBlur = true;
+    uint8_t addr[1] = { 0 };
+    EXPECT_EQ(renderer.BlurRender(addr, 0, 0, 100, config), RET_ERR);
+}
+
+/**
+ * @tc.name: PointerRendererTest_BlurRender_003
+ * @tc.desc: Operand coverage of the tier-mismatch rebuild condition in BlurRender
+ *           (pointer_renderer.cpp:429-430): height-only mismatch, no mismatch, and width-only
+ *           mismatch each rebuild the blur bitmap to the requested tier.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_BlurRender_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerRenderer renderer;
+    RenderConfig config;
+    config.style_ = MOUSE_ICON::DEFAULT;
+    config.isBlur = true;
+    constexpr uint32_t renderStride = 4;
+    std::vector<uint8_t> addr(16 * 32 * renderStride);
+
+    EXPECT_EQ(renderer.BlurRender(addr.data(), 16 * 8 * renderStride, 16, 8, config), RET_OK);
+    EXPECT_EQ(renderer.defaultInit_, true);
+    // Height-only mismatch: GetWidth() == 16 (first operand false), GetHeight() 8 != 32 (true).
+    EXPECT_EQ(renderer.BlurRender(addr.data(), 16 * 32 * renderStride, 16, 32, config), RET_OK);
+    EXPECT_EQ(renderer.defaultBitmap_.GetWidth(), 16);
+    EXPECT_EQ(renderer.defaultBitmap_.GetHeight(), 32);
+    // Matching dimensions do not rebuild.
+    EXPECT_EQ(renderer.BlurRender(addr.data(), 16 * 32 * renderStride, 16, 32, config), RET_OK);
+    EXPECT_EQ(renderer.defaultBitmap_.GetHeight(), 32);
+    // Width-only mismatch: GetWidth() 16 != 8 (first operand true).
+    EXPECT_EQ(renderer.BlurRender(addr.data(), 8 * 32 * renderStride, 8, 32, config), RET_OK);
+    EXPECT_EQ(renderer.defaultBitmap_.GetWidth(), 8);
+}
+
+/**
+ * @tc.name: PointerRendererTest_DrawBlurPointer_003
+ * @tc.desc: Covers the blur-tier boundary filter in DrawBlurPointer (pointer_renderer.cpp:503-511)
+ *           with every boundary operand true plus one all-false draw at 512, and the non-blur-tier
+ *           IsPositionOutCanvas filter (pointer_renderer.cpp:512-515) with skip true and false.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_DrawBlurPointer_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerRenderer renderer;
+    image_ptr_t img = std::make_shared<OHOS::Rosen::Drawing::Image>();
+    RenderConfig config;
+    config.style_ = MOUSE_ICON::DEFAULT;
+    config.align_ = ICON_TYPE::ANGLE_NW;
+    config.size = MAX_POINTER_SIZE;
+    config.dpi = MAX_DPI;
+    config.screenId = 0;
+    renderer.screenImages_ = {
+        {0, {img, img, img, img}}
+    };
+
+    // 512 tier, trail copy fully inside: drawn (skip == false).
+    renderer.DrawBlurPointer(BLUR_TIER_SIZE, BLUR_TIER_SIZE, config, config);
+    // 512 tier, left boundary: localX - half < -slack.
+    RenderConfig farLeft = config;
+    farLeft.x = -500;
+    renderer.DrawBlurPointer(BLUR_TIER_SIZE, BLUR_TIER_SIZE, farLeft, config);
+    // 512 tier, right boundary: localX + half > width + slack.
+    RenderConfig farRight = config;
+    farRight.x = 800;
+    renderer.DrawBlurPointer(BLUR_TIER_SIZE, BLUR_TIER_SIZE, farRight, config);
+    // 512 tier, top boundary: localY - half < -slack.
+    RenderConfig farTop = config;
+    farTop.y = -500;
+    renderer.DrawBlurPointer(BLUR_TIER_SIZE, BLUR_TIER_SIZE, farTop, config);
+    // 512 tier, bottom boundary: localY + half > height + slack.
+    RenderConfig farBottom = config;
+    farBottom.y = 800;
+    renderer.DrawBlurPointer(BLUR_TIER_SIZE, BLUR_TIER_SIZE, farBottom, config);
+    // 256 tier: in-canvas copy drawn, off-canvas copy skipped.
+    renderer.DrawBlurPointer(HARD_CURSOR_SIZE, HARD_CURSOR_SIZE, config, config);
+    RenderConfig offCanvas = config;
+    offCanvas.x = 1000;
+    renderer.DrawBlurPointer(HARD_CURSOR_SIZE, HARD_CURSOR_SIZE, offCanvas, config);
+    EXPECT_EQ(renderer.screenImages_[0][0], img);
+}
+
+/**
+ * @tc.name: PointerRendererTest_LoadDefaultPointerImage_002
+ * @tc.desc: The success path of LoadDefaultPointerImage (pointer_renderer.cpp:614 onward): with a
+ *           valid icon path the default image and all three blurred copies are decoded and cached.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(PointerRendererTest, PointerRendererTest_LoadDefaultPointerImage_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    PointerRenderer renderer;
+    RenderConfig config;
+    config.style_ = MOUSE_ICON::DEFAULT;
+    config.path_ = "/data/service/el1/public/multimodalinput/mouse_icon/Default.svg";
+    config.size = MAX_POINTER_SIZE;
+    config.dpi = MAX_DPI;
+    config.screenId = 3;
+    renderer.LoadDefaultPointerImage(HARD_CURSOR_SIZE, config);
+    ASSERT_EQ(renderer.screenImages_[3].size(), 4u);
+    for (const auto &image : renderer.screenImages_[3]) {
+        EXPECT_NE(image, nullptr);
+    }
 }
 } // namespace MMI
 } // namespace OHOS
