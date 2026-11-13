@@ -334,7 +334,7 @@ int32_t OH_Input_InjectKeyEvent(const struct Input_KeyEvent* keyEvent)
         MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectKeyEvent.Error", INPUT_PARAMETER_ERROR);
         return INPUT_PARAMETER_ERROR;
     }
-    std::make_shared<OHOS::MMI::keyEvent> event;
+    std::make_shared<KeyEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_keyEventMutex);
         CHKPR(g_keyEvent, INPUT_PARAMETER_ERROR);
@@ -370,7 +370,7 @@ int32_t OH_Input_InjectKeyEvent(const struct Input_KeyEvent* keyEvent)
         item.SetPressed(isKeyPressed);
         HandleKeyAction(keyEvent, item);
         g_keyEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-        event = std::make_shared<OHOS::MMI::keyEvent>(*g_keyEvent);
+        event = std::make_shared<KeyEvent>(*g_keyEvent);
     }
     OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true);
     return INPUT_SUCCESS;
