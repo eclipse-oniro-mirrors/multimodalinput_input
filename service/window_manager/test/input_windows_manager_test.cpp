@@ -541,10 +541,78 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_014, Te
     constexpr int32_t displayId = 1;
     std::string msg;
     ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
-    // The legacy path returned an error for an already-bound pair; the new path treats it as
-    // a successful no-op.
-    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
+    // SetDisplayBind keeps its legacy semantics for an already-bound pair: the repeat call
+    // is rejected instead of being treated as a no-op success.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_ERR);
     EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), displayId);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_015
+ * @tc.desc: Binding a device to a display leaves other devices already bound to that display
+ *           untouched (no exclusive takeover of the display)
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_015, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    constexpr int32_t devIdA { 8813 };
+    constexpr int32_t devIdX { 8814 };
+    WIN_MGR->DeviceStatusChanged(devIdA, "mouse_setdisplaybind_a", "sysUid_setdisplaybind_a", "add");
+    WIN_MGR->DeviceStatusChanged(devIdX, "mouse_setdisplaybind_x", "sysUid_setdisplaybind_x", "add");
+    constexpr int32_t displayId = 1;
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->SetDisplayBind(devIdX, displayId, msg), RET_OK);
+    // Device A binds to the display that already holds device X; X must keep its binding.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devIdA, displayId, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devIdX), displayId);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devIdA), displayId);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_016
+ * @tc.desc: Rebinding a device to another display drops its previous binding
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_016, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    // Display 888 is unique to this case, so it cannot disturb cases that rely on the absence
+    // of displays like 2 or 3.
+    auto displayGroupInfo = CreateDisplayGroupInfo(888, 888);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
+    constexpr int32_t devId { 8815 };
+    WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, 1, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, 888, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 888);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_017
+ * @tc.desc: Bindings established via SetDisplayBind are not surfaced to applications: the
+ *           bindToDisplay-only accessor keeps returning -1 for them
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_017, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    constexpr int32_t devId { 8816 };
+    WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
+    constexpr int32_t displayId = 1;
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindToDisplayIdByInputDevice(devId), -1);
 }
 
 /**

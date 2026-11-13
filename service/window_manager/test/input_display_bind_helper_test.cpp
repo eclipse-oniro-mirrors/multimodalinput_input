@@ -389,13 +389,13 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     std::string msg = "deviceId";
     deviceId = -1;
     displayId = -1;
-    int32_t ret1 = idh.SetDisplayBind(deviceId, displayId, msg);
+    int32_t ret1 = idh.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg);
     EXPECT_EQ(ret1, RET_ERR);
 
     deviceId = 1;
     displayId = 2;
-    int32_t ret2 = idh.SetDisplayBind(deviceId, displayId, msg);
-    EXPECT_EQ(ret2, RET_ERR);
+    int32_t ret2 = idh.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg);
+    EXPECT_EQ(ret2, ERR_BIND_DEVICE_NOT_EXIST);
 }
 
 /**
@@ -956,7 +956,7 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = -1;
     int32_t displayId = -1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_ERR);
 }
 
 /**
@@ -973,7 +973,7 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = -1;
     int32_t displayId = 0;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_ERR);
 }
 
 /**
@@ -990,7 +990,7 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = 1;
     int32_t displayId = -1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_ERR);
 }
 
 /**
@@ -1007,7 +1007,8 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = 1;
     int32_t displayId = 0;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg),
+        ERR_BIND_DEVICE_NOT_EXIST);
 }
 
 /**
@@ -1025,7 +1026,7 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t displayId = 0;
     std::string msg = "touch";
     inputDisplayBindHelper.infos_ = nullptr;
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_ERR);
 }
 
 /**
@@ -1048,7 +1049,9 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = 1;
     int32_t displayId = 0;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    // Device 1 is already bound to display 0, so the repeat request keeps the legacy
+    // rejection semantics.
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_ERR);
 }
 
 /**
@@ -1071,7 +1074,8 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = 2;
     int32_t displayId = 1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg),
+        ERR_BIND_DEVICE_NOT_EXIST);
 }
 
 /**
@@ -1094,7 +1098,8 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = 1;
     int32_t displayId = 0;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    // A free device binds to the display even though no bind relation holds it yet.
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_OK);
 }
 
 /**
@@ -1122,7 +1127,9 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_1
     int32_t deviceId = 1;
     int32_t displayId = 1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    // Device 1 moves from display 0 to display 1; device 2 keeps display 1 (no takeover).
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_OK);
+    EXPECT_EQ(inputDisplayBindHelper.GetBindDisplayIdByInputDevice(2), 1);
 }
 
 /**
@@ -1150,7 +1157,7 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_1
     int32_t deviceId = 1;
     int32_t displayId = 1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_OK);
 }
 
 /**
@@ -1178,7 +1185,9 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_1
     int32_t deviceId = 1;
     int32_t displayId = 1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    // Device 1 joins display 1 without displacing device 2.
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_OK);
+    EXPECT_EQ(inputDisplayBindHelper.GetBindDisplayIdByInputDevice(2), 1);
 }
 
 /**
@@ -1206,7 +1215,9 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_1
     int32_t deviceId = 1;
     int32_t displayId = 1;
     std::string msg = "touch";
-    ASSERT_NO_FATAL_FAILURE(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, msg));
+    // A free device binding to a free display succeeds directly (the legacy path hit the
+    // unreachable tail branch and failed after committing the binding).
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_OK);
 }
 
 /**
@@ -2057,12 +2068,10 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_1
     
     idh.AddInputDevice(1, "input0", "mouse");
     idh.AddDisplay(0, 0, "hp 223");
-    
+
     std::string msg;
-    int32_t ret = idh.SetDisplayBind(1, 0, msg);
-    // In standalone UT the internal bind state may differ from the service
-    // runtime, so only assert the error return, not the specific message.
-    EXPECT_EQ(ret, RET_ERR);
+    int32_t ret = idh.SetDisplayBind(1, 0, 0, "hp 223", msg);
+    EXPECT_EQ(ret, RET_OK);
 }
 
 /**

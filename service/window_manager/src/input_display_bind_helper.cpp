@@ -713,10 +713,12 @@ int32_t InputDisplayBindHelper::GetDisplayBindInfo(DisplayBindInfos &infos)
     return RET_OK;
 }
 
-int32_t InputDisplayBindHelper::SetDisplayBind(int32_t deviceId, int32_t displayId, std::string &msg)
+int32_t InputDisplayBindHelper::SetDisplayBind(int32_t deviceId, int32_t displayId, uint64_t rsId,
+    const std::string &displayName, std::string &msg)
 {
     CALL_DEBUG_ENTER;
-    MMI_HILOGI("Param: deviceId:%{public}d, displayId:%{public}d", deviceId, displayId);
+    MMI_HILOGI("Param: deviceId:%{public}d, displayId:%{public}d, rsId:%{public}llu",
+        deviceId, displayId, static_cast<unsigned long long>(rsId));
     if ((deviceId == -1) || (displayId == -1)) {
         msg = "The deviceId or displayId is invalid";
         MMI_HILOGE("%s", msg.c_str());
@@ -727,80 +729,35 @@ int32_t InputDisplayBindHelper::SetDisplayBind(int32_t deviceId, int32_t display
         MMI_HILOGE("%s", msg.c_str());
         return RET_ERR;
     }
-
-    BindInfo bindByDevice;
-    BindInfo bindByDisplay;
-    for (const auto &item : infos_->GetInfos()) {
-        if (item.GetInputDeviceId() == deviceId) {
-            MMI_HILOGD("InputDeviceId:%{public}d", bindByDevice.GetInputDeviceId());
-            bindByDevice = item;
-        }
-        if (item.GetDisplayId() == displayId) {
-            MMI_HILOGD("item.GetDisplayId():%{public}d", item.GetDisplayId());
-            bindByDisplay = item;
-        }
-    }
-    if (bindByDevice.GetInputDeviceId() == -1) {
-        auto device = INPUT_DEV_MGR->GetInputDevice(deviceId);
-        if (device != nullptr) {
-            BindInfo newDevice;
-            newDevice.AddInputDevice(deviceId, "", device->GetName());
-            bindByDevice = newDevice;
-            MMI_HILOGI("bindByDevice:%{public}d", bindByDevice.GetInputDeviceId());
-        } else {
-            msg = "The deviceId is invalid";
-            MMI_HILOGE("%s", msg.c_str());
-            return RET_ERR;
-        }
-    }
-    if (bindByDisplay.GetDisplayId() == -1) {
-        msg = "The displayId is invalid";
-        MMI_HILOGE("%s", msg.c_str());
-        return RET_ERR;
-    }
-
     if (infos_->GetBindDisplayIdByInputDevice(deviceId) == displayId) {
         msg = "The input device and display has alread bind";
         MMI_HILOGE("%s", msg.c_str());
         return RET_ERR;
     }
 
+    BindInfo bindByDevice;
+    for (const auto &item : infos_->GetInfos()) {
+        if (item.GetInputDeviceId() == deviceId) {
+            bindByDevice = item;
+        }
+    }
+    if (bindByDevice.GetInputDeviceId() == -1) {
+        auto device = INPUT_DEV_MGR->GetInputDevice(deviceId);
+        if (device == nullptr) {
+            msg = "The specified input device does not exist.";
+            MMI_HILOGE("%s", msg.c_str());
+            return ERR_BIND_DEVICE_NOT_EXIST;
+        }
+        bindByDevice.AddInputDevice(deviceId, device->GetName(), INPUT_DEV_MGR->GetSysUid(deviceId));
+    }
+
     infos_->UnbindInputDevice(bindByDevice.GetInputDeviceId());
-    infos_->UnbindInputDevice(bindByDisplay.GetInputDeviceId());
-    infos_->UnbindDisplay(bindByDevice.GetDisplayId());
-    infos_->UnbindDisplay(bindByDisplay.GetDisplayId());
-
-    BindInfo info1;
-    info1.AddInputDevice(bindByDevice.GetInputDeviceId(), bindByDevice.GetInputNodeName(),
+    BindInfo info;
+    info.AddInputDevice(bindByDevice.GetInputDeviceId(), bindByDevice.GetInputNodeName(),
         bindByDevice.GetInputDeviceName());
-    info1.AddDisplay(bindByDisplay.GetRsId(), bindByDisplay.GetDisplayId(), bindByDisplay.GetDisplayName());
-    infos_->Add(info1);
-
-    if ((bindByDevice.GetDisplayId() != -1) && (bindByDisplay.GetInputDeviceId() != -1)) {
-        MMI_HILOGD("Both display id and input device id are invalid");
-        BindInfo info2;
-        info2.AddInputDevice(bindByDisplay.GetInputDeviceId(), bindByDisplay.GetInputNodeName(),
-            bindByDisplay.GetInputDeviceName());
-        info2.AddDisplay(bindByDevice.GetRsId(), bindByDevice.GetDisplayId(), bindByDevice.GetDisplayName());
-        infos_->Add(info2);
-        return RET_OK;
-    }
-
-    if (bindByDevice.GetDisplayId() != -1) {
-        MMI_HILOGD("The display id is invalid");
-        AddDisplay(bindByDevice.GetRsId(), bindByDevice.GetDisplayId(), bindByDevice.GetDisplayName());
-        return RET_OK;
-    }
-
-    if (bindByDisplay.GetInputDeviceId() != -1) {
-        MMI_HILOGD("The input device id is invalid");
-        AddInputDevice(bindByDisplay.GetInputDeviceId(), bindByDisplay.GetInputNodeName(),
-            bindByDisplay.GetInputDeviceName());
-        return RET_OK;
-    }
-
-    msg = "Can not reach here";
-    return RET_ERR;
+    info.AddDisplay(rsId, displayId, displayName);
+    infos_->Add(info);
+    return RET_OK;
 }
 
 int32_t InputDisplayBindHelper::BindToDisplay(int32_t deviceId, int32_t displayId, uint64_t rsId,
