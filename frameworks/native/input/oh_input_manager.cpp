@@ -334,7 +334,7 @@ int32_t OH_Input_InjectKeyEvent(const struct Input_KeyEvent* keyEvent)
         MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectKeyEvent.Error", INPUT_PARAMETER_ERROR);
         return INPUT_PARAMETER_ERROR;
     }
-    std::make_shared<KeyEvent> event;
+    std::shared_ptr<OHOS::MMI::KeyEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_keyEventMutex);
         CHKPR(g_keyEvent, INPUT_PARAMETER_ERROR);
@@ -370,7 +370,7 @@ int32_t OH_Input_InjectKeyEvent(const struct Input_KeyEvent* keyEvent)
         item.SetPressed(isKeyPressed);
         HandleKeyAction(keyEvent, item);
         g_keyEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-        event = std::make_shared<KeyEvent>(*g_keyEvent);
+        event = std::make_shared<OHOS::MMI::KeyEvent>(*g_keyEvent);
     }
     OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true);
     return INPUT_SUCCESS;
@@ -567,7 +567,7 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent)
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectMouseEvent.Call", true);
     CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
     int32_t result = INPUT_SUCCESS;
-    std::make_shared<PointerEvent> event;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_mouseEventMutex);
         CHKPR(g_mouseEvent, INPUT_PARAMETER_ERROR);
@@ -596,7 +596,7 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent)
             return result;
         }
         g_mouseEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-        event = std::make_shared<PointerEvent>(*g_mouseEvent);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_mouseEvent);
     }
     result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event,
         true, PointerEvent::DISPLAY_COORDINATE);
@@ -614,7 +614,7 @@ int32_t OH_Input_InjectMouseEventGlobal(const struct Input_MouseEvent* mouseEven
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectMouseEventGlobal.Call", true);
     CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
     int32_t result = INPUT_SUCCESS;
-    std::make_shared<PointerEvent> event;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_mouseEventMutex);
         CHKPR(g_mouseEvent, INPUT_PARAMETER_ERROR);
@@ -642,7 +642,7 @@ int32_t OH_Input_InjectMouseEventGlobal(const struct Input_MouseEvent* mouseEven
             return INPUT_PARAMETER_ERROR;
         }
         g_mouseEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-        event = std::make_shared<PointerEvent>(*g_mouseEvent);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_mouseEvent);
     }
     result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event,
         true, PointerEvent::GLOBAL_COORDINATE);
@@ -936,7 +936,7 @@ int32_t OH_Input_InjectTouchEvent(const struct Input_TouchEvent* touchEvent)
     MMI_HILOGI("Input_TouchEvent injectTouchEvent");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectTouchEvent.Call", true);
     CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
-    std::make_shared<PointerEvent> event;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_touchEventMutex);
         CHKPR(g_touchEvent, INPUT_PARAMETER_ERROR);
@@ -953,7 +953,7 @@ int32_t OH_Input_InjectTouchEvent(const struct Input_TouchEvent* touchEvent)
             return INPUT_PARAMETER_ERROR;
         }
         g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-        event = std::make_shared<PointerEvent>(*g_touchEvent);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_touchEvent);
     }
     OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
         PointerEvent::DISPLAY_COORDINATE);
@@ -975,7 +975,7 @@ int32_t OH_Input_InjectTouchEventGlobal(const struct Input_TouchEvent* touchEven
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectTouchEventGlobal.Call", true);
     CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
     int32_t result = INPUT_SUCCESS;
-    std::shared_ptr<PointerEvent> event;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_touchEventMutex);
         CHKPR(g_touchEvent, INPUT_PARAMETER_ERROR);
@@ -996,7 +996,7 @@ int32_t OH_Input_InjectTouchEventGlobal(const struct Input_TouchEvent* touchEven
             return INPUT_PARAMETER_ERROR;
         }
         g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-        event = std::make_shared<PointerEvent>(*g_touchEvent);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_touchEvent);
     }
     result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
         PointerEvent::GLOBAL_COORDINATE);
