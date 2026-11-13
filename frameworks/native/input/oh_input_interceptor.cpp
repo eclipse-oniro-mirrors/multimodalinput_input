@@ -85,17 +85,25 @@ void OHInputInterceptor::SetCallback(std::function<void(std::shared_ptr<KeyEvent
 void OHInputInterceptor::OnInputEvent(std::shared_ptr<PointerEvent> pointerEvent) const
 {
     CALL_DEBUG_ENTER;
-    std::lock_guard<std::mutex> guard(mutex_);
-    CHKPV(pointerCallback_);
-    pointerCallback_(pointerEvent);
+    std::function<void(std::shared_ptr<PointerEvent>)> callback;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        callback = pointerCallback_;
+    }
+    CHKPV(callback);
+    callback(pointerEvent);
 }
 
 void OHInputInterceptor::OnInputEvent(std::shared_ptr<KeyEvent> keyEvent) const
 {
     CALL_DEBUG_ENTER;
-    std::lock_guard<std::mutex> guard(mutex_);
-    CHKPV(keyCallback_);
-    keyCallback_(keyEvent);
+    std::function<void(std::shared_ptr<KeyEvent>)> callback;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        callback = keyCallback_;
+    }
+    CHKPV(callback);
+    callback(keyEvent);
 }
 
 void OHInputInterceptor::OnInputEvent(std::shared_ptr<AxisEvent> axisEvent) const {}
