@@ -17,30 +17,31 @@
 #define KEY_EVENT_HOOK_H
 
 #include "input_event_hook.h"
-#include <shared_mutex>
-#include "dispatch_order_checker.h"
 #include "expiration_checker.h"
-#include "key_loop_closure_checker.h"
 #include "key_event.h"
 #include "uds_session.h"
 
 namespace OHOS {
 namespace MMI {
 
-class KeyEventHook final: public InputEventHook {
+class KeyEventHook: public InputEventHook {
 public:
     KeyEventHook(SessionPtr session, NextHookGetter nextHookGetter) :InputEventHook(session, HOOK_EVENT_TYPE_KEY,
         nextHookGetter) {}
     bool OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent) override;
     int32_t DispatchToNextHandler(std::shared_ptr<KeyEvent> keyEvent) override;
+    std::shared_ptr<InputEvent> GetStashEvent(int32_t eventId) override;
+    void FlushStashEvents(std::shared_ptr<InputEventHook> nextHook) override;
+    int32_t HandleEventResult(int32_t eventId, bool isConsumed) override;
 
 private:
     bool DispatchDirectly(std::shared_ptr<KeyEvent> keyEvent);
+    // Timeout fallback: stash events exceeding the server threshold without a receipt are dispatched
+    // directly to the application (nothing dropped, no disable)
+    void SweepExpiredEvents();
 
 private:
-    DispatchOrderChecker orderChecker_;
     ExpirationChecker expirationChecker_;
-    KeyLoopClosureChecker closureChecker_;
 };
 } // namespace MMI
 } // namespace OHOS

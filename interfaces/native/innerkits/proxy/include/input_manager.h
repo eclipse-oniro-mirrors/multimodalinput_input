@@ -1399,13 +1399,15 @@ public:
     int32_t RemoveInputEventHook(HookEventType hookEventType);
 
     /**
-    * @brief Redispatch keyEvent.
+    * @brief Notify the server of the hook event dispatch result.
     * @param eventId InputEvent eventId.
     * @param hookEventType Indicates the eventType of hook.
+    * @param isConsumed Indicates whether the event is consumed by the hook. <b>true</b> if consumed, <b>false</b>
+    * otherwise (redispatch).
     * @return Returns <b>0</b> if successful; returns a non-0 value otherwise.
     * @since 22
     */
-    int32_t DispatchToNextHandler(int32_t eventId, HookEventType hookEventType);
+    int32_t NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed);
 
     /**
     * @brief Enables or disables key status recording.

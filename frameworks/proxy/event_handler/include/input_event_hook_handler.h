@@ -16,7 +16,7 @@
 #ifndef INPUT_EVENT_HOOK_HANDLER_H
 #define INPUT_EVENT_HOOK_HANDLER_H
 
-#include <chrono>
+#include <functional>
 #include <memory>
 #include <queue>
 #include <shared_mutex>
@@ -39,51 +39,42 @@ private:
 public:
     int32_t AddInputEventHook(std::shared_ptr<IInputEventConsumer> consumer, HookEventType hookEventType);
     int32_t RemoveInputEventHook(HookEventType hookEventType);
-    int32_t DispatchToNextHandler(int32_t eventId, HookEventType hookEventType);
+    int32_t NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed);
     void OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent);
     void OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent);
+    void OnAxisEvent(std::shared_ptr<PointerEvent> pointerEvent);
     void OnConnected();
+    // Entry for the server 1.5S timeout disable notification: deduplicated with the client 1S timeout
+    // path via DisableHookLocal so the notification fires only once
+    void OnHookDisabledByServer(HookEventType hookEventType);
 
 private:
     void AddKeyHook(std::function<void(std::shared_ptr<KeyEvent>)> keyHook);
     void AddMouseHook(std::function<void(std::shared_ptr<PointerEvent>)> mouseHook);
     void AddTouchHook(std::function<void(std::shared_ptr<PointerEvent>)> touchHook);
+    void AddAxisHook(std::function<void(std::shared_ptr<PointerEvent>)> axisHook);
     int32_t AddInputEventHookLocal(std::shared_ptr<IInputEventConsumer> consumer, HookEventType hookEventType);
     int32_t AddInputEventHookToServer(HookEventType hookEventType);
     int32_t RemoveInputEventHookLocal(HookEventType hookEventType);
     int32_t RemoveInputEventHookOfServer(HookEventType hookEventType);
+    // Atomically checks the bit, clears it and the callback: returns true on hit (the caller notifies
+    // the consumer), false if already disabled by another path
+    bool DisableHookLocal(HookEventType hookEventType);
     bool CheckHookStatsBit(HookEventType hookEventType);
     void SetHookStatsBit(HookEventType hookEventType);
     void ClearHookStatsBit(HookEventType hookEventType);
     bool IsHookExisted(HookEventType hookEventType);
-    int32_t DispatchToNextHandler(std::shared_ptr<KeyEvent> keyEvent);
-    int32_t DispatchToNextHandler(std::shared_ptr<PointerEvent> pointerEvent);
 
 private:
-    struct StashKeyEvent {
-        std::shared_ptr<KeyEvent> event;
-        long long timeStampRcvd { 0 };
-    };
-
-    struct StashPointerEvent {
-        std::shared_ptr<PointerEvent> event;
-        long long timeStampRcvd { 0 };
-    };
-
-    using StashTouchEvent = StashPointerEvent;
-    using StashMouseEvent = StashPointerEvent;
-
     struct HookConsumer {
         std::function<void(std::shared_ptr<KeyEvent>)> keyHookCallback_;
         std::function<void(std::shared_ptr<PointerEvent>)> touchHookCallback_;
         std::function<void(std::shared_ptr<PointerEvent>)> mouseHookCallback_;
+        std::function<void(std::shared_ptr<PointerEvent>)> axisHookCallback_;
     };
 
-private:
-    std::deque<StashKeyEvent> stashKeyEvents_;
-    std::deque<StashTouchEvent> stashTouchEvents_;
-    std::deque<StashMouseEvent> stashMouseEvents_;
     HookConsumer hookConsumer_;
+    std::shared_ptr<IInputEventConsumer> consumer_;
     std::atomic_uint32_t currentHookStats_ { 0 };
     std::shared_mutex rwMutex_;
 };

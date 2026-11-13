@@ -214,8 +214,7 @@ public:
     int32_t GetExternalObject(const std::string &pluginName, sptr<IRemoteObject> &pluginRemoteStub);
     int32_t AddInputEventHook(HookEventType hookEventType);
     int32_t RemoveInputEventHook(HookEventType hookEventType);
-    int32_t DispatchToNextHandler(const std::shared_ptr<KeyEvent> keyEvent);
-    int32_t DispatchToNextHandler(const std::shared_ptr<PointerEvent> pointerEvent);
+    int32_t NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed);
     int32_t SetKeyStatusRecord(bool enable, int32_t timeout);
     int32_t GetCurrentCursorInfo(bool& visible, PointerStyle& pointerStyle);
     int32_t GetUserDefinedCursorPixelMap(void *pixelMapPtr);

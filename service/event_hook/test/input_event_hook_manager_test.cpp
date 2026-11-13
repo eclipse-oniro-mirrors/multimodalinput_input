@@ -15,6 +15,11 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <atomic>
+#include <chrono>
+
+#include "display_event_monitor.h"
+#include "input_event_handler.h"
 #include "input_event_hook.h"
 #include "key_event_hook.h"
 #include "pointer_event_hook.h"
@@ -39,6 +44,44 @@ public:
     static void TearDownTestCase(void) {}
 };
 
+// Probe hook counting intercepted calls, used for the screen-lock skip/resume assertions
+class SpyHook : public InputEventHook {
+public:
+    SpyHook(SessionPtr session, HookEventType hookType, NextHookGetter nextHookGetter)
+        : InputEventHook(session, hookType, nextHookGetter) {}
+    bool OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent) override
+    {
+        ++keyCallCount_;
+        return true;
+    }
+    bool OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent) override
+    {
+        ++pointerCallCount_;
+        return true;
+    }
+    std::atomic<int32_t> keyCallCount_ { 0 };
+    std::atomic<int32_t> pointerCallCount_ { 0 };
+};
+
+// Decline probe hook: simulates a gate skip or send failure (accept returns false)
+class DeclineSpyHook : public InputEventHook {
+public:
+    DeclineSpyHook(SessionPtr session, HookEventType hookType, NextHookGetter nextHookGetter)
+        : InputEventHook(session, hookType, nextHookGetter) {}
+    bool OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent) override
+    {
+        ++keyCallCount_;
+        return false;
+    }
+    bool OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent) override
+    {
+        ++pointerCallCount_;
+        return false;
+    }
+    std::atomic<int32_t> keyCallCount_ { 0 };
+    std::atomic<int32_t> pointerCallCount_ { 0 };
+};
+
 /**
  * @tc.name: InputEventHookManagerTest_IsHookExisted001
  * @tc.desc: Test the function IsHookExisted
@@ -56,8 +99,10 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_IsHookExisted001, 
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
     hookMgr.hooks_[HOOK_EVENT_TYPE_TOUCH].push_back(
         std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter));
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), true);
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_MOUSE), false);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].empty(), true);
+    EXPECT_EQ(hookMgr.IsHookExistedByPid(UDS_PID), true);
+    EXPECT_EQ(hookMgr.IsHookExistedByPid(999), false);
 }
 
 /**
@@ -84,66 +129,6 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_RemoveKeyEventHook
     EXPECT_EQ(hookMgr.RemoveInputEventHook(UDS_PID, HOOK_EVENT_TYPE_TOUCH), RET_OK);
     EXPECT_EQ(hookMgr.RemoveInputEventHook(UDS_PID, HOOK_EVENT_TYPE_MOUSE), RET_OK);
     EXPECT_EQ(hookMgr.RemoveInputEventHook(UDS_PID, HOOK_EVENT_TYPE_KEY), RET_OK);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchToNextHandler001
- * @tc.desc: Test the function DispatchToNextHandler
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchToNextHandler001, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
-        return hookMgr.GetNextHook(hook);
-    };
-    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
-        std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
-    keyEvent->SetKeyCode(1);
-    EXPECT_EQ(hookMgr.DispatchToNextHandler(UDS_PID, keyEvent), ERROR_INVALID_PARAMETER);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchMouseToNextHandler001
- * @tc.desc: Test the function DispatchMouseToNextHandler
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchMouseToNextHandler001, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
-        return hookMgr.GetNextHook(hook);
-    };
-    hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].push_back(
-        std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter));
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    EXPECT_EQ(hookMgr.DispatchMouseToNextHandler(UDS_PID, pointerEvent), ERROR_INVALID_PARAMETER);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchTouchToNextHandler001
- * @tc.desc: Test the function DispatchTouchToNextHandler
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchTouchToNextHandler001, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
-        return hookMgr.GetNextHook(hook);
-    };
-    hookMgr.hooks_[HOOK_EVENT_TYPE_TOUCH].push_back(
-        std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter));
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    EXPECT_EQ(hookMgr.DispatchTouchToNextHandler(UDS_PID, pointerEvent), ERROR_INVALID_PARAMETER);
 }
 
 /**
@@ -229,6 +214,24 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_AddInputEventHook0
 {
     InputEventHookManager hookMgr;
     EXPECT_EQ(hookMgr.AddInputEventHook(-1, HOOK_EVENT_TYPE_TOUCH), RET_ERR);
+}
+
+/**
+ * @tc.name: InputEventHookManagerTest_AddInputEventHook005
+ * @tc.desc: Test AddInputEventHook rejects a second hook type of the same pid
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_AddInputEventHook005, TestSize.Level1)
+{
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
+        return hookMgr.GetNextHook(hook);
+    };
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
+        std::make_shared<KeyEventHook>(sess, nextHookGetter));
+    EXPECT_EQ(hookMgr.AddInputEventHook(UDS_PID, HOOK_EVENT_TYPE_MOUSE), ERROR_REPEAT_INTERCEPTOR);
 }
 
 /**
@@ -341,105 +344,6 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_HandleTouchEvent00
     std::shared_ptr<PointerEvent> pointerEvent = nullptr;
     // Should not crash with null event
     hookMgr.HandleTouchEvent(pointerEvent);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchToNextHandler002
- * @tc.desc: Test DispatchToNextHandler with non-existent pid
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchToNextHandler002, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
-    keyEvent->SetKeyCode(1);
-    EXPECT_EQ(hookMgr.DispatchToNextHandler(999, keyEvent), RET_ERR);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchToNextHandler003
- * @tc.desc: Test DispatchToNextHandler with null keyEvent
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchToNextHandler003, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
-        return hookMgr.GetNextHook(hook);
-    };
-    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
-        std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    std::shared_ptr<KeyEvent> keyEvent = nullptr;
-    EXPECT_EQ(hookMgr.DispatchToNextHandler(UDS_PID, keyEvent), RET_ERR);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchMouseToNextHandler002
- * @tc.desc: Test DispatchMouseToNextHandler with non-existent pid
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchMouseToNextHandler002, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    EXPECT_EQ(hookMgr.DispatchMouseToNextHandler(999, pointerEvent), RET_ERR);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchMouseToNextHandler003
- * @tc.desc: Test DispatchMouseToNextHandler with null pointerEvent
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchMouseToNextHandler003, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
-        return hookMgr.GetNextHook(hook);
-    };
-    hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].push_back(
-        std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter));
-    std::shared_ptr<PointerEvent> pointerEvent = nullptr;
-    EXPECT_EQ(hookMgr.DispatchMouseToNextHandler(UDS_PID, pointerEvent), RET_ERR);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchTouchToNextHandler002
- * @tc.desc: Test DispatchTouchToNextHandler with non-existent pid
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchTouchToNextHandler002, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    EXPECT_EQ(hookMgr.DispatchTouchToNextHandler(999, pointerEvent), RET_ERR);
-}
-
-/**
- * @tc.name: InputEventHookManagerTest_DispatchTouchToNextHandler003
- * @tc.desc: Test DispatchTouchToNextHandler with null pointerEvent
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_DispatchTouchToNextHandler003, TestSize.Level1)
-{
-    InputEventHookManager hookMgr;
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    auto nextHookGetter = [&hookMgr] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> const {
-        return hookMgr.GetNextHook(hook);
-    };
-    hookMgr.hooks_[HOOK_EVENT_TYPE_TOUCH].push_back(
-        std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter));
-    std::shared_ptr<PointerEvent> pointerEvent = nullptr;
-    EXPECT_EQ(hookMgr.DispatchTouchToNextHandler(UDS_PID, pointerEvent), RET_ERR);
 }
 
 /**
@@ -563,9 +467,9 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_OnSessionLost002, 
         std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter));
     // Should remove all hooks for the session pid
     hookMgr.OnSessionLost(sess);
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), false);
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_MOUSE), false);
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_TOUCH), false);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), true);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].empty(), true);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_TOUCH].empty(), true);
 }
 
 /**
@@ -586,7 +490,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_PrependHook001, Te
     hookMgr.PrependHook(HOOK_EVENT_TYPE_KEY, hook1);
     hookMgr.PrependHook(HOOK_EVENT_TYPE_KEY, hook2);
     // hook2 should be at front
-    auto firstHook = hookMgr.GetFirstValidHook(HOOK_EVENT_TYPE_KEY);
+    auto firstHook = hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].front();
     EXPECT_EQ(firstHook, hook2);
 }
 
@@ -605,7 +509,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_IsHookExisted002, 
     };
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    EXPECT_EQ(hookMgr.IsHookExisted(999, HOOK_EVENT_TYPE_KEY), false);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
 }
 
 /**
@@ -617,7 +521,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_IsHookExisted002, 
 HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_IsHookExisted003, TestSize.Level1)
 {
     InputEventHookManager hookMgr;
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), false);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), true);
 }
 
 /**
@@ -701,7 +605,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_RemoveHookByPid002
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
     EXPECT_EQ(hookMgr.RemoveHookByPid(999, HOOK_EVENT_TYPE_KEY), RET_OK);
     // Hook should still exist
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), true);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
 }
 
 /**
@@ -721,7 +625,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_RemoveHookByPid003
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
     EXPECT_EQ(hookMgr.RemoveHookByPid(UDS_PID, HOOK_EVENT_TYPE_KEY), RET_OK);
     // Hook should be removed
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), false);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), true);
 }
 
 /**
@@ -733,7 +637,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_RemoveHookByPid003
 HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_GetHookNum001, TestSize.Level1)
 {
     InputEventHookManager hookMgr;
-    EXPECT_EQ(hookMgr.GetHookNum(HOOK_EVENT_TYPE_KEY), 0);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].size(), 0u);
 }
 
 /**
@@ -753,7 +657,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_GetHookNum002, Tes
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    EXPECT_EQ(hookMgr.GetHookNum(HOOK_EVENT_TYPE_KEY), 2);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].size(), 2u);
 }
 
 /**
@@ -765,8 +669,9 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_GetHookNum002, Tes
 HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_GetFirstValidHook001, TestSize.Level1)
 {
     InputEventHookManager hookMgr;
-    auto hook = hookMgr.GetFirstValidHook(HOOK_EVENT_TYPE_KEY);
-    EXPECT_EQ(hook, nullptr);
+    // 类型未注册：hooks_ 中无该键对应的链表，断言为空
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), true);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].size(), 0u);
 }
 
 /**
@@ -784,7 +689,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_GetFirstValidHook0
     };
     auto hook1 = std::make_shared<KeyEventHook>(sess, nextHookGetter);
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(hook1);
-    auto hook = hookMgr.GetFirstValidHook(HOOK_EVENT_TYPE_KEY);
+    auto hook = hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].front();
     EXPECT_EQ(hook, hook1);
 }
 
@@ -967,7 +872,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_IsHookExisted004, 
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), true);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
 }
 
 /**
@@ -986,7 +891,188 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_IsHookExisted005, 
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(nullptr);
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    EXPECT_EQ(hookMgr.IsHookExisted(UDS_PID, HOOK_EVENT_TYPE_KEY), true);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
 }
+
+/**
+ * @tc.name: InputEventHookManagerTest_OnScreenLockedSkip001
+ * @tc.desc: Screen locked: events skip hooks but registration kept; unlock resumes
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_OnScreenLockedSkip001, TestSize.Level1)
+{
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto spy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_KEY,
+        [] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
+            return nullptr;
+        });
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(spy);
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetKeyCode(1);
+
+    // Screen locked: events skip the hook, the spy is not called; the registration is kept
+    DISPLAY_MONITOR->SetScreenLocked(true);
+    hookMgr.HandleKeyEvent(keyEvent);
+    EXPECT_EQ(spy->keyCallCount_, 0);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
+
+    // Unlocked: forwarding resumes
+    DISPLAY_MONITOR->SetScreenLocked(false);
+    hookMgr.HandleKeyEvent(keyEvent);
+    EXPECT_EQ(spy->keyCallCount_, 1);
+}
+
+/**
+ * @tc.name: InputEventHookManagerTest_OnScreenLockedSkip002
+ * @tc.desc: Screen locked: pointer events skip MOUSE hook and resume after unlock
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_OnScreenLockedSkip002, TestSize.Level1)
+{
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto spy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
+            return nullptr;
+        });
+    hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].push_back(spy);
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
+
+    DISPLAY_MONITOR->SetScreenLocked(true);
+    hookMgr.HandlePointerEvent(pointerEvent);
+    EXPECT_EQ(spy->pointerCallCount_, 0);
+
+    DISPLAY_MONITOR->SetScreenLocked(false);
+    hookMgr.HandlePointerEvent(pointerEvent);
+    EXPECT_EQ(spy->pointerCallCount_, 1);
+}
+
+/**
+ * @tc.name: InputEventHookManagerTest_OnScreenLockedSuspend001
+ * @tc.desc: Lock edge suspends hooks: stash flushed, gesture/stream state reset, registration kept
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_OnScreenLockedSuspend001, TestSize.Level1)
+{
+    InputHandler->BuildInputHandlerChain();
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [] (std::shared_ptr<InputEventHook> self) -> std::shared_ptr<InputEventHook> {
+            return nullptr;
+        });
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(hook);
+
+    // Set up an in-flight state: events stuck in the stash (replayed to applications on lock suspend)
+    auto downEvent = KeyEvent::Create();
+    ASSERT_NE(downEvent, nullptr);
+    downEvent->SetId(1);
+    downEvent->SetKeyCode(KeyEvent::KEYCODE_A);
+    downEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    hook->expirationChecker_.UpdateInputEvent(downEvent);
+
+    // Screen locked (lock edge): suspend - replay in-flight events, clear registrations, cancel the monitor; keep the registration
+    DISPLAY_MONITOR->SetScreenLocked(true);
+    auto duringLock = KeyEvent::Create();
+    ASSERT_NE(duringLock, nullptr);
+    duringLock->SetKeyCode(1);
+    hookMgr.HandleKeyEvent(duringLock);
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+    EXPECT_EQ(hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].empty(), false);
+
+    // Unlocked: interception resumes (new events can be accepted)
+    DISPLAY_MONITOR->SetScreenLocked(false);
+}
+
+/**
+ * @tc.name: InputEventHookManagerTest_HandleHooksWalk001
+ * @tc.desc: Head hook declines, HandleHooks offers the event to the next hook in the chain
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_HandleHooksWalk001, TestSize.Level1)
+{
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto acceptSpy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_KEY,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto declineSpy = std::make_shared<DeclineSpyHook>(sess, HOOK_EVENT_TYPE_KEY,
+        [acceptSpy] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return acceptSpy; });
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(declineSpy);
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(acceptSpy);
+
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetId(1);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_A);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    // A head-of-chain decline moves the event backward instead of bypassing the older hooks
+    EXPECT_TRUE(hookMgr.HandleHooks(keyEvent));
+    EXPECT_EQ(declineSpy->keyCallCount_, 1);
+    EXPECT_EQ(acceptSpy->keyCallCount_, 1);
+}
+
+/**
+ * @tc.name: InputEventHookManagerTest_HandleHooksWalk002
+ * @tc.desc: Whole chain declines, HandleHooks returns false to fall back to normal dispatch
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_HandleHooksWalk002, TestSize.Level1)
+{
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto declineSpy1 = std::make_shared<DeclineSpyHook>(sess, HOOK_EVENT_TYPE_KEY,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto declineSpy2 = std::make_shared<DeclineSpyHook>(sess, HOOK_EVENT_TYPE_KEY,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(declineSpy1);
+    hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(declineSpy2);
+
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetId(1);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_A);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    EXPECT_FALSE(hookMgr.HandleHooks(keyEvent));
+    EXPECT_EQ(declineSpy1->keyCallCount_, 1);
+    EXPECT_EQ(declineSpy2->keyCallCount_, 1);
+}
+
+/**
+ * @tc.name: InputEventHookManagerTest_HandleHooksWalk003
+ * @tc.desc: Pointer chain walk: head declines, next hook accepts
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_HandleHooksWalk003, TestSize.Level1)
+{
+    InputEventHookManager hookMgr;
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto acceptSpy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto declineSpy = std::make_shared<DeclineSpyHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [acceptSpy] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return acceptSpy; });
+    hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].push_back(declineSpy);
+    hookMgr.hooks_[HOOK_EVENT_TYPE_MOUSE].push_back(acceptSpy);
+
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_BUTTON_DOWN);
+    EXPECT_TRUE(hookMgr.HandleHooks(pointerEvent));
+    EXPECT_EQ(declineSpy->pointerCallCount_, 1);
+    EXPECT_EQ(acceptSpy->pointerCallCount_, 1);
+}
+
+
 } // namespace MMI
 } // namespace OHOS

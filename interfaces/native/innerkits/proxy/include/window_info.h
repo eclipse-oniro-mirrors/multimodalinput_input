@@ -306,6 +306,13 @@ enum WindowInputPolicy : uint32_t {
      * @since 26
      */
     FLAG_SKIP_MONITOR = 1 << 13,
+    /**
+     * Skip hook. If set, events sent to this window will not be forwarded to
+     * input event hook interceptors.
+     *
+     * @since 26
+     */
+    FLAG_SKIP_HOOK = 1 << 14,
 };
 
 struct WindowInfo {

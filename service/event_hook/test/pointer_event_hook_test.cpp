@@ -14,13 +14,12 @@
  */
 
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
-#include "key_event_hook_manager.h"
+#include <cstdio>
+#include <atomic>
+
 #include "pointer_event_hook.h"
 #include "input_event_hook.h"
 #include "event_dispatch_handler.h"
-#include "event_loop_closure_checker.h"
-#include "event_dispatch_order_checker.h"
 #include "define_multimodal.h"
 #include "error_multimodal.h"
 #include "input_event_handler.h"
@@ -37,579 +36,238 @@ constexpr int32_t MODULE_TYPE = 1;
 constexpr int32_t UDS_FD = -1;
 constexpr int32_t UDS_UID = 456;
 constexpr int32_t UDS_PID = 123;
-constexpr int32_t POINTER_ITEM_DOWN_TIME_THREE = 10006;
-constexpr int32_t POINTER_ITEM_DISPLAY_X_ELEVEN = 543;
-constexpr int32_t POINTER_ITEM_DISPLAY_Y_FIFTEEN = 863;
 using namespace testing::ext;
+
+std::shared_ptr<PointerEvent> MakeMouseEvent(int32_t eventId)
+{
+    auto pointerEvent = PointerEvent::Create();
+    if (pointerEvent != nullptr) {
+        pointerEvent->SetId(eventId);
+        pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
+        pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
+        pointerEvent->SetPointerId(0);
+        pointerEvent->SetButtonId(PointerEvent::BUTTON_NONE);
+        PointerEvent::PointerItem item;
+        item.SetDisplayX(100);
+        item.SetDisplayY(100);
+        pointerEvent->AddPointerItem(item);
+    }
+    return pointerEvent;
+}
 } // namespace
 
 class PointerEventHookTest : public testing::Test {
 public:
-    static void SetUpTestCase() {};
-    static void TearDownTestCase() {};
-    void SetUp() {};
-    void TearDown() {};
+    static void SetUpTestCase() {}
+    static void TearDownTestCase() {}
+    void SetUp() {}
+    void TearDown() {}
+};
+
+// Probe hook counting intercepted calls, used for chain forwarding/replay observation
+class SpyHook : public InputEventHook {
+public:
+    SpyHook(SessionPtr session, HookEventType hookType, NextHookGetter nextHookGetter)
+        : InputEventHook(session, hookType, nextHookGetter) {}
+    bool OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent) override
+    {
+        ++pointerCallCount_;
+        return true;
+    }
+    std::atomic<int32_t> pointerCallCount_ { 0 };
 };
 
 /**
  * @tc.name: PointerEventHookTest001
- * @tc.desc: Test the function
+ * @tc.desc: OnPointerEvent with nullptr event
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest001, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    PointerEvent::PointerItem item;
-    item.SetPointerId(0);
-    item.SetDownTime(POINTER_ITEM_DOWN_TIME_THREE);
-    item.SetPressed(true);
-    item.SetDisplayX(POINTER_ITEM_DISPLAY_X_ELEVEN);
-    item.SetDisplayY(POINTER_ITEM_DISPLAY_Y_FIFTEEN);
-    item.SetDeviceId(1);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    pointerEvent->AddPointerItem(item);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
-    pointerEvent->SetPointerId(0);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
+    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    EXPECT_FALSE(hook.OnPointerEvent(nullptr));
 }
 
 /**
  * @tc.name: PointerEventHookTest002
- * @tc.desc: Test the function
+ * @tc.desc: OnPointerEvent rejects event whose sourceType does not match hook type
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest002, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
+    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto touchEvent = MakeMouseEvent(1);
+    ASSERT_NE(touchEvent, nullptr);
+    touchEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
+    EXPECT_FALSE(hook.OnPointerEvent(touchEvent));
 }
 
 /**
  * @tc.name: PointerEventHookTest003
- * @tc.desc: Test the function
+ * @tc.desc: OnPointerEvent send failure without valid session
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest003, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
+    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto mouseEvent = MakeMouseEvent(1);
+    ASSERT_NE(mouseEvent, nullptr);
+    EXPECT_FALSE(hook.OnPointerEvent(mouseEvent));
 }
 
 /**
  * @tc.name: PointerEventHookTest004
- * @tc.desc: Test the function
+ * @tc.desc: DispatchToNextHandler with nullptr event
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest004, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    pointerEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    int32_t result = hook.DispatchToNextHandler(pointerEvent);
-    EXPECT_EQ(result, ERROR_INVALID_PARAMETER);
+    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    EXPECT_EQ(hook.DispatchToNextHandler(nullptr), RET_ERR);
 }
 
 /**
  * @tc.name: PointerEventHookTest005
- * @tc.desc: Test the function
+ * @tc.desc: DispatchToNextHandler walks the chain: successor accepts
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest005, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_JOYSTICK);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
-    PointerEvent::PointerItem pointerItem1;
-    int32_t disPlayX1 = 100;
-    int32_t disPlayY1 = 110;
-    pointerItem1.SetFixedDisplayXPos(disPlayX1);
-    pointerItem1.SetFixedDisplayYPos(disPlayY1);
-    pointerItem1.SetPointerId(0);
-    pointerItem1.SetDownTime(0);
-    pointerItem1.SetPressed(true);
-    pointerItem1.SetPressure(30);
-    pointerEvent->AddPointerItem(pointerItem1);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    pointerEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    int32_t result = hook.DispatchToNextHandler(pointerEvent);
-    EXPECT_EQ(result, ERROR_INVALID_PARAMETER);
+    auto acceptSpy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [acceptSpy] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return acceptSpy; });
+    auto mouseEvent = MakeMouseEvent(1);
+    ASSERT_NE(mouseEvent, nullptr);
+    EXPECT_EQ(hook->DispatchToNextHandler(mouseEvent), RET_OK);
+    EXPECT_EQ(acceptSpy->pointerCallCount_, 1);
 }
 
 /**
  * @tc.name: PointerEventHookTest006
- * @tc.desc: Test the function
+ * @tc.desc: DispatchToNextHandler falls back to direct dispatch after whole chain declines
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest006, TestSize.Level0)
 {
+    InputHandler->BuildInputHandlerChain();
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    pointerEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto mouseEvent = MakeMouseEvent(1);
+    ASSERT_NE(mouseEvent, nullptr);
+    // Chain-tail direct dispatch: the direct-dispatch handler is void-semantics, mouse events always report success
+    EXPECT_EQ(hook->DispatchToNextHandler(mouseEvent), RET_OK);
 }
 
 /**
  * @tc.name: PointerEventHookTest007
- * @tc.desc: Test the function
+ * @tc.desc: HandleEventResult consumed removes event from stash
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest007, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    pointerEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto mouseEvent = MakeMouseEvent(1);
+    ASSERT_NE(mouseEvent, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(mouseEvent);
+    EXPECT_NE(hook->GetStashEvent(1), nullptr);
+    EXPECT_EQ(hook->HandleEventResult(1, true), RET_OK); // Consume: do not dispatch further
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
 }
 
 /**
  * @tc.name: PointerEventHookTest008
- * @tc.desc: Test the function
+ * @tc.desc: HandleEventResult released forwards the event
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest008, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    pointerEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
+    auto acceptSpy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [acceptSpy] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return acceptSpy; });
+    auto mouseEvent = MakeMouseEvent(1);
+    ASSERT_NE(mouseEvent, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(mouseEvent);
+    EXPECT_EQ(hook->HandleEventResult(1, false), RET_OK); // Release: dispatch further
+    EXPECT_EQ(acceptSpy->pointerCallCount_, 1);
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
 }
 
 /**
  * @tc.name: PointerEventHookTest009
- * @tc.desc: Test the function
+ * @tc.desc: Late receipt for swept event is treated as handled
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest009, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_UNKNOWN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    pointerEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    EXPECT_EQ(hook->HandleEventResult(999, true), RET_ERR);
+    EXPECT_EQ(hook->HandleEventResult(999, false), RET_ERR);
 }
 
 /**
  * @tc.name: PointerEventHookTest010
- * @tc.desc: Test OnPointerEvent with nullptr pointerEvent
+ * @tc.desc: SweepExpiredEvents dispatches stale events and clears stash
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest010, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = nullptr;
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto staleEvent = MakeMouseEvent(1);
+    ASSERT_NE(staleEvent, nullptr);
+    int64_t past = std::chrono::duration_cast<std::chrono::milliseconds>(
+        (std::chrono::steady_clock::now() - std::chrono::seconds(5)).time_since_epoch()).count();
+    hook->expirationChecker_.UpdateInputEvent(staleEvent, past);
+    auto freshEvent = MakeMouseEvent(2);
+    ASSERT_NE(freshEvent, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(freshEvent);
+
+    hook->SweepExpiredEvents();
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+    EXPECT_NE(hook->GetStashEvent(2), nullptr);
 }
 
 /**
  * @tc.name: PointerEventHookTest011
- * @tc.desc: Test OnPointerEvent with TOUCHSCREEN and HOOK_EVENT_TYPE_TOUCH success path
+ * @tc.desc: FlushStashEvents forwards to next hook and drains stash
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(PointerEventHookTest, PointerEventHookTest011, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
-    PointerEvent::PointerItem item;
-    item.SetPointerId(0);
-    item.SetDownTime(1000);
-    item.SetDisplayX(100);
-    item.SetDisplayY(200);
-    pointerEvent->AddPointerItem(item);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
+    auto spy = std::make_shared<SpyHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto hook = std::make_shared<PointerEventHook>(sess, HOOK_EVENT_TYPE_MOUSE,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto mouseEvent1 = MakeMouseEvent(1);
+    ASSERT_NE(mouseEvent1, nullptr);
+    auto mouseEvent2 = MakeMouseEvent(2);
+    ASSERT_NE(mouseEvent2, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(mouseEvent1);
+    hook->expirationChecker_.UpdateInputEvent(mouseEvent2);
 
-/**
- * @tc.name: PointerEventHookTest012
- * @tc.desc: Test OnPointerEvent with MOUSE and HOOK_EVENT_TYPE_MOUSE success path
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest012, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
-    PointerEvent::PointerItem item;
-    item.SetPointerId(0);
-    item.SetDownTime(1000);
-    item.SetDisplayX(300);
-    item.SetDisplayY(400);
-    pointerEvent->AddPointerItem(item);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest013
- * @tc.desc: Test OnPointerEvent with TOUCHPAD source type
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest013, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest014
- * @tc.desc: Test OnPointerEvent with UNKNOWN source type
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest014, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_UNKNOWN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest015
- * @tc.desc: Test DispatchToNextHandler
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest015, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = nullptr;
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    int32_t result = hook.DispatchToNextHandler(pointerEvent);
-    EXPECT_EQ(result, RET_ERR);
-}
-
-/**
- * @tc.name: PointerEventHookTest017
- * @tc.desc: Test DispatchToNextHandler
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest017, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    int32_t eventId = 5;
-    int32_t eventId1 = 10;
-    pointerEvent->SetId(eventId);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    int32_t result = hook.DispatchToNextHandler(pointerEvent);
-    EXPECT_EQ(result, ERROR_INVALID_PARAMETER);
-}
-
-/**
- * @tc.name: PointerEventHookTest018
- * @tc.desc: Test DispatchDirectly
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest018, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    int32_t eventId = 1;
-    pointerEvent->SetId(eventId);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    hook.orderChecker_.UpdateEvent(eventId);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest019
- * @tc.desc: Test DispatchDirectly
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest019, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    int32_t eventId = 2;
-    pointerEvent->SetId(eventId);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter);
-    hook.orderChecker_.UpdateEvent(eventId);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest020
- * @tc.desc: Test DispatchDirectly with nullptr pointerEvent
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest020, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = nullptr;
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest021
- * @tc.desc: Test OnPointerEvent with POINTER_ACTION_UP action
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest021, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_UP);
-    PointerEvent::PointerItem item;
-    item.SetPointerId(0);
-    item.SetDownTime(2000);
-    item.SetDisplayX(500);
-    item.SetDisplayY(600);
-    pointerEvent->AddPointerItem(item);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest022
- * @tc.desc: Test OnPointerEvent with POINTER_ACTION_CANCEL action
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest022, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_CANCEL);
-    PointerEvent::PointerItem item;
-    item.SetPointerId(1);
-    item.SetDownTime(3000);
-    item.SetDisplayX(700);
-    item.SetDisplayY(800);
-    pointerEvent->AddPointerItem(item);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_MOUSE, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest024
- * @tc.desc: Test DispatchDirectly
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest024, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_JOYSTICK);
-    int32_t eventId = 4;
-    pointerEvent->SetId(eventId);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    hook.orderChecker_.UpdateEvent(eventId);
-    bool result = hook.DispatchDirectly(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest025
- * @tc.desc: Test OnPointerEvent with empty pointer items
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest025, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
-}
-
-/**
- * @tc.name: PointerEventHookTest026
- * @tc.desc: Test OnPointerEvent with MOUSE source and HOOK_EVENT_TYPE_TOUCH mismatch
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerEventHookTest, PointerEventHookTest026, TestSize.Level0)
-{
-    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    PointerEventHook hook(sess, HOOK_EVENT_TYPE_TOUCH, nextHookGetter);
-    bool result = hook.OnPointerEvent(pointerEvent);
-    EXPECT_FALSE(result);
+    hook->FlushStashEvents(spy);
+    EXPECT_EQ(spy->pointerCallCount_, 2);
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+    EXPECT_EQ(hook->GetStashEvent(2), nullptr);
 }
 } // namespace MMI
 } // namespace OHOS

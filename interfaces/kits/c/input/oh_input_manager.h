@@ -349,8 +349,13 @@ typedef enum Input_Result {
      * Service error.
      */
     INPUT_SERVICE_EXCEPTION = 3800001,
-    /** No product config of specific parameter */
-    INPUT_NO_PRODUCT_CONFIG = 3800002,
+
+    /**
+     * Input event handler repeatedly enabled. Only one handler can be enabled for a process.
+     * This value shares the numeric value with {@link INPUT_NO_PRODUCT_CONFIG}.
+     * @since 26.1.0
+     */
+    INPUT_REPEAT_HANDLER = 3800002,
     /**
      * Interceptor repeatedly created.
      */
@@ -2951,6 +2956,266 @@ Input_Result OH_Input_GetCursorInfo(Input_CursorInfo* cursorInfo, OH_PixelmapNat
  * @since 26.0.0
  */
 Input_Result OH_Input_BindInputDeviceToDisplay(int32_t inputDeviceId, int32_t displayId);
+
+/**
+ * @brief Defines the input event handler object, which is used to intercept input events.
+ *
+ * The object is an opaque handle created by {@link OH_Input_EventHandler_Create} and destroyed by
+ * {@link OH_Input_EventHandler_Destroy}. A newly created handler is disabled and intercepts no event until it is
+ * enabled by {@link OH_Input_EventHandler_Enable}.
+ *
+ * @since 26.1.0
+ */
+typedef struct OH_Input_EventHandler OH_Input_EventHandler;
+
+/**
+ * @brief Defines the unified input event object delivered to the event callback.
+ *
+ * The object is an opaque, read-only view of the intercepted event. It is owned by the input service and remains valid
+ * only during the event callback. Do not free or modify it, and do not store the pointer beyond the callback.
+ * Type-specific views can be obtained through {@link OH_Input_Event_AsKeyEvent},
+ * {@link OH_Input_Event_AsMouseEvent}, {@link OH_Input_Event_AsTouchEvent}, and {@link OH_Input_Event_AsAxisEvent}.
+ *
+ * @since 26.1.0
+ */
+typedef struct OH_Input_Event OH_Input_Event;
+
+/**
+ * @brief Enumerates input event types.
+ *
+ * @since 26.1.0
+ */
+typedef enum OH_Input_EventType {
+    /**
+     * No valid event type, which is the default value of the event type before it is set.
+     */
+    OH_INPUT_EVENT_NONE = -1,
+    /**
+     * Key event, which corresponds to the Input_KeyEvent view.
+     */
+    OH_INPUT_EVENT_KEY = 0,
+    /**
+     * Mouse event, which corresponds to the Input_MouseEvent view.
+     */
+    OH_INPUT_EVENT_MOUSE = 1,
+    /**
+     * Touch event, which corresponds to the Input_TouchEvent view.
+     */
+    OH_INPUT_EVENT_TOUCH = 2,
+    /**
+     * Axis event (for example, a mouse wheel event), which corresponds to the Input_AxisEvent view.
+     */
+    OH_INPUT_EVENT_AXIS = 3,
+} OH_Input_EventType;
+
+/**
+ * @brief Defines the event type mask, which is used to specify the event types to intercept.
+ *
+ * @since 26.1.0
+ */
+typedef uint64_t OH_Input_EventTypeMask;
+
+/**
+ * @brief Key event type mask, which is used to intercept key events.
+ *
+ * @since 26.1.0
+ */
+#define OH_INPUT_EVENT_TYPE_MASK_KEY   (1ULL << OH_INPUT_EVENT_KEY)
+
+/**
+ * @brief Mouse event type mask, which is used to intercept mouse events.
+ *
+ * @since 26.1.0
+ */
+#define OH_INPUT_EVENT_TYPE_MASK_MOUSE (1ULL << OH_INPUT_EVENT_MOUSE)
+
+/**
+ * @brief Touch event type mask, which is used to intercept touch events.
+ *
+ * @since 26.1.0
+ */
+#define OH_INPUT_EVENT_TYPE_MASK_TOUCH (1ULL << OH_INPUT_EVENT_TOUCH)
+
+/**
+ * @brief Axis event type mask, which is used to intercept axis events (for example, mouse wheel events).
+ * Axis events are intercepted via an independent channel and can be registered alone or combined with
+ * other event type masks.
+ *
+ * @since 26.1.0
+ */
+#define OH_INPUT_EVENT_TYPE_MASK_AXIS  (1ULL << OH_INPUT_EVENT_AXIS)
+
+/**
+ * @brief Describes the event callback, which is invoked synchronously on the multimodal input client thread when an
+ * intercepted event arrives.
+ *
+ * The callback must return as quickly as possible. If it does not return within the timeout threshold (1 second),
+ * the handler is disabled, the event is dispatched by default, and {@link OH_Input_EventHandler_OnDisabledFunc} is
+ * invoked. The handler can be enabled again by {@link OH_Input_EventHandler_Enable} to resume interception.
+ *
+ * @param handler Indicates the pointer to the input event handler that receives the event.
+ * @param event Indicates the pointer to the intercepted event, which is never NULL. The event is read-only and is
+ * valid only during this callback. Do not free or modify it.
+ * @return Returns the same <b>event</b> pointer to pass the event to the next handler or the target application,
+ * or returns NULL to consume (block) the event.
+ * @since 26.1.0
+ */
+typedef const OH_Input_Event* (*OH_Input_EventHandler_OnEventFunc)(
+    OH_Input_EventHandler* handler, const OH_Input_Event* event);
+
+/**
+ * @brief Describes the disabled callback, which is invoked when the handler is disabled because
+ * {@link OH_Input_EventHandler_OnEventFunc} exceeded the timeout threshold.
+ *
+ * After this callback is invoked, the handler no longer intercepts events. The interception can be resumed by calling
+ * {@link OH_Input_EventHandler_Enable} with <b>enable</b> set to <b>true</b>.
+ *
+ * @param handler Indicates the pointer to the input event handler that has been disabled.
+ * @since 26.1.0
+ */
+typedef void (*OH_Input_EventHandler_OnDisabledFunc)(OH_Input_EventHandler* handler);
+
+/**
+ * @brief Creates an input event handler. The handler is disabled after being created and intercepts no event until
+ * {@link OH_Input_EventHandler_Enable} is called.
+ *
+ * Multiple handlers can be created. The permission
+ * <b>ohos.permission.HOOK_INPUT_EVENT</b> is required by {@link OH_Input_EventHandler_Enable} to start interception.
+ *
+ * @param mask Indicates the event type mask, which must be non-zero and contain only supported bits. The supported
+ * bits are {@link OH_INPUT_EVENT_TYPE_MASK_KEY}, {@link OH_INPUT_EVENT_TYPE_MASK_MOUSE},
+ * {@link OH_INPUT_EVENT_TYPE_MASK_TOUCH}, and {@link OH_INPUT_EVENT_TYPE_MASK_AXIS}.
+ * @param onEventFunc Indicates the event callback, which is invoked when an intercepted event arrives.
+ * @param onDisabledFunc Indicates the disabled callback, which is invoked when the handler is disabled due to the
+ * event callback timeout.
+ * @param handler Indicates the pointer to the created input event handler.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_EventHandler_Create(OH_Input_EventTypeMask mask,
+    OH_Input_EventHandler_OnEventFunc onEventFunc,
+    OH_Input_EventHandler_OnDisabledFunc onDisabledFunc,
+    OH_Input_EventHandler** handler);
+
+/**
+ * @brief Destroys an input event handler and releases related resources. Events are no longer intercepted by the
+ * handler after it is destroyed. This API performs no operation if <b>handler</b> is NULL.
+ *
+ * @param handler Indicates the pointer to the input event handler to destroy.
+ * @since 26.1.0
+ */
+void OH_Input_EventHandler_Destroy(OH_Input_EventHandler* handler);
+
+/**
+ * @brief Enables or disables the input event handler. A newly created handler is disabled, and the interception
+ * starts only after this API is called with <b>enable</b> set to <b>true</b>.
+ *
+ * Enabling a handler requires the permission <b>ohos.permission.HOOK_INPUT_EVENT</b>. Disabling a handler does not
+ * check the permission. If the handler has been disabled due to the event callback timeout, call this API with
+ * <b>enable</b> set to <b>true</b> to resume interception. Only one handler can intercept the same event type at the
+ * same time.
+ *
+ * @permission ohos.permission.HOOK_INPUT_EVENT (required only when <b>enable</b> is <b>true</b>)
+ * @param handler Indicates the pointer to the input event handler.
+ * @param enable Specifies whether to enable the handler. The value <b>true</b> means to enable the handler, and
+ * <b>false</b> means to disable it.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PERMISSION_DENIED} if the permission verification fails (only when <b>enable</b> is <b>true</b>);
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails;
+ * {@link INPUT_REPEAT_INTERCEPTOR} if another handler that contains the same event type is already enabled in this
+ * process;
+ * {@link INPUT_SERVICE_EXCEPTION} if the service is abnormal.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_EventHandler_Enable(OH_Input_EventHandler* handler, bool enable);
+
+/**
+ * @brief Checks whether the input event handler is enabled.
+ *
+ * @param handler Indicates the pointer to the input event handler.
+ * @param enabled Indicates the pointer to the check result. The value <b>true</b> means that the handler is enabled,
+ * and <b>false</b> means that it is disabled.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_EventHandler_IsEnabled(const OH_Input_EventHandler* handler, bool* enabled);
+
+/**
+ * @brief Obtains the event type mask of the input event handler.
+ *
+ * @param handler Indicates the pointer to the input event handler.
+ * @param mask Indicates the pointer to the event type mask.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_EventHandler_GetMask(const OH_Input_EventHandler* handler, OH_Input_EventTypeMask* mask);
+
+/**
+ * @brief Obtains the type of the input event.
+ *
+ * @param event Indicates the pointer to the input event, which is obtained in
+ * {@link OH_Input_EventHandler_OnEventFunc}.
+ * @param type Indicates the pointer to the event type.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_Event_GetType(const OH_Input_Event* event, OH_Input_EventType* type);
+
+/**
+ * @brief Obtains the read-only key event view of the input event. The view is valid only during the event callback.
+ *
+ * @param event Indicates the pointer to the input event, which is obtained in
+ * {@link OH_Input_EventHandler_OnEventFunc}.
+ * @param keyEvent Indicates the pointer to the key event view. The event fields can be read through the
+ * <b>OH_Input_GetKeyEvent*</b> APIs.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails or the event is not a key event.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_Event_AsKeyEvent(const OH_Input_Event* event, const Input_KeyEvent** keyEvent);
+
+/**
+ * @brief Obtains the read-only mouse event view of the input event. The view is valid only during the event callback.
+ *
+ * @param event Indicates the pointer to the input event, which is obtained in
+ * {@link OH_Input_EventHandler_OnEventFunc}.
+ * @param mouseEvent Indicates the pointer to the mouse event view. The event fields can be read through the
+ * <b>OH_Input_GetMouseEvent*</b> APIs.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails or the event is not a mouse event.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_Event_AsMouseEvent(const OH_Input_Event* event, const Input_MouseEvent** mouseEvent);
+
+/**
+ * @brief Obtains the read-only touch event view of the input event. The view is valid only during the event callback.
+ *
+ * @param event Indicates the pointer to the input event, which is obtained in
+ * {@link OH_Input_EventHandler_OnEventFunc}.
+ * @param touchEvent Indicates the pointer to the touch event view. The event fields can be read through the
+ * <b>OH_Input_GetTouchEvent*</b> APIs.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails or the event is not a touch event.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_Event_AsTouchEvent(const OH_Input_Event* event, const Input_TouchEvent** touchEvent);
+
+/**
+ * @brief Obtains the read-only axis event view of the input event. The view is valid only during the event callback.
+ *
+ * @param event Indicates the pointer to the input event, which is obtained in
+ * {@link OH_Input_EventHandler_OnEventFunc}.
+ * @param axisEvent Indicates the pointer to the axis event view. The event fields can be read through the
+ * <b>OH_Input_GetAxisEvent*</b> APIs.
+ * @return Returns {@link INPUT_SUCCESS} if the operation is successful;
+ * {@link INPUT_PARAMETER_ERROR} if the parameter verification fails or the event is not an axis event.
+ * @since 26.1.0
+ */
+Input_Result OH_Input_Event_AsAxisEvent(const OH_Input_Event* event, const Input_AxisEvent** axisEvent);
 #ifdef __cplusplus
 }
 #endif
