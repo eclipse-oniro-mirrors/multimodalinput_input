@@ -947,6 +947,8 @@ void TouchDrawingHandler::OnDisplayModeChange()
     MMI_HILOGI("OnDisplayModeChange");
     if (surfaceNode_ != nullptr) {
         surfaceNode_->ClearChildren();
+        surfaceNode_->SetBounds(0, 0, screenWidth_, screenHeight_);
+        surfaceNode_->SetFrame(0, 0, screenWidth_, screenHeight_);
     }
     if (trackerCanvasNode_ != nullptr) {
         trackerCanvasNode_.reset();
