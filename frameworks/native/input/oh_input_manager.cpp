@@ -566,6 +566,7 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent)
     MMI_HILOGI("Input_MouseEvent injectEvent");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectMouseEvent.Call", true);
     CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
+    int32_t result = INPUT_SUCCESS;
     std::make_shared<PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_mouseEventMutex);
@@ -586,7 +587,7 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent)
         OHOS::MMI::PointerEvent::PointerItem item;
         g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
         item.SetDownTime(time);
-        int32_t result = HandleMouseAction(mouseEvent, item);
+        result = HandleMouseAction(mouseEvent, item);
         if (result != 0) {
             return result;
         }
@@ -612,6 +613,7 @@ int32_t OH_Input_InjectMouseEventGlobal(const struct Input_MouseEvent* mouseEven
     MMI_HILOGD("Input_MouseEvent global");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectMouseEventGlobal.Call", true);
     CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
+    int32_t result = INPUT_SUCCESS;
     std::make_shared<PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_mouseEventMutex);
@@ -627,7 +629,7 @@ int32_t OH_Input_InjectMouseEventGlobal(const struct Input_MouseEvent* mouseEven
         OHOS::MMI::PointerEvent::PointerItem item;
         g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
         item.SetDownTime(time);
-        int32_t result = HandleMouseAction(mouseEvent, item);
+        result = HandleMouseAction(mouseEvent, item);
         if (result != 0) {
             return result;
         }
