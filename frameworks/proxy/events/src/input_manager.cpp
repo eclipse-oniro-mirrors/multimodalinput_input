@@ -1077,9 +1077,9 @@ int32_t InputManager::RemoveInputEventHook(HookEventType hookEventType)
     return InputMgrImpl.RemoveInputEventHook(hookEventType);
 }
 
-int32_t InputManager::DispatchToNextHandler(int32_t eventId, HookEventType hookEventType)
+int32_t InputManager::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed)
 {
-    return InputMgrImpl.DispatchToNextHandler(eventId, hookEventType);
+    return InputMgrImpl.NotifyHookEventResult(eventId, hookEventType, isConsumed);
 }
 
 int32_t InputManager::SetKeyStatusRecord(bool enable, int32_t timeout)

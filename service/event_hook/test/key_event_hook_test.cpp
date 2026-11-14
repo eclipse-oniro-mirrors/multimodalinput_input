@@ -14,13 +14,11 @@
  */
 
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
-#include "key_event_hook_manager.h"
+#include <atomic>
+
 #include "key_event_hook.h"
 #include "input_event_hook.h"
 #include "event_dispatch_handler.h"
-#include "event_loop_closure_checker.h"
-#include "event_dispatch_order_checker.h"
 #include "define_multimodal.h"
 #include "error_multimodal.h"
 #include "input_event_handler.h"
@@ -37,172 +35,221 @@ constexpr int32_t MODULE_TYPE = 1;
 constexpr int32_t UDS_FD = -1;
 constexpr int32_t UDS_UID = 456;
 constexpr int32_t UDS_PID = 123;
-constexpr int32_t NANOSECOND_TO_MILLISECOND = 1000000;
-constexpr int32_t SEC_TO_NANOSEC = 1000000000;
 using namespace testing::ext;
+
+std::shared_ptr<KeyEvent> MakeKeyEvent(int32_t eventId, int32_t keyCode = KeyEvent::KEYCODE_A)
+{
+    auto keyEvent = KeyEvent::Create();
+    if (keyEvent != nullptr) {
+        keyEvent->SetId(eventId);
+        keyEvent->SetKeyCode(keyCode);
+        keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    }
+    return keyEvent;
+}
 } // namespace
 
 class KeyEventHookTest : public testing::Test {
 public:
-    static void SetUpTestCase() {};
-    static void TearDownTestCase() {};
-    void SetUp() {};
-    void TearDown() {};
+    static void SetUpTestCase() {}
+    static void TearDownTestCase() {}
+    void SetUp() {}
+    void TearDown() {}
 };
 
-int64_t GetNanoTime()
-{
-    struct timespec time = { 0 };
-    clock_gettime(CLOCK_MONOTONIC, &time);
-    return (static_cast<int64_t>(time.tv_sec) * SEC_TO_NANOSEC) + static_cast<int64_t>(time.tv_nsec);
-}
+// Probe hook counting intercepted calls, used for chain forwarding/replay observation
+class SpyHook : public InputEventHook {
+public:
+    SpyHook(SessionPtr session, NextHookGetter nextHookGetter)
+        : InputEventHook(session, HOOK_EVENT_TYPE_KEY, nextHookGetter) {}
+    bool OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent) override
+    {
+        ++keyCallCount_;
+        return true;
+    }
+    std::atomic<int32_t> keyCallCount_ { 0 };
+};
 
 /**
  * @tc.name: KeyEventHookTest001
- * @tc.desc: Test the function
+ * @tc.desc: OnKeyEvent with nullptr event
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(KeyEventHookTest, KeyEventHookTest001, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
+    KeyEventHook hook(sess, [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> {
         return nullptr;
-    };
-    KeyEventHook hook(sess, nextHookGetter);
-    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
-    EXPECT_NE(keyEvent, nullptr);
-    keyEvent->SetKeyCode(KeyEvent::KEYCODE_VOLUME_DOWN);
-    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
-    keyEvent->SetRepeatKey(true);
-    int64_t downTime = GetNanoTime() / NANOSECOND_TO_MILLISECOND;
-    KeyEvent::KeyItem kitDown;
-    kitDown.SetKeyCode(KeyEvent::KEYCODE_A);
-    kitDown.SetPressed(true);
-    kitDown.SetDownTime(downTime);
-    keyEvent->SetKeyCode(KeyEvent::KEYCODE_A);
-    keyEvent->AddPressedKeyItems(kitDown);
-    bool result = hook.OnKeyEvent(keyEvent);
-    EXPECT_FALSE(result);
+    });
+    EXPECT_FALSE(hook.OnKeyEvent(nullptr));
 }
 
 /**
  * @tc.name: KeyEventHookTest002
- * @tc.desc: Test the function
+ * @tc.desc: OnKeyEvent send failure without valid session
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(KeyEventHookTest, KeyEventHookTest002, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
+    KeyEventHook hook(sess, [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> {
         return nullptr;
-    };
-    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
-    EXPECT_NE(keyEvent, nullptr);
-    keyEvent->SetKeyCode(KeyEvent::KEYCODE_VOLUME_DOWN);
-    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
-    keyEvent->SetRepeatKey(true);
-    int64_t downTime = GetNanoTime() / NANOSECOND_TO_MILLISECOND;
-    KeyEvent::KeyItem kitDown;
-    kitDown.SetKeyCode(KeyEvent::KEYCODE_A);
-    kitDown.SetPressed(true);
-    kitDown.SetDownTime(downTime);
-    keyEvent->SetKeyCode(KeyEvent::KEYCODE_A);
-    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
-    keyEvent->AddPressedKeyItems(kitDown);
-    KeyEventHook hook(sess, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    keyEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    int32_t result = hook.DispatchToNextHandler(keyEvent);
-    EXPECT_EQ(result, ERROR_INVALID_PARAMETER);
+    });
+    auto keyEvent = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent, nullptr);
+    EXPECT_FALSE(hook.OnKeyEvent(keyEvent));
 }
 
 /**
  * @tc.name: KeyEventHookTest003
- * @tc.desc: Test the function
+ * @tc.desc: DispatchToNextHandler with nullptr event
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(KeyEventHookTest, KeyEventHookTest003, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [this] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
+    KeyEventHook hook(sess, [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> {
         return nullptr;
-    };
-    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
-    EXPECT_NE(keyEvent, nullptr);
-    keyEvent->SetKeyCode(KeyEvent::KEYCODE_VOLUME_DOWN);
-    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
-    keyEvent->SetRepeatKey(true);
-    int64_t downTime = GetNanoTime() / NANOSECOND_TO_MILLISECOND;
-    KeyEvent::KeyItem kitDown;
-    kitDown.SetKeyCode(KeyEvent::KEYCODE_A);
-    kitDown.SetPressed(true);
-    kitDown.SetDownTime(downTime);
-    keyEvent->SetKeyCode(KeyEvent::KEYCODE_A);
-    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
-    keyEvent->AddPressedKeyItems(kitDown);
-    KeyEventHook hook(sess, nextHookGetter);
-    int32_t eventId = 1;
-    int32_t eventId1 = 0;
-    keyEvent->SetId(eventId);
-    hook.orderChecker_.UpdateEvent(eventId1);
-    bool result = hook.DispatchDirectly(keyEvent);
-    EXPECT_FALSE(result);
+    });
+    EXPECT_EQ(hook.DispatchToNextHandler(nullptr), RET_ERR);
 }
 
 /**
  * @tc.name: KeyEventHookTest004
- * @tc.desc: Test OnKeyEvent with nullptr event
+ * @tc.desc: DispatchToNextHandler walks the chain: successor accepts
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(KeyEventHookTest, KeyEventHookTest004, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    KeyEventHook hook(sess, nextHookGetter);
-    bool result = hook.OnKeyEvent(nullptr);
-    EXPECT_FALSE(result);
+    auto acceptSpy = std::make_shared<SpyHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [acceptSpy] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return acceptSpy; });
+    auto keyEvent = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent, nullptr);
+    EXPECT_EQ(hook->DispatchToNextHandler(keyEvent), RET_OK);
+    EXPECT_EQ(acceptSpy->keyCallCount_, 1);
 }
 
 /**
  * @tc.name: KeyEventHookTest005
- * @tc.desc: Test DispatchToNextHandler with nullptr keyEvent
+ * @tc.desc: DispatchToNextHandler falls back to direct dispatch after whole chain declines
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(KeyEventHookTest, KeyEventHookTest005, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    KeyEventHook hook(sess, nextHookGetter);
-    int32_t result = hook.DispatchToNextHandler(nullptr);
-    EXPECT_EQ(result, RET_ERR);
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto keyEvent = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent, nullptr);
+    // Chain-tail direct dispatch: no UDS server in the test environment so it fails with RET_ERR
+    // (see the SweepExpiredEvents test for the nothing-dropped semantics)
+    EXPECT_EQ(hook->DispatchToNextHandler(keyEvent), RET_ERR);
 }
 
 /**
  * @tc.name: KeyEventHookTest006
- * @tc.desc: Test DispatchDirectly with nullptr keyEvent
+ * @tc.desc: HandleEventResult consumed removes event from stash
  * @tc.type: FUNC
- * @tc.require:
  */
 HWTEST_F(KeyEventHookTest, KeyEventHookTest006, TestSize.Level0)
 {
     SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
-    NextHookGetter nextHookGetter = [] (std::shared_ptr<InputEventHook> hook) -> std::shared_ptr<InputEventHook> {
-        return nullptr;
-    };
-    KeyEventHook hook(sess, nextHookGetter);
-    bool result = hook.DispatchDirectly(nullptr);
-    EXPECT_FALSE(result);
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto keyEvent = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(keyEvent);
+    EXPECT_NE(hook->GetStashEvent(1), nullptr);
+    EXPECT_EQ(hook->HandleEventResult(1, true), RET_OK); // Consume: do not dispatch further
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+}
+
+/**
+ * @tc.name: KeyEventHookTest007
+ * @tc.desc: HandleEventResult released forwards the event
+ * @tc.type: FUNC
+ */
+HWTEST_F(KeyEventHookTest, KeyEventHookTest007, TestSize.Level0)
+{
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto acceptSpy = std::make_shared<SpyHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [acceptSpy] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return acceptSpy; });
+    auto keyEvent = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(keyEvent);
+    EXPECT_EQ(hook->HandleEventResult(1, false), RET_OK); // Release: dispatch further
+    EXPECT_EQ(acceptSpy->keyCallCount_, 1);
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+}
+
+/**
+ * @tc.name: KeyEventHookTest008
+ * @tc.desc: Late receipt for swept event is treated as handled
+ * @tc.type: FUNC
+ */
+HWTEST_F(KeyEventHookTest, KeyEventHookTest008, TestSize.Level0)
+{
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    // Not in the stash (already dispatched by the timeout fallback): late receipt treated as handled
+    EXPECT_EQ(hook->HandleEventResult(999, true), RET_ERR);
+    EXPECT_EQ(hook->HandleEventResult(999, false), RET_ERR);
+}
+
+/**
+ * @tc.name: KeyEventHookTest009
+ * @tc.desc: SweepExpiredEvents dispatches stale events and clears stash
+ * @tc.type: FUNC
+ */
+HWTEST_F(KeyEventHookTest, KeyEventHookTest009, TestSize.Level0)
+{
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto staleEvent = MakeKeyEvent(1);
+    ASSERT_NE(staleEvent, nullptr);
+    int64_t past = std::chrono::duration_cast<std::chrono::milliseconds>(
+        (std::chrono::steady_clock::now() - std::chrono::seconds(5)).time_since_epoch()).count();
+    hook->expirationChecker_.UpdateInputEvent(staleEvent, past);
+    auto freshEvent = MakeKeyEvent(2);
+    ASSERT_NE(freshEvent, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(freshEvent);
+
+    hook->SweepExpiredEvents();
+    // Expired events are dispatched by the fallback (removed from the stash); fresh events are kept
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+    EXPECT_NE(hook->GetStashEvent(2), nullptr);
+}
+
+/**
+ * @tc.name: KeyEventHookTest010
+ * @tc.desc: FlushStashEvents forwards to next hook and drains stash
+ * @tc.type: FUNC
+ */
+HWTEST_F(KeyEventHookTest, KeyEventHookTest010, TestSize.Level0)
+{
+    SessionPtr sess = std::make_shared<UDSSession>(PROGRAM_NAME, MODULE_TYPE, UDS_FD, UDS_UID, UDS_PID);
+    auto spy = std::make_shared<SpyHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto hook = std::make_shared<KeyEventHook>(sess,
+        [] (std::shared_ptr<InputEventHook>) -> std::shared_ptr<InputEventHook> { return nullptr; });
+    auto keyEvent1 = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent1, nullptr);
+    auto keyEvent2 = MakeKeyEvent(2);
+    ASSERT_NE(keyEvent2, nullptr);
+    hook->expirationChecker_.UpdateInputEvent(keyEvent1);
+    hook->expirationChecker_.UpdateInputEvent(keyEvent2);
+
+    hook->FlushStashEvents(spy);
+    EXPECT_EQ(spy->keyCallCount_, 2);
+    EXPECT_EQ(hook->GetStashEvent(1), nullptr);
+    EXPECT_EQ(hook->GetStashEvent(2), nullptr);
 }
 } // namespace MMI
 } // namespace OHOS

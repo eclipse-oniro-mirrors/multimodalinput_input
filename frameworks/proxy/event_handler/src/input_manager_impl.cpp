@@ -3549,10 +3549,10 @@ int32_t InputManagerImpl::RemoveInputEventHook(HookEventType hookEventType)
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
-int32_t InputManagerImpl::DispatchToNextHandler(int32_t eventId, HookEventType hookEventType)
+int32_t InputManagerImpl::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed)
 {
 #ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-    return INPUT_EVENT_HOOK_HANDLER.DispatchToNextHandler(eventId, hookEventType);
+    return INPUT_EVENT_HOOK_HANDLER.NotifyHookEventResult(eventId, hookEventType, isConsumed);
 #else
     return ERROR_UNSUPPORT;
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK

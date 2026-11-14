@@ -20,6 +20,7 @@
 #include "input_event_data_transformation.h"
 #include "input_event_handler.h"
 #include "mmi_log.h"
+#include "proto.h"
 
 #undef MMI_LOG_DOMAIN
 #define MMI_LOG_DOMAIN MMI_LOG_HANDLER
@@ -30,7 +31,6 @@ namespace OHOS {
 namespace MMI {
 bool PointerEventHook::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent)
 {
-    CALL_DEBUG_ENTER;
     CHKPF(pointerEvent);
     auto pkt = std::make_shared<NetPacket>(MmiMessageId::INVALID);
     auto sourceType = pointerEvent->GetSourceType();
@@ -39,6 +39,8 @@ bool PointerEventHook::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent
         pkt = std::make_shared<NetPacket>(MmiMessageId::ON_HOOK_TOUCH_EVENT);
     } else if (sourceType == PointerEvent::SOURCE_TYPE_MOUSE && hookEventType == HOOK_EVENT_TYPE_MOUSE) {
         pkt = std::make_shared<NetPacket>(MmiMessageId::ON_HOOK_MOUSE_EVENT);
+    } else if (sourceType == PointerEvent::SOURCE_TYPE_MOUSE && hookEventType == HOOK_EVENT_TYPE_AXIS) {
+        pkt = std::make_shared<NetPacket>(MmiMessageId::ON_HOOK_AXIS_EVENT);
     } else {
         MMI_HILOGE("Unsupported sourceType");
         return false;
@@ -56,6 +58,9 @@ bool PointerEventHook::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent
         MMI_HILOGE("SendNetPacketToHook failed");
         return false;
     }
+    // Timeout fallback: first dispatch stale stashed events that exceeded the threshold without a
+    // receipt (nothing dropped, no disable), then register the new event
+    SweepExpiredEvents();
     expirationChecker_.UpdateInputEvent(pointerEvent);
     return true;
 }
@@ -63,33 +68,70 @@ bool PointerEventHook::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent
 int32_t PointerEventHook::DispatchToNextHandler(std::shared_ptr<PointerEvent> pointerEvent)
 {
     CHKPR(pointerEvent, RET_ERR);
-    auto eventId = pointerEvent->GetId();
-    if (!expirationChecker_.CheckValid(pointerEvent) || !expirationChecker_.CheckExpiration(eventId)) {
-        MMI_HILOGW("CheckValid failed or CheckExpiration failed");
-        return ERROR_INVALID_PARAMETER;
+    // A decline (send failure) is not a failure: offer the event along the chain one by one and
+    // dispatch directly to the application at the chain tail, so nothing is dropped
+    bool ret = false;
+    for (auto hook = GetNextHook(); hook != nullptr; hook = hook->GetNextHook()) {
+        if (hook->OnPointerEvent(pointerEvent)) {
+            ret = true;
+            break;
+        }
     }
-    if (!orderChecker_.CheckOrder(eventId)) {
-        MMI_HILOGW("CheckOrder failed");
-        return ERROR_INVALID_PARAMETER;
-    }
-    if (closureChecker_.CheckAndUpdateEventLoopClosure(pointerEvent) != RET_OK) {
-        MMI_HILOGW("CheckAndUpdateEventLoopClosure failed, eventId:%{public}d", eventId);
-        return RET_OK;
-    }
-    bool ret { false };
-    if (auto nextHook = GetNextHook(); nextHook != nullptr) {
-        ret =  nextHook->OnPointerEvent(pointerEvent);
-    } else {
+    if (!ret) {
         ret = DispatchDirectly(pointerEvent);
     }
-    orderChecker_.UpdateEvent(eventId);
+    expirationChecker_.RemoveEvent(pointerEvent->GetId());
     MMI_HILOGD("DispatchToNextHandler res:%{public}s", ret ? "success" : "failed");
     return ret ? RET_OK : RET_ERR;
 }
 
+std::shared_ptr<InputEvent> PointerEventHook::GetStashEvent(int32_t eventId)
+{
+    return expirationChecker_.GetEvent(eventId);
+}
+
+void PointerEventHook::FlushStashEvents(std::shared_ptr<InputEventHook> nextHook)
+{
+    auto events = expirationChecker_.DrainStashEvents();
+    for (const auto &event : events) {
+        auto pointerEvent = std::static_pointer_cast<PointerEvent>(event);
+        CHKPC(pointerEvent);
+        bool forwarded = false;
+        for (auto hook = nextHook; hook != nullptr; hook = hook->GetNextHook()) {
+            if (hook->OnPointerEvent(pointerEvent)) {
+                forwarded = true;
+                break;
+            }
+        }
+        if (!forwarded) {
+            DispatchDirectly(pointerEvent);
+        }
+    }
+}
+
+int32_t PointerEventHook::HandleEventResult(int32_t eventId, bool isConsumed)
+{
+    auto event = expirationChecker_.GetEvent(eventId);
+    CHKPR(event, RET_ERR); // Not in the stash: already dispatched by the timeout fallback; late receipt treated as handled
+    if (isConsumed) {
+        // Consume: do not dispatch further
+        expirationChecker_.RemoveEvent(eventId);
+        return RET_OK;
+    }
+    // Release: dispatch further
+    return DispatchToNextHandler(std::static_pointer_cast<PointerEvent>(event));
+}
+
+void PointerEventHook::SweepExpiredEvents()
+{
+    auto events = expirationChecker_.TakeExpiredEvents();
+    for (const auto &event : events) {
+        DispatchDirectly(std::static_pointer_cast<PointerEvent>(event));
+    }
+}
+
 bool PointerEventHook::DispatchDirectly(std::shared_ptr<PointerEvent> pointerEvent)
 {
-    CALL_DEBUG_ENTER;
     CHKPF(pointerEvent);
     auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
     CHKPF(eventDispatchHandler);

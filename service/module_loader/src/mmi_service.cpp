@@ -6393,11 +6393,9 @@ ErrCode MMIService::AddInputEventHook(HookEventType hookEventType)
     MMI_HILOGE("AddInputEventHook is disabled - feature not enabled");
     return ERROR_UNSUPPORT;
 #else
-    if (hookEventType & HOOK_EVENT_TYPE_KEY) {
-        if (!PER_HELPER->CheckKeyEventHook()) {
-            MMI_HILOGE("CheckKeyEventHook failed");
-            return ERROR_NO_PERMISSION;
-        }
+    if (!PER_HELPER->CheckInputEventHook()) {
+        MMI_HILOGE("CheckInputEventHook failed");
+        return ERROR_NO_PERMISSION;
     }
     int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), hookEventType] () -> int32_t {
         auto hookMgr = InputHandler->GetInputEventHook();
@@ -6442,60 +6440,29 @@ ErrCode MMIService::RemoveInputEventHook(HookEventType hookEventType)
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
-ErrCode MMIService::DispatchToNextHandler(const KeyEvent &keyEvent)
+ErrCode MMIService::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed)
 {
 #ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-    MMI_HILOGE("DispatchToNextHandler(KeyEvent) is disabled - feature not enabled");
+    MMI_HILOGE("NotifyHookEventResult is disabled - feature not enabled");
     return ERROR_UNSUPPORT;
 #else
-    auto keyEventPtr = std::make_shared<KeyEvent>(keyEvent);
-    CHKPR(keyEventPtr, ERROR_NULL_POINTER);
-    int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), keyEventPtr] () -> int32_t {
+    // Receipt is processed asynchronously: the synchronous mode would block the client dispatch
+    // thread waiting for a server DT-thread round trip; under high-frequency event streams receipts
+    // contend with event dispatching on DT and inevitably arrive late, tripping the 1.5S timeout
+    // disable. Receipts carry no return-value requirement, so async posting suffices
+    int32_t ret = delegateTasks_.PostAsyncTask(
+        [pid = GetCallingPid(), eventId, hookEventType, isConsumed] () -> int32_t {
         auto hookMgr = InputHandler->GetInputEventHook();
         CHKPR(hookMgr, RET_ERR);
-        if (int32_t result = hookMgr->DispatchToNextHandler(pid, keyEventPtr); result != RET_OK) {
-            MMI_HILOGE("DispatchToNextHandler failed, ret:%{public}d", result);
+        if (int32_t result = hookMgr->NotifyHookEventResult(pid, eventId, hookEventType, isConsumed);
+            result != RET_OK) {
+            MMI_HILOGE("NotifyHookEventResult failed, ret:%{public}d", result);
             return result;
         }
         return RET_OK;
     });
     if (ret != RET_OK) {
-        MMI_HILOGE("PostSyncTask DispatchToNextHandler failed, ret:%{public}d", ret);
-        return ret;
-    }
-    return RET_OK;
-#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-}
-
-ErrCode MMIService::DispatchToNextHandler(const PointerEvent &pointerEvent)
-{
-#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-    MMI_HILOGE("DispatchToNextHandler(PointerEvent) is disabled - feature not enabled");
-    return ERROR_UNSUPPORT;
-#else
-    auto pointerEventPtr = std::make_shared<PointerEvent>(pointerEvent);
-    CHKPR(pointerEventPtr, ERROR_NULL_POINTER);
-    int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), pointerEventPtr] () -> int32_t {
-        auto sourceType = pointerEventPtr->GetSourceType();
-        auto hookMgr = InputHandler->GetInputEventHook();
-        CHKPR(hookMgr, RET_ERR);
-        if (sourceType == PointerEvent::SOURCE_TYPE_TOUCHSCREEN) {
-            if (int32_t result = hookMgr->DispatchTouchToNextHandler(pid, pointerEventPtr); result != RET_OK) {
-                MMI_HILOGE("DispatchTouchToNextHandler failed, ret:%{public}d", result);
-                return result;
-            }
-        } else if (sourceType == PointerEvent::SOURCE_TYPE_MOUSE) {
-            if (int32_t result = hookMgr->DispatchMouseToNextHandler(pid, pointerEventPtr); result != RET_OK) {
-                MMI_HILOGE("DispatchMouseToNextHandler failed, ret:%{public}d", result);
-                return result;
-            }
-        } else {
-            return RET_ERR;
-        }
-        return RET_OK;
-    });
-    if (ret != RET_OK) {
-        MMI_HILOGE("PostSyncTask DispatchToNextHandler failed, ret:%{public}d", ret);
+        MMI_HILOGE("PostAsyncTask NotifyHookEventResult failed, ret:%{public}d", ret);
         return ret;
     }
     return RET_OK;

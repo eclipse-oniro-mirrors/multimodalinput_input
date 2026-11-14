@@ -204,8 +204,7 @@ interface OHOS.MMI.IMultimodalInputConnect {
     void GetExternalObject([in] String pluginName, [out] IRemoteObject pluginRemoteStub);
     void AddInputEventHook([in] unsigned int hookEventType);
     void RemoveInputEventHook([in] unsigned int hookEventType);
-    void DispatchToNextHandler([in] KeyEvent keyEvent);
-    void DispatchToNextHandler([in] PointerEvent pointerEvent);
+    void NotifyHookEventResult([in] int eventId, [in] unsigned int hookEventType, [in] boolean isConsumed);
     void SetKeyStatusRecord([in] boolean enable, [in] int timeout);
     void GetCurrentCursorInfo([out] boolean visible, [out] PointerStyle pointerStyle);
     void GetUserDefinedCursorPixelMap([out] sharedptr<PixelMap> pixelMap);

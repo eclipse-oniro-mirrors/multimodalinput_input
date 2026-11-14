@@ -1458,6 +1458,14 @@ int32_t MultimodalInputConnectManager::DispatchToNextHandler(int32_t eventId)
     return multimodalInputConnectService_->DispatchToNextHandler(eventId);
 }
 
+int32_t MultimodalInputConnectManager::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType,
+    bool isConsumed)
+{
+    std::lock_guard<std::mutex> guard(lock_);
+    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
+    return multimodalInputConnectService_->NotifyHookEventResult(eventId, hookEventType, isConsumed);
+}
+
 int32_t MultimodalInputConnectManager::GetExternalObject(
     const std::string &pluginName, sptr<IRemoteObject> &pluginRemoteStub)
 {
@@ -1478,22 +1486,6 @@ int32_t MultimodalInputConnectManager::RemoveInputEventHook(HookEventType hookEv
     std::lock_guard<std::mutex> guard(lock_);
     CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
     return multimodalInputConnectService_->RemoveInputEventHook(hookEventType);
-}
-
-int32_t MultimodalInputConnectManager::DispatchToNextHandler(const std::shared_ptr<KeyEvent> keyEvent)
-{
-    std::lock_guard<std::mutex> guard(lock_);
-    CHKPR(keyEvent, ERR_INVALID_VALUE);
-    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->DispatchToNextHandler(*keyEvent);
-}
-
-int32_t MultimodalInputConnectManager::DispatchToNextHandler(const std::shared_ptr<PointerEvent> pointerEvent)
-{
-    std::lock_guard<std::mutex> guard(lock_);
-    CHKPR(pointerEvent, ERR_INVALID_VALUE);
-    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->DispatchToNextHandler(*pointerEvent);
 }
 
 int32_t MultimodalInputConnectManager::SetKeyStatusRecord(bool enable, int32_t timeout)

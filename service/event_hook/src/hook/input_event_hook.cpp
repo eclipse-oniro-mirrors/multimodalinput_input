@@ -16,8 +16,7 @@
 #include "input_event_hook.h"
 
 #include "define_multimodal.h"
-#include "error_multimodal.h"
-#include "input_event_data_transformation.h"
+#include "input_event_handler.h"
 #include "mmi_log.h"
 
 #undef MMI_LOG_DOMAIN
@@ -27,6 +26,8 @@
 
 namespace OHOS {
 namespace MMI {
+
+InputEventHook::~InputEventHook() {}
 
 bool InputEventHook::OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent)
 {
@@ -46,6 +47,11 @@ int32_t InputEventHook::DispatchToNextHandler(const std::shared_ptr<KeyEvent> ke
 int32_t InputEventHook::DispatchToNextHandler(const std::shared_ptr<PointerEvent> pointerEvent)
 {
     return RET_OK;
+}
+
+int32_t InputEventHook::HandleEventResult(int32_t eventId, bool isConsumed)
+{
+    return RET_ERR;
 }
 
 bool InputEventHook::SendNetPacketToHook(NetPacket &pkt)
@@ -92,6 +98,14 @@ std::string InputEventHook::GetProgramName()
         return "default";
     }
     return session_->GetProgramName();
+}
+
+void InputEventHook::Suspend()
+{
+    // Screen-lock suspend: in-flight events are dispatched directly to the target application
+    // (nothing dropped; the whole hook chain pauses without cascading into the next hook); the
+    // registration is kept without notifying the business, and interception resumes after unlock
+    FlushStashEvents(nullptr);
 }
 } // namespace MMI
 } // namespace OHOS

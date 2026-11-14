@@ -15,8 +15,9 @@
 
 #include "expiration_checker.h"
 
+#include <algorithm>
 #include <chrono>
-#include "define_multimodal.h"
+
 #include "mmi_log.h"
 
 #undef MMI_LOG_DOMAIN
@@ -27,52 +28,78 @@
 namespace OHOS {
 namespace MMI {
 namespace {
-constexpr long long STASH_EVENT_TIMEOUT_MS { 3000 };
-}
-
-bool ExpirationChecker::CheckExpiration(int32_t eventId)
-{
-    std::unique_lock<std::shared_mutex> lock(rwMutex_);
-    RemoveExpiredEvent();
-    auto iter = std::find_if(stashEvents_.begin(), stashEvents_.end(), [eventId] (const auto &event) {
-        return event.eventId == eventId;
-    });
-    return iter != stashEvents_.end();
-}
-
-bool ExpirationChecker::CheckValid(const std::shared_ptr<InputEvent> event)
-{
-    CHKPF(event);
-    std::unique_lock<std::shared_mutex> lock(rwMutex_);
-    RemoveExpiredEvent();
-    auto iter = std::find_if(stashEvents_.begin(), stashEvents_.end(), [&event] (const auto &elem) {
-        return elem.hashCode == event->Hash();
-    });
-    return iter != stashEvents_.end();
+constexpr long long STASH_EVENT_TIMEOUT_MS { 1500 };
 }
 
 void ExpirationChecker::UpdateInputEvent(const std::shared_ptr<InputEvent> event)
 {
+    long long now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    UpdateInputEvent(event, now);
+}
+
+void ExpirationChecker::UpdateInputEvent(const std::shared_ptr<InputEvent> event, long long timeStampRcvd)
+{
     CALL_DEBUG_ENTER;
     CHKPV(event);
     std::unique_lock<std::shared_mutex> lock(rwMutex_);
-    RemoveExpiredEvent();
-    ExpirationChecker::StashEvent stashEvent {
-        .timeStampRcvd = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count(),
+    stashEvents_.push_back(StashEvent {
+        .timeStampRcvd = timeStampRcvd,
         .eventId = event->GetId(),
-        .hashCode = event->Hash()
-    };
-    stashEvents_.push_back(stashEvent);
+        .event = event,
+    });
 }
 
-void ExpirationChecker::RemoveExpiredEvent()
+std::shared_ptr<InputEvent> ExpirationChecker::GetEvent(int32_t eventId)
 {
+    std::shared_lock<std::shared_mutex> lock(rwMutex_);
+    auto iter = std::find_if(stashEvents_.begin(), stashEvents_.end(), [eventId] (const auto &event) {
+        return event.eventId == eventId;
+    });
+    if (iter == stashEvents_.end()) {
+        return nullptr;
+    }
+    return iter->event;
+}
+
+std::vector<std::shared_ptr<InputEvent>> ExpirationChecker::TakeExpiredEvents()
+{
+    std::vector<std::shared_ptr<InputEvent>> expiredEvents;
     long long now = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
-    stashEvents_.erase(std::remove_if(stashEvents_.begin(), stashEvents_.end(), [now] (const auto &elem) {
-        return now - elem.timeStampRcvd >= STASH_EVENT_TIMEOUT_MS; }),
+    std::unique_lock<std::shared_mutex> lock(rwMutex_);
+    for (auto iter = stashEvents_.begin(); iter != stashEvents_.end();) {
+        if (now - iter->timeStampRcvd >= STASH_EVENT_TIMEOUT_MS) {
+            if (iter->event != nullptr) {
+                expiredEvents.push_back(std::move(iter->event));
+            }
+            iter = stashEvents_.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    return expiredEvents;
+}
+
+void ExpirationChecker::RemoveEvent(int32_t eventId)
+{
+    std::unique_lock<std::shared_mutex> lock(rwMutex_);
+    stashEvents_.erase(std::remove_if(stashEvents_.begin(), stashEvents_.end(), [eventId] (const auto &event) {
+        return event.eventId == eventId; }),
         stashEvents_.end());
+}
+
+std::vector<std::shared_ptr<InputEvent>> ExpirationChecker::DrainStashEvents()
+{
+    std::vector<std::shared_ptr<InputEvent>> events;
+    events.reserve(stashEvents_.size());
+    for (auto &stashEvent : stashEvents_) {
+        if (stashEvent.event != nullptr) {
+            events.push_back(std::move(stashEvent.event));
+        }
+    }
+    stashEvents_.clear();
+    return events;
 }
 } // namespace MMI
 } // namespace OHOS
