@@ -142,30 +142,24 @@ void PrintKeyEvent(const Input_KeyEvent* key)
 {
     int32_t eventId { -1 };
     OH_Input_GetKeyEventId(key, &eventId);
-    printf("[key]   action=%-6s keyCode=%d eventId=%d actionTime=%lld windowId=%d displayId=%d\n",
-        KeyActionToString(OH_Input_GetKeyEventAction(key)), OH_Input_GetKeyEventKeyCode(key), eventId,
+    printf("[key]   action=%-6s eventId=%d actionTime=%lld windowId=%d displayId=%d\n",
+        KeyActionToString(OH_Input_GetKeyEventAction(key)), eventId,
         static_cast<long long>(OH_Input_GetKeyEventActionTime(key)), OH_Input_GetKeyEventWindowId(key),
         OH_Input_GetKeyEventDisplayId(key));
 }
 
 void PrintMouseEvent(const Input_MouseEvent* mouse)
 {
-    printf("[mouse] action=%-10s button=%s display=(%d,%d) global=(%d,%d) actionTime=%lld windowId=%d\n",
+    printf("[mouse] action=%-10s button=%s actionTime=%lld windowId=%d\n",
         MouseActionToString(OH_Input_GetMouseEventAction(mouse)),
         MouseButtonToString(OH_Input_GetMouseEventButton(mouse)),
-        OH_Input_GetMouseEventDisplayX(mouse), OH_Input_GetMouseEventDisplayY(mouse),
-        OH_Input_GetMouseEventGlobalX(mouse), OH_Input_GetMouseEventGlobalY(mouse),
         static_cast<long long>(OH_Input_GetMouseEventActionTime(mouse)), OH_Input_GetMouseEventWindowId(mouse));
 }
 
 void PrintTouchEvent(const Input_TouchEvent* touch)
 {
-    printf("[touch] action=%-6s id=%d display=(%d,%d) global=(%d,%d) window=(%d,%d) pressure=%.3f actionTime=%lld"
-           " windowId=%d displayId=%d\n",
+    printf("[touch] action=%-6s id=%d pressure=%.3f actionTime=%lld windowId=%d displayId=%d\n",
         TouchActionToString(OH_Input_GetTouchEventAction(touch)), OH_Input_GetTouchEventFingerId(touch),
-        OH_Input_GetTouchEventDisplayX(touch), OH_Input_GetTouchEventDisplayY(touch),
-        OH_Input_GetTouchEventGlobalX(touch), OH_Input_GetTouchEventGlobalY(touch),
-        OH_Input_GetTouchEventWindowX(touch), OH_Input_GetTouchEventWindowY(touch),
         OH_Input_GetTouchEventPressure(touch), static_cast<long long>(OH_Input_GetTouchEventActionTime(touch)),
         OH_Input_GetTouchEventWindowId(touch), OH_Input_GetTouchEventDisplayId(touch));
 }
@@ -175,20 +169,15 @@ void PrintAxisEvent(const Input_AxisEvent* axis)
     InputEvent_AxisAction action { AXIS_ACTION_CANCEL };
     InputEvent_AxisEventType axisEventType { AXIS_EVENT_TYPE_SCROLL };
     InputEvent_SourceType sourceType { SOURCE_TYPE_MOUSE };
-    float displayX { 0.0f };
-    float displayY { 0.0f };
     int64_t actionTime { 0 };
     if (OH_Input_GetAxisEventAction(axis, &action) != INPUT_SUCCESS ||
         OH_Input_GetAxisEventType(axis, &axisEventType) != INPUT_SUCCESS ||
         OH_Input_GetAxisEventSourceType(axis, &sourceType) != INPUT_SUCCESS ||
-        OH_Input_GetAxisEventDisplayX(axis, &displayX) != INPUT_SUCCESS ||
-        OH_Input_GetAxisEventDisplayY(axis, &displayY) != INPUT_SUCCESS ||
         OH_Input_GetAxisEventActionTime(axis, &actionTime) != INPUT_SUCCESS) {
         return;
     }
-    printf("[axis]  action=%-6s eventType=%d sourceType=%d display=(%.1f,%.1f) actionTime=%lld\n",
-        AxisActionToString(action), axisEventType, sourceType, displayX, displayY,
-        static_cast<long long>(actionTime));
+    printf("[axis]  action=%-6s eventType=%d sourceType=%d actionTime=%lld\n",
+        AxisActionToString(action), axisEventType, sourceType, static_cast<long long>(actionTime));
 }
 
 // Synchronous callback: returning event (non-NULL) passes the event on to the next handler or the

@@ -61,7 +61,11 @@ bool PointerEventHook::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent
     // Timeout fallback: first dispatch stale stashed events that exceeded the threshold without a
     // receipt (nothing dropped, no disable), then register the new event
     SweepExpiredEvents();
-    expirationChecker_.UpdateInputEvent(pointerEvent);
+    // PointerEvents reported consecutively by the same device share one object instance (the
+    // pipeline reuses it and mutates it in place): the stash caches a copy snapshot, so the state
+    // of an earlier-cached event is not overwritten by a later-cached one; receipt dispatch and
+    // timeout fallback dispatch are based on the state captured when each event was cached
+    expirationChecker_.UpdateInputEvent(std::make_shared<PointerEvent>(*pointerEvent));
     return true;
 }
 

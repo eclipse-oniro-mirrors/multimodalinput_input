@@ -48,7 +48,12 @@ bool KeyEventHook::OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent)
     // Timeout fallback: first dispatch stale stashed events that exceeded the threshold without a
     // receipt (nothing dropped, no disable), then register the new event
     SweepExpiredEvents();
-    expirationChecker_.UpdateInputEvent(keyEvent);
+    // KeyEvents reported consecutively by the same device share one object instance (the pipeline
+    // reuses it and mutates it in place): the stash caches a Clone snapshot (following the
+    // KeyEvent::Clone pattern of the original EventExpirationChecker::UpdateStashEvent), so the
+    // state of an earlier-cached event is not overwritten by a later-cached one; receipt dispatch
+    // and timeout fallback dispatch are based on the state captured when each event was cached
+    expirationChecker_.UpdateInputEvent(KeyEvent::Clone(keyEvent));
     return true;
 }
 
