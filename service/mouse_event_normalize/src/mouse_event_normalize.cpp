@@ -166,7 +166,10 @@ int32_t MouseEventNormalize::OnEvent(struct libinput_event *event)
         return RET_ERR;
     }
     SetCurrentDeviceId(deviceId);
-    if (libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION) {
+    // Touchpad cursor motion arrives as POINTER_MOTION_TOUCHPAD (instead of the
+    // POINTER_MOTION type used by mice), both types belong to the statistics scope.
+    if (libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION ||
+        libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION_TOUCHPAD) {
         InputEventStatistics::MarkMouseDispatchStart(deviceId, device);
         InputEventStatistics::OnPointerMotionEvent(deviceId, device);
     } else {

@@ -73,9 +73,10 @@ public:
     };
 
     // ---------------- notification entries (event pipeline) ----------------
-    // Called on POINTER_MOTION from MouseEventNormalize::OnEvent. Handles physical device
-    // validation (cached) and interval bucketing; the first event of a stream only sets
-    // the baseline and is not counted.
+    // Called on pointer motion events (POINTER_MOTION of mice, POINTER_MOTION_TOUCHPAD of
+    // touchpads) from MouseEventNormalize::OnEvent. Handles physical device validation
+    // (cached) and interval bucketing; the first event of a stream only sets the baseline
+    // and is not counted.
     static void OnPointerMotionEvent(int32_t deviceId, struct libinput_device *device);
 
     // Called on non-MOTION pointer events (button/tap/axis) from MouseEventNormalize::OnEvent.
@@ -83,9 +84,10 @@ public:
     // click may arrive before any motion event); computes no interval.
     static void OnPointerEvent(int32_t deviceId, struct libinput_device *device);
 
-    // Called on POINTER_MOTION from MouseEventNormalize::OnEvent (libinput arrival,
-    // before normalize and gesture interpretation) for physical pointer devices; marks
-    // the receive time of the current move event as the dispatch-latency start, so the
+    // Called on pointer motion events (POINTER_MOTION of mice, POINTER_MOTION_TOUCHPAD of
+    // touchpads) from MouseEventNormalize::OnEvent (libinput arrival, before normalize
+    // and gesture interpretation) for physical pointer devices; marks the receive time
+    // of the current move event as the dispatch-latency start, so the
     // measured span covers the full in-service processing (normalize + gesture
     // interpretation + routing + dispatch). Source-type/move-action/simulate filtering
     // stays on the record side (RecordMouseDispatchLatency).
