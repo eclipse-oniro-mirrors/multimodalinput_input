@@ -19,9 +19,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
-#include <string>
 
-#include "libinput.h"
 #include "pointer_event.h"
 
 namespace OHOS {
@@ -30,12 +28,16 @@ namespace MMI {
  * Input event statistics (DFX only, no public API).
  *
  * Collects, reports and dumps three kinds of aggregated counters:
- *  - pointer motion event interval (mouse/touchpad, per physical device);
+ *  - pointer motion event interval (mouse/touchpad);
  *  - mouse pointer-move event dispatch latency (libinput arrival at
  *    MouseEventNormalize::OnEvent, before normalize/gesture interpretation ->
  *    UDS send done, move-action events only);
  *  - touchpad right-click gesture count, split by gesture source (two-finger
  *    tap / press in the right-click area).
+ *
+ * Device scope: every device reported by libinput (kernel /dev/input node,
+ * including uinput created ones) is counted as a physical device; only UDS
+ * injected events carrying EVENT_FLAG_SIMULATE are excluded.
  *
  * Threading: all notification entries (OnPointerMotionEvent/MarkMouseDispatchStart/
  * RecordMouseDispatchLatency/RecordTouchpadRightClick/OnDeviceRemoved) are invoked on the
@@ -74,24 +76,18 @@ public:
 
     // ---------------- notification entries (event pipeline) ----------------
     // Called on pointer motion events (POINTER_MOTION of mice, POINTER_MOTION_TOUCHPAD of
-    // touchpads) from MouseEventNormalize::OnEvent. Handles physical device validation
-    // (cached) and interval bucketing; the first event of a stream only sets the baseline
-    // and is not counted.
-    static void OnPointerMotionEvent(int32_t deviceId, struct libinput_device *device);
-
-    // Called on non-MOTION pointer events (button/tap/axis) from MouseEventNormalize::OnEvent.
-    // Only ensures the device is registered as a physical pointer device (a touchpad right
-    // click may arrive before any motion event); computes no interval.
-    static void OnPointerEvent(int32_t deviceId, struct libinput_device *device);
+    // touchpads) from MouseEventNormalize::OnEvent. Handles interval bucketing; the first
+    // event of a stream only sets the baseline and is not counted.
+    static void OnPointerMotionEvent(int32_t deviceId);
 
     // Called on pointer motion events (POINTER_MOTION of mice, POINTER_MOTION_TOUCHPAD of
     // touchpads) from MouseEventNormalize::OnEvent (libinput arrival, before normalize
-    // and gesture interpretation) for physical pointer devices; marks the receive time
-    // of the current move event as the dispatch-latency start, so the
-    // measured span covers the full in-service processing (normalize + gesture
-    // interpretation + routing + dispatch). Source-type/move-action/simulate filtering
-    // stays on the record side (RecordMouseDispatchLatency).
-    static void MarkMouseDispatchStart(int32_t deviceId, struct libinput_device *device);
+    // and gesture interpretation); marks the receive time of the current move event as
+    // the dispatch-latency start, so the measured span covers the full in-service
+    // processing (normalize + gesture interpretation + routing + dispatch).
+    // Source-type/move-action/simulate filtering stays on the record side
+    // (RecordMouseDispatchLatency).
+    static void MarkMouseDispatchStart(int32_t deviceId);
 
     // Called after the UDS socket send of the pointer event succeeded; records the
     // dispatch latency once per marked event, for mouse/touchpad sourced move-action
@@ -101,28 +97,13 @@ public:
     static void RecordMouseDispatchLatency(const std::shared_ptr<PointerEvent> &point);
 
     // Called when a touchpad right-click gesture is recognized (two-finger tap or
-    // right button zone press). Counted per gesture source for tracked physical
-    // devices: isTwoFingerTap=true counts as a two-finger tap gesture, otherwise
-    // as a press in the right-click area.
+    // right button zone press). Counted per gesture source: isTwoFingerTap=true counts
+    // as a two-finger tap gesture, otherwise as a press in the right-click area.
     static void RecordTouchpadRightClick(int32_t deviceId, bool isTwoFingerTap);
 
-    // ---------------- physical device registry ----------------
-    // True if the device is a tracked physical pointer device. O(1) integer scan only,
-    // safe for the hot path.
-    static bool IsDeviceTracked(int32_t deviceId);
-
-    // Caches the device as a physical pointer device (called after name validation).
-    static void TrackDevice(int32_t deviceId);
-
-    // Removes the device from the physical registry (device removed).
-    static void UntrackDevice(int32_t deviceId);
-
-    // True if the libinput device name identifies a virtual/remote device
-    // (uinput injection "vuinput*" or distributed input "DistributedInput*").
-    static bool IsVirtualDeviceName(const std::string &name);
-
     // ---------------- lifecycle ----------------
-    // Clears device related state when the device is removed.
+    // Drops the motion-interval baseline of the device when it is removed, so no
+    // interval is computed across the removal gap.
     static void OnDeviceRemoved(int32_t deviceId);
 
     // Device trim switch: statistics (record/report) are disabled when trimmed.
@@ -151,35 +132,14 @@ public:
 
     // ---------------- testable core ----------------
     // Core motion interval logic: computes the interval against the previous timestamp
-    // (only when the previous event came from the same tracked device) and buckets it.
-    static void NotifyMotionEvent(int32_t deviceId, int64_t timestampUs, bool isPhysical);
+    // (only when the previous event came from the same device) and buckets it.
+    static void NotifyMotionEvent(int32_t deviceId, int64_t timestampUs);
 
     // Bucketing helpers (negative values are ignored).
     static void RecordMoveInterval(int64_t intervalUs);
     static void RecordDispatchLatency(int64_t latencyUs);
 
 private:
-    static constexpr size_t MAX_TRACKED_DEVICES = 16;
-    static constexpr int32_t DEVICE_SLOT_FREE = -1;
-    struct DeviceRegistry {
-        // DEVICE_SLOT_FREE: slot free, otherwise a device id (device ids come from
-        // kernel eventN nodes and may be 0, so 0 must not be the free sentinel).
-        std::atomic<int32_t> deviceId { DEVICE_SLOT_FREE };
-    };
-    static DeviceRegistry deviceRegistry_[MAX_TRACKED_DEVICES];
-    // Cache of devices rejected by the name validation, so the steady state of a virtual
-    // device stream does not repeat the string checks on the hot path.
-    static DeviceRegistry rejectedRegistry_[MAX_TRACKED_DEVICES];
-
-    // Validates the device name once and caches the device as a tracked physical device
-    // (or as rejected). Returns false for invalid/virtual devices; still returns true
-    // when the registry is full (the device was validated as physical).
-    static bool EnsureDeviceTracked(int32_t deviceId, struct libinput_device *device);
-
-    static bool IsDeviceRejected(int32_t deviceId);
-
-    static void RejectDevice(int32_t deviceId);
-
     // Prints the one-line summary log of a report window (hourly low frequency path).
     static void LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
         const uint32_t (&latencyCounts)[BUCKET_COUNT], uint32_t twoFingerTapCount,

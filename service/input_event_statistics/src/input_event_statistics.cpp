@@ -45,8 +45,6 @@ int64_t GetCurrentEpochHour()
 }
 } // namespace
 
-InputEventStatistics::DeviceRegistry InputEventStatistics::deviceRegistry_[InputEventStatistics::MAX_TRACKED_DEVICES];
-InputEventStatistics::DeviceRegistry InputEventStatistics::rejectedRegistry_[InputEventStatistics::MAX_TRACKED_DEVICES];
 std::atomic<uint64_t> InputEventStatistics::moveIntervalCounts_[BUCKET_COUNT] = {};
 std::atomic<uint64_t> InputEventStatistics::dispatchLatencyCounts_[BUCKET_COUNT] = {};
 std::atomic<uint64_t> InputEventStatistics::touchpadTwoFingerTapCount_ { 0 };
@@ -59,130 +57,20 @@ bool InputEventStatistics::dispatchStartPending_ { false };
 std::atomic<int64_t> InputEventStatistics::lastReportHour_ { 0 };
 int32_t InputEventStatistics::reportTimerId_ { -1 };
 
-bool InputEventStatistics::IsVirtualDeviceName(const std::string &name)
-{
-    // Virtual devices injected by the uinput tool are named "vuinput*", remote devices
-    // forwarded by distributed input are named "DistributedInput*".
-    return name.find("vuinput") != std::string::npos ||
-        name.find("DistributedInput ") != std::string::npos;
-}
-
-bool InputEventStatistics::IsDeviceTracked(int32_t deviceId)
-{
-    if (deviceId < 0) {
-        return false;
-    }
-    for (size_t i = 0; i < MAX_TRACKED_DEVICES; ++i) {
-        if (deviceRegistry_[i].deviceId.load(std::memory_order_relaxed) == deviceId) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void InputEventStatistics::TrackDevice(int32_t deviceId)
-{
-    if (deviceId < 0 || IsDeviceTracked(deviceId)) {
-        return;
-    }
-    for (size_t i = 0; i < MAX_TRACKED_DEVICES; ++i) {
-        int32_t expected = DEVICE_SLOT_FREE;
-        if (deviceRegistry_[i].deviceId.compare_exchange_strong(expected, deviceId,
-            std::memory_order_relaxed)) {
-            return;
-        }
-    }
-    MMI_HILOGW("Physical device registry is full, device:%{public}d not tracked", deviceId);
-}
-
-void InputEventStatistics::UntrackDevice(int32_t deviceId)
-{
-    if (deviceId < 0) {
-        return;
-    }
-    for (size_t i = 0; i < MAX_TRACKED_DEVICES; ++i) {
-        int32_t expected = deviceId;
-        if (deviceRegistry_[i].deviceId.compare_exchange_strong(expected, DEVICE_SLOT_FREE,
-            std::memory_order_relaxed)) {
-            return;
-        }
-    }
-}
-
-bool InputEventStatistics::IsDeviceRejected(int32_t deviceId)
-{
-    if (deviceId < 0) {
-        return true;
-    }
-    for (size_t i = 0; i < MAX_TRACKED_DEVICES; ++i) {
-        if (rejectedRegistry_[i].deviceId.load(std::memory_order_relaxed) == deviceId) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void InputEventStatistics::RejectDevice(int32_t deviceId)
-{
-    if (deviceId < 0 || IsDeviceRejected(deviceId)) {
-        return;
-    }
-    for (size_t i = 0; i < MAX_TRACKED_DEVICES; ++i) {
-        int32_t expected = DEVICE_SLOT_FREE;
-        if (rejectedRegistry_[i].deviceId.compare_exchange_strong(expected, deviceId,
-            std::memory_order_relaxed)) {
-            return;
-        }
-    }
-}
-
-bool InputEventStatistics::EnsureDeviceTracked(int32_t deviceId, struct libinput_device *device)
-{
-    if (IsDeviceTracked(deviceId)) {
-        return true;
-    }
-    if (IsDeviceRejected(deviceId)) {
-        return false;
-    }
-    if (device == nullptr) {
-        return false;
-    }
-    const char *devName = libinput_device_get_name(device);
-    if (devName == nullptr) {
-        return false;
-    }
-    if (IsVirtualDeviceName(devName)) {
-        RejectDevice(deviceId);
-        return false;
-    }
-    TrackDevice(deviceId);
-    return true;
-}
-
-void InputEventStatistics::OnPointerMotionEvent(int32_t deviceId, struct libinput_device *device)
+// Every device reported by libinput (kernel /dev/input node, including uinput created
+// ones) is counted as a physical device; only UDS injected events carrying
+// EVENT_FLAG_SIMULATE are excluded on the record side.
+void InputEventStatistics::OnPointerMotionEvent(int32_t deviceId)
 {
     if (deviceTrimmed_.load(std::memory_order_relaxed)) {
         return;
     }
-    if (!EnsureDeviceTracked(deviceId, device)) {
-        return;
-    }
-    NotifyMotionEvent(deviceId, GetSysClockTime(), true);
+    NotifyMotionEvent(deviceId, GetSysClockTime());
 }
 
-void InputEventStatistics::OnPointerEvent(int32_t deviceId, struct libinput_device *device)
+void InputEventStatistics::NotifyMotionEvent(int32_t deviceId, int64_t timestampUs)
 {
     if (deviceTrimmed_.load(std::memory_order_relaxed)) {
-        return;
-    }
-    // A touchpad right click (tap/button event) may arrive before any motion event of the
-    // device; make sure the device is registered so the gesture is not dropped.
-    EnsureDeviceTracked(deviceId, device);
-}
-
-void InputEventStatistics::NotifyMotionEvent(int32_t deviceId, int64_t timestampUs, bool isPhysical)
-{
-    if (deviceTrimmed_.load(std::memory_order_relaxed) || !isPhysical) {
         return;
     }
     // The first event (or the first event after a device change/removal/report reset)
@@ -209,12 +97,9 @@ void InputEventStatistics::RecordMoveInterval(int64_t intervalUs)
     }
 }
 
-void InputEventStatistics::MarkMouseDispatchStart(int32_t deviceId, struct libinput_device *device)
+void InputEventStatistics::MarkMouseDispatchStart(int32_t deviceId)
 {
     if (deviceTrimmed_.load(std::memory_order_relaxed)) {
-        return;
-    }
-    if (!EnsureDeviceTracked(deviceId, device)) {
         return;
     }
     dispatchStartTimeUs_ = GetSysClockTime();
@@ -240,9 +125,6 @@ void InputEventStatistics::RecordMouseDispatchLatency(const std::shared_ptr<Poin
     if (point->HasFlag(InputEvent::EVENT_FLAG_SIMULATE)) {
         return;
     }
-    if (!IsDeviceTracked(point->GetDeviceId())) {
-        return;
-    }
     int64_t latencyUs = GetSysClockTime() - dispatchStartTimeUs_;
     RecordDispatchLatency(latencyUs);
 }
@@ -262,7 +144,7 @@ void InputEventStatistics::RecordDispatchLatency(int64_t latencyUs)
 
 void InputEventStatistics::RecordTouchpadRightClick(int32_t deviceId, bool isTwoFingerTap)
 {
-    if (deviceTrimmed_.load(std::memory_order_relaxed) || !IsDeviceTracked(deviceId)) {
+    if (deviceTrimmed_.load(std::memory_order_relaxed)) {
         return;
     }
     if (isTwoFingerTap) {
@@ -274,16 +156,6 @@ void InputEventStatistics::RecordTouchpadRightClick(int32_t deviceId, bool isTwo
 
 void InputEventStatistics::OnDeviceRemoved(int32_t deviceId)
 {
-    UntrackDevice(deviceId);
-    // Clear the rejection cache as well: the eventN node (and so the device id) may be
-    // reused by a different device after a replug.
-    for (size_t i = 0; i < MAX_TRACKED_DEVICES; ++i) {
-        int32_t expected = deviceId;
-        if (rejectedRegistry_[i].deviceId.compare_exchange_strong(expected, DEVICE_SLOT_FREE,
-            std::memory_order_relaxed)) {
-            break;
-        }
-    }
     if (lastMoveDeviceId_ == deviceId) {
         // Drop the baseline so no interval is computed across the device removal gap.
         lastMoveEventTimeUs_ = 0;

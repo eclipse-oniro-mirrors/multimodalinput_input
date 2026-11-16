@@ -170,10 +170,8 @@ int32_t MouseEventNormalize::OnEvent(struct libinput_event *event)
     // POINTER_MOTION type used by mice), both types belong to the statistics scope.
     if (libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION ||
         libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION_TOUCHPAD) {
-        InputEventStatistics::MarkMouseDispatchStart(deviceId, device);
-        InputEventStatistics::OnPointerMotionEvent(deviceId, device);
-    } else {
-        InputEventStatistics::OnPointerEvent(deviceId, device);
+        InputEventStatistics::MarkMouseDispatchStart(deviceId);
+        InputEventStatistics::OnPointerMotionEvent(deviceId);
     }
     std::shared_ptr<MouseTransformProcessor> processor { nullptr };
     if (auto it = processors_.find(deviceId); it != processors_.end()) {

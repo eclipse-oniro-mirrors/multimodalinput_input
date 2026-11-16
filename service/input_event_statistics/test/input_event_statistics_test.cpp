@@ -150,67 +150,10 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_FirstEventNoInterval
 {
     CALL_TEST_DEBUG;
     int64_t baseTime = 1000 * US_PER_MS;
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime, true);
+    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime);
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 10 * US_PER_MS, true);
+    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 10 * US_PER_MS);
     EXPECT_EQ(InputEventStatistics::GetMoveIntervalCount(1), 1u);
-}
-
-/**
- * @tc.name: InputEventStatisticsTest_VirtualDeviceFilterTest_001
- * @tc.desc: events of non-physical devices are not counted
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_VirtualDeviceFilterTest_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    int64_t baseTime = 1000 * US_PER_MS;
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime, false);
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 10 * US_PER_MS, false);
-    EXPECT_EQ(SumMoveIntervalCounts(), 0u);
-}
-
-/**
- * @tc.name: InputEventStatisticsTest_VirtualDeviceFilterTest_002
- * @tc.desc: virtual/remote device names are recognized
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_VirtualDeviceFilterTest_002, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_TRUE(InputEventStatistics::IsVirtualDeviceName("vuinput mouse device"));
-    EXPECT_TRUE(InputEventStatistics::IsVirtualDeviceName("DistributedInput abc"));
-    EXPECT_FALSE(InputEventStatistics::IsVirtualDeviceName("Bluetooth Mouse"));
-    EXPECT_FALSE(InputEventStatistics::IsVirtualDeviceName(""));
-}
-
-/**
- * @tc.name: InputEventStatisticsTest_DeviceRegistryTest_001
- * @tc.desc: track/untrack device registry
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DeviceRegistryTest_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    EXPECT_FALSE(InputEventStatistics::IsDeviceTracked(TEST_DEVICE_ID));
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
-    EXPECT_TRUE(InputEventStatistics::IsDeviceTracked(TEST_DEVICE_ID));
-    InputEventStatistics::UntrackDevice(TEST_DEVICE_ID);
-    EXPECT_FALSE(InputEventStatistics::IsDeviceTracked(TEST_DEVICE_ID));
-    // device id 0 comes from kernel event0 and must be registry-usable
-    InputEventStatistics::TrackDevice(0);
-    EXPECT_TRUE(InputEventStatistics::IsDeviceTracked(0));
-    InputEventStatistics::UntrackDevice(0);
-    EXPECT_FALSE(InputEventStatistics::IsDeviceTracked(0));
-    // events without a raw device can not register the device
-    InputEventStatistics::OnPointerEvent(TEST_DEVICE_ID, nullptr);
-    EXPECT_FALSE(InputEventStatistics::IsDeviceTracked(TEST_DEVICE_ID));
-    InputEventStatistics::OnPointerMotionEvent(TEST_DEVICE_ID, nullptr);
-    EXPECT_FALSE(InputEventStatistics::IsDeviceTracked(TEST_DEVICE_ID));
-    EXPECT_EQ(SumMoveIntervalCounts(), 0u);
 }
 
 /**
@@ -236,11 +179,10 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordDispatchLatenc
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordDispatchLatencyTest_002, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     auto point = CreatePointerEvent(PointerEvent::SOURCE_TYPE_MOUSE, TEST_DEVICE_ID);
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
-    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID, nullptr);
+    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
     InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 1u);
     // one mark only records once
@@ -257,7 +199,6 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordDispatchLatenc
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_InterceptedEventNoStatTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     auto point = CreatePointerEvent(PointerEvent::SOURCE_TYPE_MOUSE, TEST_DEVICE_ID);
     ASSERT_NE(point, nullptr);
     InputEventStatistics::RecordMouseDispatchLatency(point);
@@ -266,31 +207,26 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_InterceptedEventNoSt
 }
 
 /**
- * @tc.name: InputEventStatisticsTest_VirtualDeviceNoDispatchStatTest_001
- * @tc.desc: simulated/untracked-device events are not counted into dispatch latency
+ * @tc.name: InputEventStatisticsTest_SimulateNoDispatchStatTest_001
+ * @tc.desc: simulated (UDS injected) and non-mouse events are not counted into dispatch latency
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_VirtualDeviceNoDispatchStatTest_001, TestSize.Level1)
+HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_SimulateNoDispatchStatTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
     auto point = CreatePointerEvent(PointerEvent::SOURCE_TYPE_MOUSE, TEST_DEVICE_ID);
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
-    // device not tracked
-    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID, nullptr);
-    InputEventStatistics::RecordMouseDispatchLatency(point);
-    EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
     // simulate flag (api injected)
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     point->AddFlag(InputEvent::EVENT_FLAG_SIMULATE);
-    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID, nullptr);
+    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
     InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
     // touchscreen source is not mouse statistics scope
     auto touch = CreatePointerEvent(PointerEvent::SOURCE_TYPE_TOUCHSCREEN, TEST_DEVICE_ID);
     ASSERT_NE(touch, nullptr);
-    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID, nullptr);
+    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
     InputEventStatistics::RecordMouseDispatchLatency(touch);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
@@ -304,32 +240,26 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_VirtualDeviceNoDispa
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_NonMoveNoDispatchStatTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     auto point = CreatePointerEvent(PointerEvent::SOURCE_TYPE_MOUSE, TEST_DEVICE_ID);
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
-    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID, nullptr);
+    InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
     InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
 
 /**
  * @tc.name: InputEventStatisticsTest_RecordTouchpadRightClickTest_001
- * @tc.desc: right click of tracked physical touchpad is counted per gesture source
+ * @tc.desc: touchpad right click is counted per gesture source
  * @tc.type: FUNC
  * @tc.require:
  */
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordTouchpadRightClickTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
-    EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 2u);
-    EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 1u);
-    // untracked (virtual) device is not counted
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID + 1, true);
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 2u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 1u);
 }
@@ -345,7 +275,6 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_TryReportWithDataTes
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
     InputEventStatistics::TryReport();
@@ -382,7 +311,6 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_ResetClearsAllTest_0
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
     InputEventStatistics::Reset();
@@ -403,7 +331,6 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpAllStatisticsTes
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
     std::string dumpStr = DumpToString();
@@ -442,7 +369,6 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DeviceTrimTest_001, 
     EXPECT_TRUE(InputEventStatistics::IsDeviceTrimmed());
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
@@ -452,24 +378,22 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DeviceTrimTest_001, 
 
 /**
  * @tc.name: InputEventStatisticsTest_DeviceRemovedClearsDataTest_001
- * @tc.desc: device removal untracks the device and drops the interval baseline
+ * @tc.desc: device removal drops the interval baseline
  * @tc.type: FUNC
  * @tc.require:
  */
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DeviceRemovedClearsDataTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    InputEventStatistics::TrackDevice(TEST_DEVICE_ID);
     int64_t baseTime = 1000 * US_PER_MS;
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime, true);
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 10 * US_PER_MS, true);
+    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime);
+    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 10 * US_PER_MS);
     EXPECT_EQ(SumMoveIntervalCounts(), 1u);
     InputEventStatistics::OnDeviceRemoved(TEST_DEVICE_ID);
-    EXPECT_FALSE(InputEventStatistics::IsDeviceTracked(TEST_DEVICE_ID));
     // first event after removal only sets the baseline again
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 20 * US_PER_MS, true);
+    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 20 * US_PER_MS);
     EXPECT_EQ(SumMoveIntervalCounts(), 1u);
-    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 30 * US_PER_MS, true);
+    InputEventStatistics::NotifyMotionEvent(TEST_DEVICE_ID, baseTime + 30 * US_PER_MS);
     EXPECT_EQ(SumMoveIntervalCounts(), 2u);
 }
 } // namespace MMI
