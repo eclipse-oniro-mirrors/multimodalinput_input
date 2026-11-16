@@ -6604,15 +6604,15 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectKeyEvent_DownUpDo
     keyEvent.keyCode = 2017;
     keyEvent.actionTime = 100;
     keyEvent.action = KEY_ACTION_DOWN;
-    EXPECT_EQ(OH_Input_InjectKeyEvent(&KeyEvent), INPUT_SUCCESS);
+    EXPECT_EQ(OH_Input_InjectKeyEvent(&keyEvent), INPUT_SUCCESS);
 
     keyEvent.actionTime = 200;
     keyEvent.action = KEY_ACTION_UP;
-    EXPECT_EQ(OH_Input_InjectKeyEvent(&KeyEvent), INPUT_SUCCESS);
+    EXPECT_EQ(OH_Input_InjectKeyEvent(&keyEvent), INPUT_SUCCESS);
 
     keyEvent.actionTime = 300;
     keyEvent.action = KEY_ACTION_DOWN;
-    EXPECT_EQ(OH_Input_InjectKeyEvent(&KeyEvent), INPUT_SUCCESS);
+    EXPECT_EQ(OH_Input_InjectKeyEvent(&keyEvent), INPUT_SUCCESS);
 }
 
 /**
@@ -6808,14 +6808,14 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEvent_Cancel
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_DownMoveUpSequence, TestSize.Level1)
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_WhenEventIsNull, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
     EXPECT_EQ(OH_Input_InjectTouchEventGlobal(nullptr), INPUT_PARAMETER_ERROR);
 }
 
 /**
- * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEvent_DownMoveUpSequence
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEventGlobal_DownMoveUpSequence
  * @tc.desc: InjectTouchEventGlobal DOWN/MOVE/UP sequence covers fobal coordinate and reset branches
  * @tc.type: FUNC
  * @tc.require:
