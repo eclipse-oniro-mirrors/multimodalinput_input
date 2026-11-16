@@ -50,6 +50,7 @@ public:
     bool CheckInputEventFilter();
     bool CheckAuthorize();
     bool CheckControlDevicePermission();
+    bool CheckEnterpriseControlDevice(uint32_t tokenID = 0);
     bool CheckKeyEventHook();
     bool CheckInputEventHook();
     bool CheckInputDeviceController();

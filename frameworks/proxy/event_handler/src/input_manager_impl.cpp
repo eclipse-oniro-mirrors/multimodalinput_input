@@ -71,6 +71,7 @@ const std::map<int32_t, int32_t> g_keyActionMap = {
 static const std::string g_foldScreenType = system::GetParameter("const.window.foldscreen.type", "0,0,0,0");
 const std::string PRODUCT_TYPE = system::GetParameter("const.product.devicetype", "unknown");
 constexpr char PRODUCT_TYPE_PC[] { "2in1" };
+constexpr char PRODUCT_TYPE_TABLET[] { "tablet" };
 } // namespace
 
 struct MonitorEventConsumer : public IInputEventConsumer {
@@ -3712,7 +3713,7 @@ int32_t InputManagerImpl::CheckTouchControllerPermission()
     return CAPABILITY_NOT_SUPPORTED;
 #else
     CHKPR(MULTIMODAL_INPUT_CONNECT_MGR, RET_ERR);
-    if (PRODUCT_TYPE != PRODUCT_TYPE_PC) {
+    if (PRODUCT_TYPE != PRODUCT_TYPE_PC && PRODUCT_TYPE != PRODUCT_TYPE_TABLET) {
         MMI_HILOGE("TouchController not supported on non-PC device, productType:%{public}s", PRODUCT_TYPE.c_str());
         return CAPABILITY_NOT_SUPPORTED;
     }
