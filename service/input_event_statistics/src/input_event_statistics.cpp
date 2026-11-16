@@ -142,7 +142,7 @@ void InputEventStatistics::RecordDispatchLatency(int64_t latencyUs)
     }
 }
 
-void InputEventStatistics::RecordTouchpadRightClick(int32_t deviceId, bool isTwoFingerTap)
+void InputEventStatistics::RecordTouchpadRightClick(bool isTwoFingerTap)
 {
     if (deviceTrimmed_.load(std::memory_order_relaxed)) {
         return;

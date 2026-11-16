@@ -99,7 +99,7 @@ public:
     // Called when a touchpad right-click gesture is recognized (two-finger tap or
     // right button zone press). Counted per gesture source: isTwoFingerTap=true counts
     // as a two-finger tap gesture, otherwise as a press in the right-click area.
-    static void RecordTouchpadRightClick(int32_t deviceId, bool isTwoFingerTap);
+    static void RecordTouchpadRightClick(bool isTwoFingerTap);
 
     // ---------------- lifecycle ----------------
     // Drops the motion-interval baseline of the device when it is removed, so no

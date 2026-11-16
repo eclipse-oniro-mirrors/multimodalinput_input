@@ -257,9 +257,9 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_NonMoveNoDispatchSta
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordTouchpadRightClickTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
+    InputEventStatistics::RecordTouchpadRightClick(true);
+    InputEventStatistics::RecordTouchpadRightClick(true);
+    InputEventStatistics::RecordTouchpadRightClick(false);
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 2u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 1u);
 }
@@ -275,8 +275,8 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_TryReportWithDataTes
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
+    InputEventStatistics::RecordTouchpadRightClick(true);
+    InputEventStatistics::RecordTouchpadRightClick(false);
     InputEventStatistics::TryReport();
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
@@ -311,8 +311,8 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_ResetClearsAllTest_0
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
+    InputEventStatistics::RecordTouchpadRightClick(true);
+    InputEventStatistics::RecordTouchpadRightClick(false);
     InputEventStatistics::Reset();
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
@@ -331,8 +331,8 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpAllStatisticsTes
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, false);
+    InputEventStatistics::RecordTouchpadRightClick(true);
+    InputEventStatistics::RecordTouchpadRightClick(false);
     std::string dumpStr = DumpToString();
     EXPECT_NE(dumpStr.find("Input Event Statistics"), std::string::npos);
     EXPECT_NE(dumpStr.find("Mouse Move Interval"), std::string::npos);
@@ -369,7 +369,7 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DeviceTrimTest_001, 
     EXPECT_TRUE(InputEventStatistics::IsDeviceTrimmed());
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::RecordTouchpadRightClick(TEST_DEVICE_ID, true);
+    InputEventStatistics::RecordTouchpadRightClick(true);
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 0u);

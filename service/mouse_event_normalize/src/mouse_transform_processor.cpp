@@ -1820,7 +1820,7 @@ void MouseTransformProcessor::TransTouchpadRightButton(struct libinput_event_poi
         if (button == MouseDeviceState::LIBINPUT_BUTTON_CODE::LIBINPUT_RIGHT_BUTTON_CODE) {
             // Gesture source split: a tap gesture counts as two-finger tap, a touchpad
             // button press counts as press in the right-click area.
-            InputEventStatistics::RecordTouchpadRightClick(deviceId_, evenType == LIBINPUT_EVENT_POINTER_TAP);
+            InputEventStatistics::RecordTouchpadRightClick(evenType == LIBINPUT_EVENT_POINTER_TAP);
         }
         if (button < MouseDeviceState::LIBINPUT_BUTTON_CODE::LIBINPUT_LEFT_BUTTON_CODE) {
             MMI_HILOGE("button press from:%{public}d to :%{public}d, evenType:%{public}d, switchType:%{public}d",
