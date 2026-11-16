@@ -215,6 +215,9 @@ const char* InputEvent::DumpSourceType() const
         case InputEvent::SOURCE_TYPE_TOUCHPAD: {
             return "touch-pad";
         }
+        case InputEvent::SOURCE_TYPE_TOUCHPAD_RAW: {
+            return "touch-pad-raw";
+        }
         case InputEvent::SOURCE_TYPE_JOYSTICK: {
             return "joystick";
         }

@@ -1640,6 +1640,8 @@ bool PointerEvent::IsValid() const
         }
         case SOURCE_TYPE_JOYSTICK:
             break;
+        case SOURCE_TYPE_TOUCHPAD_RAW:
+            break;
         default: {
             MMI_HILOGE("SourceType is invalid");
             return false;

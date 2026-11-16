@@ -1929,7 +1929,7 @@ void EventNormalizeHandler::FillRawPointerEvent(std::shared_ptr<PointerEvent> po
         pointerEvent->AddPointerItem(pointerItem);
     }
     pointerEvent->SetTouchpadRawExt(ext);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD);
+    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHPAD_RAW);
     pointerEvent->SetPointerAction(pointerAction);
     pointerEvent->SetPointerId(0);
     pointerEvent->SetDeviceId(INPUT_DEV_MGR->FindInputDeviceId(device));
