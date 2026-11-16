@@ -936,6 +936,7 @@ int32_t OH_Input_InjectTouchEvent(const struct Input_TouchEvent* touchEvent)
     MMI_HILOGI("Input_TouchEvent injectTouchEvent");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectTouchEvent.Call", true);
     CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
+    int32_t pointerId = -1;
     std::shared_ptr<OHOS::MMI::PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_touchEventMutex);
@@ -954,12 +955,13 @@ int32_t OH_Input_InjectTouchEvent(const struct Input_TouchEvent* touchEvent)
         }
         g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
         event = std::make_shared<OHOS::MMI::PointerEvent>(*g_touchEvent);
+        pointerId = g_touchEvent->GetPointerId();
     }
     OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
         PointerEvent::DISPLAY_COORDINATE);
     if (touchEvent->action == TOUCH_ACTION_UP) {
         std::lock_guard<std::mutex> lock(g_touchEventMutex);
-        g_touchEvent->RemovePointerItem(g_touchEvent->GetPointerId());
+        g_touchEvent->RemovePointerItem(pointerId);
         MMI_HILOGD("This touch event is up remove this finger");
         if (g_touchEvent->GetPointerIds().empty()) {
             MMI_HILOGD("This touch event is final finger up remove this finger");
@@ -975,6 +977,7 @@ int32_t OH_Input_InjectTouchEventGlobal(const struct Input_TouchEvent* touchEven
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectTouchEventGlobal.Call", true);
     CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
     int32_t result = INPUT_SUCCESS;
+    int32_t pointerId = -1;
     std::shared_ptr<OHOS::MMI::PointerEvent> event;
     {
         std::lock_guard<std::mutex> lock(g_touchEventMutex);
@@ -997,12 +1000,13 @@ int32_t OH_Input_InjectTouchEventGlobal(const struct Input_TouchEvent* touchEven
         }
         g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
         event = std::make_shared<OHOS::MMI::PointerEvent>(*g_touchEvent);
+        pointerId = g_touchEvent->GetPointerId();
     }
     result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
         PointerEvent::GLOBAL_COORDINATE);
     if (touchEvent->action == TOUCH_ACTION_UP) {
         std::lock_guard<std::mutex> lock(g_touchEventMutex);
-        g_touchEvent->RemovePointerItem(g_touchEvent->GetPointerId());
+        g_touchEvent->RemovePointerItem(pointerId);
         MMI_HILOGD("This touch event is up remove this finger");
         if (g_touchEvent->GetPointerIds().empty()) {
             MMI_HILOGD("This touch event is final finger up remove this finger");
