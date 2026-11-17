@@ -313,7 +313,7 @@ int32_t InputManager::SimulateInputEvent(std::shared_ptr<PointerEvent> pointerEv
     } else {
         MMI_HILOGD("isAutoToVirtualScreen=%{public}s", isAutoToVirtualScreen ? "true" : "false");
     }
-    return InputMgrImpl.SimulateInputEvent(pointerEvent, useCoordinate);
+    return InputMgrImpl.SimulateInputEvent(pointerEvent, false, useCoordinate);
     // LCOV_EXCL_STOP
 }
 
