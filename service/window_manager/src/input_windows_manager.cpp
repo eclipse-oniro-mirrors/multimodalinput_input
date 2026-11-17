@@ -6084,9 +6084,15 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
     CHKPR(pointerEvent, ERROR_NULL_POINTER);
     RemoveActiveWindow(pointerEvent);
 #ifdef OHOS_BUILD_ENABLE_VKEYBOARD
-    if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_CANCEL) {
-        MMI_HILOG_DISPATCHD("Abort UpdateTouchScreenTarget due to POINTER_ACTION_CANCEL");
-        return RET_OK;
+    bool isFoldPC = std::find(DEVICE_TYPE_FOLD_PC_VECTOR.begin(), DEVICE_TYPE_FOLD_PC_VECTOR.end(), SYS_PRODUCT_TYPE) != 
+        DEVICE_TYPE_FOLD_PC_VECTOR.end();
+    if(isFoldPC) {
+        auto device = INPUT_DEV_MGR->GetInputDevice(pointerEvent->GetDeviceId());
+        if (device != nullptr && device->GetName() == "input_mt_wrapper" && 
+            pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_CANCEL) {
+            MMI_HILOG_DISPATCHD("Abort UpdateTouchScreenTarget due to POINTER_ACTION_CANCEL");
+            return RET_OK;
+        }
     }
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
     auto displayId = pointerEvent->GetTargetDisplayId();
