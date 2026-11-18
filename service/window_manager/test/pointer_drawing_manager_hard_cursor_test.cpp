@@ -15,9 +15,11 @@
 
 #include <gtest/gtest.h>
 
+#include "config_multimodal.h"
 #include "cursor_drawing_component.h"
 #include "pointer_device_manager.h"
 #include "pointer_drawing_manager.h"
+#include "resource_decompress.h"
 
 #undef MMI_LOG_TAG
 #define MMI_LOG_TAG "PointerDrawingManagerHardCursorTest"
@@ -37,7 +39,13 @@ constexpr int32_t DEFAULT_VALUE { -1 };
 
 class PointerDrawingManagerHardCursorTest : public testing::Test {
 public:
-    static void SetUpTestCase(void) {};
+    static void SetUpTestCase(void)
+    {
+        // The renderer reads built-in SVGs from the decompressed icon dir; without this the
+        // suite only passes when another suite (e.g. CursorDrawingComponentTest) has already
+        // decompressed the bundle on this boot, so make it standalone-runnable.
+        DecompressToDisk(DEF_MOUSE_ICONS_DAT_PATH, "/data/service/el1/public/multimodalinput/mouse_icon/");
+    };
     static void TearDownTestCase(void) {};
     void SetUp(void) {}
     void TearDown(void) {}
