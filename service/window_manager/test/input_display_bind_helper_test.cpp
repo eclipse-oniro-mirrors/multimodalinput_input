@@ -1049,9 +1049,8 @@ HWTEST_F(InputDisplayBindHelperTest, InputDisplayBindHelperTest_SetDisplayBind_0
     int32_t deviceId = 1;
     int32_t displayId = 0;
     std::string msg = "touch";
-    // Device 1 is already bound to display 0, so the repeat request keeps the legacy
-    // rejection semantics.
-    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_ERR);
+    // Device 1 is already bound to display 0, so the repeat request is an idempotent no-op.
+    EXPECT_EQ(inputDisplayBindHelper.SetDisplayBind(deviceId, displayId, 1, "hp 223", msg), RET_OK);
 }
 
 /**

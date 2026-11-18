@@ -541,9 +541,9 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_014, Te
     constexpr int32_t displayId = 1;
     std::string msg;
     ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
-    // SetDisplayBind keeps its legacy semantics for an already-bound pair: the repeat call
-    // is rejected instead of being treated as a no-op success.
-    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_ERR);
+    // Rebinding the same pair is an idempotent no-op that succeeds: the RK3568 field test
+    // showed partners rebind periodically and treat the legacy 401 as a failure.
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
     EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), displayId);
 }
 

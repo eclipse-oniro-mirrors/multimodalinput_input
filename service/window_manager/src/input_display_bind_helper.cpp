@@ -730,9 +730,9 @@ int32_t InputDisplayBindHelper::SetDisplayBind(int32_t deviceId, int32_t display
         return RET_ERR;
     }
     if (infos_->GetBindDisplayIdByInputDevice(deviceId) == displayId) {
-        msg = "The input device and display has alread bind";
-        MMI_HILOGE("%s", msg.c_str());
-        return RET_ERR;
+        msg = "The input device and display are already bound";
+        MMI_HILOGI("%{public}s", msg.c_str());
+        return RET_OK;
     }
 
     BindInfo bindByDevice;
