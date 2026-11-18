@@ -6629,7 +6629,7 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_WhenEv
 
 /**
  * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEvent_DisplayIdPositive
- * @tc.desc: InjectMouseEvent with positive sets target display and reaches simulate path
+ * @tc.desc: InjectMouseEvent with positive displayId sets target display and reaches simulate path
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -6706,8 +6706,8 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEventGlobal_
     Input_MouseEvent mouseEvent {};
     mouseEvent.action = static_cast<Input_MouseEventAction>(100);
     mouseEvent.actionTime = 100;
-    mouseEvent.displayX = 100;
-    mouseEvent.displayY = 100;
+    mouseEvent.globalX = 100;
+    mouseEvent.globalY = 100;
     mouseEvent.button = MOUSE_BUTTON_LEFT;
     EXPECT_EQ(OH_Input_InjectMouseEventGlobal(&mouseEvent), INPUT_PARAMETER_ERROR);
 }
@@ -6782,7 +6782,7 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEvent_UpWith
 
 /**
  * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEvent_CancelAfterDown
- * @tc.desc: InjectTouchEvent CANCEL after DOWN finds pointers item and returns INPUT_SUCCESS
+ * @tc.desc: InjectTouchEvent CANCEL after DOWN finds pointer item and returns INPUT_SUCCESS
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -6816,7 +6816,7 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_
 
 /**
  * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEventGlobal_DownMoveUpSequence
- * @tc.desc: InjectTouchEventGlobal DOWN/MOVE/UP sequence covers fobal coordinate and reset branches
+ * @tc.desc: InjectTouchEventGlobal DOWN/MOVE/UP sequence covers gobal coordinate and reset branches
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -6831,17 +6831,17 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_
     touchEvent.globalY = 100;
     touchEvent.actionTime = 100;
     touchEvent.action = TOUCH_ACTION_DOWN;
-    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_SUCCESS);
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PERMISSION_DENIED);
 
     touchEvent.globalX = 120;
     touchEvent.globalY = 120;
     touchEvent.actionTime = 200;
     touchEvent.action = TOUCH_ACTION_MOVE;
-    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_SUCCESS);
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PERMISSION_DENIED);
 
     touchEvent.actionTime = 300;
     touchEvent.action = TOUCH_ACTION_UP;
-    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_SUCCESS);
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PERMISSION_DENIED);
 }
 
 /**
