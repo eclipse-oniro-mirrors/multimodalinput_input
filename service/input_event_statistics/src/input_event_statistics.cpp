@@ -47,8 +47,10 @@ int64_t GetCurrentEpochHour()
 
 std::atomic<uint64_t> InputEventStatistics::moveIntervalCounts_[BUCKET_COUNT] = {};
 std::atomic<uint64_t> InputEventStatistics::dispatchLatencyCounts_[BUCKET_COUNT] = {};
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
 std::atomic<uint64_t> InputEventStatistics::touchpadTwoFingerTapCount_ { 0 };
 std::atomic<uint64_t> InputEventStatistics::touchpadPressRightClickAreaCount_ { 0 };
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 std::atomic<bool> InputEventStatistics::deviceTrimmed_ { false };
 int64_t InputEventStatistics::lastMoveEventTimeUs_ { 0 };
 int32_t InputEventStatistics::lastMoveDeviceId_ { -1 };
@@ -106,7 +108,7 @@ void InputEventStatistics::MarkMouseDispatchStart(int32_t deviceId)
     dispatchStartPending_ = true;
 }
 
-void InputEventStatistics::RecordMouseDispatchLatency(const std::shared_ptr<PointerEvent> &point)
+void InputEventStatistics::RecordMouseDispatchLatency(const PointerEvent *point)
 {
     if (!dispatchStartPending_ || point == nullptr) {
         return;
@@ -142,6 +144,7 @@ void InputEventStatistics::RecordDispatchLatency(int64_t latencyUs)
     }
 }
 
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
 void InputEventStatistics::RecordTouchpadRightClick(bool isTwoFingerTap)
 {
     if (deviceTrimmed_.load(std::memory_order_relaxed)) {
@@ -153,6 +156,7 @@ void InputEventStatistics::RecordTouchpadRightClick(bool isTwoFingerTap)
         touchpadPressRightClickAreaCount_.fetch_add(1, std::memory_order_relaxed);
     }
 }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 void InputEventStatistics::OnDeviceRemoved(int32_t deviceId)
 {
@@ -189,6 +193,7 @@ uint64_t InputEventStatistics::GetDispatchLatencyCount(size_t bucket)
     return dispatchLatencyCounts_[bucket].load(std::memory_order_relaxed);
 }
 
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
 uint64_t InputEventStatistics::GetTouchpadTwoFingerTapCount()
 {
     return touchpadTwoFingerTapCount_.load(std::memory_order_relaxed);
@@ -198,6 +203,7 @@ uint64_t InputEventStatistics::GetTouchpadPressRightClickAreaCount()
 {
     return touchpadPressRightClickAreaCount_.load(std::memory_order_relaxed);
 }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 void InputEventStatistics::StartReportTimer()
 {
@@ -223,9 +229,13 @@ void InputEventStatistics::StartReportTimer()
 }
 
 void InputEventStatistics::LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
-    const uint32_t (&latencyCounts)[BUCKET_COUNT], uint32_t twoFingerTapCount,
-    uint32_t pressRightClickAreaCount)
+    const uint32_t (&latencyCounts)[BUCKET_COUNT]
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+    , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
+    )
 {
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     MMI_HILOGI("Input event statistics: moveInterval[0-8ms:%{public}u, 8-16ms:%{public}u, 16-33ms:%{public}u,"
         " 33-50ms:%{public}u, 50ms+:%{public}u], dispatchLatency[0-2ms:%{public}u, 2-4ms:%{public}u,"
         " 4-8ms:%{public}u, 8-16ms:%{public}u, 16ms+:%{public}u],"
@@ -237,6 +247,17 @@ void InputEventStatistics::LogReportSummary(const uint32_t (&moveCounts)[BUCKET_
         latencyCounts[DISPATCH_LATENCY_FROM_4_TO_8MS], latencyCounts[DISPATCH_LATENCY_FROM_8_TO_16MS],
         latencyCounts[DISPATCH_LATENCY_ABOVE_16MS],
         twoFingerTapCount, pressRightClickAreaCount);
+#else
+    MMI_HILOGI("Input event statistics: moveInterval[0-8ms:%{public}u, 8-16ms:%{public}u, 16-33ms:%{public}u,"
+        " 33-50ms:%{public}u, 50ms+:%{public}u], dispatchLatency[0-2ms:%{public}u, 2-4ms:%{public}u,"
+        " 4-8ms:%{public}u, 8-16ms:%{public}u, 16ms+:%{public}u]",
+        moveCounts[MOVE_INTERVAL_BELOW_8MS], moveCounts[MOVE_INTERVAL_FROM_8_TO_16MS],
+        moveCounts[MOVE_INTERVAL_FROM_16_TO_33MS], moveCounts[MOVE_INTERVAL_FROM_33_TO_50MS],
+        moveCounts[MOVE_INTERVAL_ABOVE_50MS],
+        latencyCounts[DISPATCH_LATENCY_BELOW_2MS], latencyCounts[DISPATCH_LATENCY_FROM_2_TO_4MS],
+        latencyCounts[DISPATCH_LATENCY_FROM_4_TO_8MS], latencyCounts[DISPATCH_LATENCY_FROM_8_TO_16MS],
+        latencyCounts[DISPATCH_LATENCY_ABOVE_16MS]);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 
 void InputEventStatistics::TryReport()
@@ -256,6 +277,7 @@ void InputEventStatistics::TryReport()
         latencyCounts[i] = static_cast<uint32_t>(dispatchLatencyCounts_[i].load(std::memory_order_relaxed));
         latencyTotal += latencyCounts[i];
     }
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     uint32_t twoFingerTapCount =
         static_cast<uint32_t>(touchpadTwoFingerTapCount_.load(std::memory_order_relaxed));
     uint32_t pressRightClickAreaCount =
@@ -264,7 +286,16 @@ void InputEventStatistics::TryReport()
     if (moveTotal == 0 && latencyTotal == 0 && gestureTotal == 0) {
         return;
     }
-    LogReportSummary(moveCounts, latencyCounts, twoFingerTapCount, pressRightClickAreaCount);
+#else
+    if (moveTotal == 0 && latencyTotal == 0) {
+        return;
+    }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
+    LogReportSummary(moveCounts, latencyCounts
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+        , twoFingerTapCount, pressRightClickAreaCount
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
+    );
     if (moveTotal > 0) {
         int32_t ret = DfxHisysevent::ReportOriginalInputEventIntervalStat(moveCounts[MOVE_INTERVAL_BELOW_8MS],
             moveCounts[MOVE_INTERVAL_FROM_8_TO_16MS], moveCounts[MOVE_INTERVAL_FROM_16_TO_33MS],
@@ -282,12 +313,14 @@ void InputEventStatistics::TryReport()
             MMI_HILOGE("Report event dispatch latency stat failed, ret:%{public}d", ret);
         }
     }
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     if (gestureTotal > 0) {
         int32_t ret = DfxHisysevent::ReportInputGestureStat(twoFingerTapCount, pressRightClickAreaCount);
         if (ret != RET_OK) {
             MMI_HILOGE("Report input gesture stat failed, ret:%{public}d", ret);
         }
     }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     Reset();
 }
 
@@ -297,8 +330,10 @@ void InputEventStatistics::Reset()
         moveIntervalCounts_[i].store(0, std::memory_order_relaxed);
         dispatchLatencyCounts_[i].store(0, std::memory_order_relaxed);
     }
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     touchpadTwoFingerTapCount_.store(0, std::memory_order_relaxed);
     touchpadPressRightClickAreaCount_.store(0, std::memory_order_relaxed);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     lastMoveEventTimeUs_ = 0;
     lastMoveDeviceId_ = -1;
     dispatchStartPending_ = false;
@@ -321,10 +356,17 @@ void InputEventStatistics::Dump(int32_t fd)
         static_cast<unsigned long long>(GetDispatchLatencyCount(DISPATCH_LATENCY_FROM_4_TO_8MS)),
         static_cast<unsigned long long>(GetDispatchLatencyCount(DISPATCH_LATENCY_FROM_8_TO_16MS)),
         static_cast<unsigned long long>(GetDispatchLatencyCount(DISPATCH_LATENCY_ABOVE_16MS)));
-    mprintf(fd, "  Touchpad Right Click Count (Two Finger Tap): %llu\n",
+}
+
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+void InputEventStatistics::DumpTouchpadGesture(int32_t fd)
+{
+    mprintf(fd, "Touchpad Gesture Statistics:\n");
+    mprintf(fd, "  Right Click Count (Two Finger Tap): %llu\n",
         static_cast<unsigned long long>(GetTouchpadTwoFingerTapCount()));
-    mprintf(fd, "  Touchpad Right Click Count (Press Right Click Area): %llu\n",
+    mprintf(fd, "  Right Click Count (Press Right Click Area): %llu\n",
         static_cast<unsigned long long>(GetTouchpadPressRightClickAreaCount()));
 }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 } // namespace MMI
 } // namespace OHOS

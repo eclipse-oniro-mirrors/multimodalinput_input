@@ -484,6 +484,7 @@ int32_t DfxHisysevent::ReportOriginalEventDispatchLatencyStat(uint32_t below2ms,
     return ret;
 }
 
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
 int32_t DfxHisysevent::ReportInputGestureStat(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount)
 {
     int32_t ret = HiSysEventWrite(
@@ -497,6 +498,7 @@ int32_t DfxHisysevent::ReportInputGestureStat(uint32_t twoFingerTapCount, uint32
     }
     return ret;
 }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 void DfxHisysevent::ReportTouchpadSettingState(TOUCHPAD_SETTING_CODE settingCode, bool flag)
 {

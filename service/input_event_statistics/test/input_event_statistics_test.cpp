@@ -65,14 +65,14 @@ uint64_t SumDispatchLatencyCounts()
     return total;
 }
 
-std::string DumpToString()
+std::string DumpStatsToString(void (*dumpFn)(int32_t))
 {
     char path[] = "/data/local/tmp/input_event_statistics_test_XXXXXX";
     int32_t fd = mkstemp(path);
     if (fd < 0) {
         return "";
     }
-    InputEventStatistics::Dump(fd);
+    dumpFn(fd);
     close(fd);
     std::ifstream file(path);
     std::stringstream ss;
@@ -183,10 +183,10 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordDispatchLatenc
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(point);
+    InputEventStatistics::RecordMouseDispatchLatency(point.get());
     EXPECT_EQ(SumDispatchLatencyCounts(), 1u);
     // one mark only records once
-    InputEventStatistics::RecordMouseDispatchLatency(point);
+    InputEventStatistics::RecordMouseDispatchLatency(point.get());
     EXPECT_EQ(SumDispatchLatencyCounts(), 1u);
 }
 
@@ -201,7 +201,7 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_InterceptedEventNoSt
     CALL_TEST_DEBUG;
     auto point = CreatePointerEvent(PointerEvent::SOURCE_TYPE_MOUSE, TEST_DEVICE_ID);
     ASSERT_NE(point, nullptr);
-    InputEventStatistics::RecordMouseDispatchLatency(point);
+    InputEventStatistics::RecordMouseDispatchLatency(point.get());
     InputEventStatistics::RecordMouseDispatchLatency(nullptr);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
@@ -221,13 +221,13 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_SimulateNoDispatchSt
     // simulate flag (api injected)
     point->AddFlag(InputEvent::EVENT_FLAG_SIMULATE);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(point);
+    InputEventStatistics::RecordMouseDispatchLatency(point.get());
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
     // touchscreen source is not mouse statistics scope
     auto touch = CreatePointerEvent(PointerEvent::SOURCE_TYPE_TOUCHSCREEN, TEST_DEVICE_ID);
     ASSERT_NE(touch, nullptr);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(touch);
+    InputEventStatistics::RecordMouseDispatchLatency(touch.get());
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
 
@@ -244,10 +244,11 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_NonMoveNoDispatchSta
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(point);
+    InputEventStatistics::RecordMouseDispatchLatency(point.get());
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
 
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
 /**
  * @tc.name: InputEventStatisticsTest_RecordTouchpadRightClickTest_001
  * @tc.desc: touchpad right click is counted per gesture source
@@ -263,6 +264,7 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordTouchpadRightC
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 2u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 1u);
 }
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 /**
  * @tc.name: InputEventStatisticsTest_TryReportWithDataTest_001
@@ -275,13 +277,17 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_TryReportWithDataTes
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     InputEventStatistics::RecordTouchpadRightClick(true);
     InputEventStatistics::RecordTouchpadRightClick(false);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     InputEventStatistics::TryReport();
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 0u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 0u);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 
 /**
@@ -296,8 +302,10 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_TryReportNoDataTest_
     InputEventStatistics::TryReport();
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 0u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 0u);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 
 /**
@@ -311,18 +319,22 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_ResetClearsAllTest_0
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     InputEventStatistics::RecordTouchpadRightClick(true);
     InputEventStatistics::RecordTouchpadRightClick(false);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     InputEventStatistics::Reset();
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 0u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 0u);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 
 /**
  * @tc.name: InputEventStatisticsTest_DumpAllStatisticsTest_001
- * @tc.desc: Dump outputs all three kinds of statistics
+ * @tc.desc: Dump outputs mouse interval and latency statistics only
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -331,15 +343,33 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpAllStatisticsTes
     CALL_TEST_DEBUG;
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
-    InputEventStatistics::RecordTouchpadRightClick(true);
-    InputEventStatistics::RecordTouchpadRightClick(false);
-    std::string dumpStr = DumpToString();
+    std::string dumpStr = DumpStatsToString(InputEventStatistics::Dump);
     EXPECT_NE(dumpStr.find("Input Event Statistics"), std::string::npos);
     EXPECT_NE(dumpStr.find("Mouse Move Interval"), std::string::npos);
     EXPECT_NE(dumpStr.find("Mouse Dispatch Latency"), std::string::npos);
-    EXPECT_NE(dumpStr.find("Touchpad Right Click Count (Two Finger Tap)"), std::string::npos);
-    EXPECT_NE(dumpStr.find("Touchpad Right Click Count (Press Right Click Area)"), std::string::npos);
+    EXPECT_EQ(dumpStr.find("Touchpad Gesture Statistics"), std::string::npos);
 }
+
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+/**
+ * @tc.name: InputEventStatisticsTest_DumpTouchpadGestureTest_001
+ * @tc.desc: DumpTouchpadGesture outputs gesture statistics with trigger sources distinguished
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpTouchpadGestureTest_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputEventStatistics::RecordTouchpadRightClick(true);
+    InputEventStatistics::RecordTouchpadRightClick(false);
+    std::string dumpStr = DumpStatsToString(InputEventStatistics::DumpTouchpadGesture);
+    EXPECT_NE(dumpStr.find("Touchpad Gesture Statistics"), std::string::npos);
+    EXPECT_NE(dumpStr.find("Right Click Count (Two Finger Tap): 1"), std::string::npos);
+    EXPECT_NE(dumpStr.find("Right Click Count (Press Right Click Area): 1"), std::string::npos);
+    EXPECT_EQ(dumpStr.find("Mouse Move Interval"), std::string::npos);
+    EXPECT_EQ(dumpStr.find("Mouse Dispatch Latency"), std::string::npos);
+}
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 /**
  * @tc.name: InputEventStatisticsTest_DumpNoDataTest_001
@@ -350,10 +380,16 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpAllStatisticsTes
 HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpNoDataTest_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
-    std::string dumpStr = DumpToString();
+    std::string dumpStr = DumpStatsToString(InputEventStatistics::Dump);
     EXPECT_NE(dumpStr.find("Input Event Statistics"), std::string::npos);
-    EXPECT_NE(dumpStr.find("Touchpad Right Click Count (Two Finger Tap): 0"), std::string::npos);
-    EXPECT_NE(dumpStr.find("Touchpad Right Click Count (Press Right Click Area): 0"), std::string::npos);
+    EXPECT_NE(dumpStr.find("Mouse Move Interval"), std::string::npos);
+    EXPECT_NE(dumpStr.find("Mouse Dispatch Latency"), std::string::npos);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+    std::string gestureStr = DumpStatsToString(InputEventStatistics::DumpTouchpadGesture);
+    EXPECT_NE(gestureStr.find("Touchpad Gesture Statistics"), std::string::npos);
+    EXPECT_NE(gestureStr.find("Right Click Count (Two Finger Tap): 0"), std::string::npos);
+    EXPECT_NE(gestureStr.find("Right Click Count (Press Right Click Area): 0"), std::string::npos);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 
 /**
@@ -369,11 +405,15 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DeviceTrimTest_001, 
     EXPECT_TRUE(InputEventStatistics::IsDeviceTrimmed());
     InputEventStatistics::RecordMoveInterval(10 * US_PER_MS);
     InputEventStatistics::RecordDispatchLatency(3 * US_PER_MS);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     InputEventStatistics::RecordTouchpadRightClick(true);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     EXPECT_EQ(SumMoveIntervalCounts(), 0u);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     EXPECT_EQ(InputEventStatistics::GetTouchpadTwoFingerTapCount(), 0u);
     EXPECT_EQ(InputEventStatistics::GetTouchpadPressRightClickAreaCount(), 0u);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 
 /**

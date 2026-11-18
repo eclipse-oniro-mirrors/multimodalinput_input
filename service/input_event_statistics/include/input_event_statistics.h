@@ -18,7 +18,6 @@
 
 #include <atomic>
 #include <cstdint>
-#include <memory>
 
 #include "pointer_event.h"
 
@@ -47,6 +46,10 @@ namespace MMI {
  *
  * Performance: notification entries only do integer compare/increment on the hot path
  * (no allocation, no string formatting, no logging), see docs constraint <=50us.
+ *
+ * Build gating: the touchpad gesture statistics (record/report/dump) are compiled
+ * only when OHOS_BUILD_ENABLE_TOUCHPAD is defined; the mouse interval/latency
+ * statistics are always compiled.
  */
 class InputEventStatistics final {
 public:
@@ -93,13 +96,17 @@ public:
     // dispatch latency once per marked event, for mouse/touchpad sourced move-action
     // events only (button/wheel events share the pipeline but are not counted).
     // Events that never reach a successful UDS send (intercepted/consumed/dropped)
-    // are not counted.
-    static void RecordMouseDispatchLatency(const std::shared_ptr<PointerEvent> &point);
+    // are not counted. A null pointer is ignored. Takes a const raw pointer on
+    // purpose: read-only hot path access, no ownership transfer and no shared_ptr
+    // refcount churn.
+    static void RecordMouseDispatchLatency(const PointerEvent *point);
 
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     // Called when a touchpad right-click gesture is recognized (two-finger tap or
     // right button zone press). Counted per gesture source: isTwoFingerTap=true counts
     // as a two-finger tap gesture, otherwise as a press in the right-click area.
     static void RecordTouchpadRightClick(bool isTwoFingerTap);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
     // ---------------- lifecycle ----------------
     // Drops the motion-interval baseline of the device when it is removed, so no
@@ -121,14 +128,23 @@ public:
     // Resets all counters and baselines.
     static void Reset();
 
-    // Dumps all statistics to fd (zero values when no data, never fails).
+    // Dumps mouse statistics (motion interval and dispatch latency) to fd
+    // (zero values when no data, never fails).
     static void Dump(int32_t fd);
+
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+    // Dumps touchpad gesture statistics to fd, one line per gesture with its
+    // trigger sources distinguished (zero values when no data, never fails).
+    static void DumpTouchpadGesture(int32_t fd);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
     // ---------------- state accessors (report/dump/tests) ----------------
     static uint64_t GetMoveIntervalCount(size_t bucket);
     static uint64_t GetDispatchLatencyCount(size_t bucket);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     static uint64_t GetTouchpadTwoFingerTapCount();
     static uint64_t GetTouchpadPressRightClickAreaCount();
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
     // ---------------- testable core ----------------
     // Core motion interval logic: computes the interval against the previous timestamp
@@ -141,14 +157,20 @@ public:
 
 private:
     // Prints the one-line summary log of a report window (hourly low frequency path).
+    // The touchpad gesture segment is part of the line only in touchpad builds.
     static void LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
-        const uint32_t (&latencyCounts)[BUCKET_COUNT], uint32_t twoFingerTapCount,
-        uint32_t pressRightClickAreaCount);
+        const uint32_t (&latencyCounts)[BUCKET_COUNT]
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+        , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
+    );
 
     static std::atomic<uint64_t> moveIntervalCounts_[BUCKET_COUNT];
     static std::atomic<uint64_t> dispatchLatencyCounts_[BUCKET_COUNT];
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     static std::atomic<uint64_t> touchpadTwoFingerTapCount_;
     static std::atomic<uint64_t> touchpadPressRightClickAreaCount_;
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     static std::atomic<bool> deviceTrimmed_;
 
     // The following members are only accessed on the server epoll thread.

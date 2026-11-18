@@ -20,6 +20,7 @@
 #include "event_statistic.h"
 #include "input_device_manager.h"
 #include "input_event_handler.h"
+#include "input_event_statistics.h"
 #ifdef OHOS_BUILD_ENABLE_KEYBOARD
 #include "i_input_windows_manager.h"
 #ifdef OHOS_BUILD_ENABLE_COMBINATION_KEY
@@ -114,6 +115,7 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
         { "frozenPid", no_argument, 0, 'p' },
         { "pendingBind", no_argument, 0, 'B' },
         { "lastInputTime", no_argument, 0, 'L' },
+        { "touchpadGesture", no_argument, 0, 'g' },
         { "touchpadScrollDirection", no_argument, 0, 'T' },
         { "assetCheck", no_argument, 0, 'a' },
         { nullptr, 0, 0, 0 }
@@ -147,7 +149,7 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
         std::lock_guard<std::mutex> lock(getoptMtx_);
         optind = 1;
         int32_t c;
-        while ((c = getopt_long (args.size(), argv, "hdlwusoifmckKetbnpBLTa", dumpOptions, &optionIndex)) != -1) {
+        while ((c = getopt_long (args.size(), argv, "hdlwusoifmckKetbnpBLTga", dumpOptions, &optionIndex)) != -1) {
             getoptResults.push_back(c);
         }
     }
@@ -343,6 +345,14 @@ void EventDump::ParseCommand(int32_t fd, const std::vector<std::string> &args)
 #endif // OHOS_BUILD_ENABLE_POINTER
                 break;
             }
+            case 'g': {
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+                InputEventStatistics::DumpTouchpadGesture(fd);
+#else
+                mprintf(fd, "Touchpad device does not support");
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
+                break;
+            }
             case 'a': {
                 auto dispatchHandler = InputHandler->GetEventDispatchHandler();
                 if (dispatchHandler == nullptr) {
@@ -396,6 +406,7 @@ void EventDump::DumpHelp(int32_t fd)
     mprintf(fd, "      -B, --pendingBind: dump the deferred bind (active sequence/pending/timer) state\t");
     mprintf(fd, "      -L, --lastInputTime: dump the last input event time of each display group\t");
     mprintf(fd, "      -T, --touchpadScrollDirection: dump the touchpad two-finger scroll direction of each user\t");
+    mprintf(fd, "      -g, --touchpadGesture: dump the touchpad gesture statistics\t");
     mprintf(fd, "      -a, --assetCheck: dump the asset check last result\t");
 }
 

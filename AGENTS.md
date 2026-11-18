@@ -22,6 +22,7 @@
 | 修改硬件光标 | `service/hardware_cursor_pointer_manager/` | `hardware_cursor_pointer_manager.h/cpp` |
 | 修改显示状态 | `service/display_state_manager/` | `display_event_monitor.h/cpp` |
 | 触摸/鼠标/键盘事件归一化 | `service/*_event_normalize/` | 对应归一化处理器 |
+| 修改事件统计打点（间隔/耗时/触控板手势） | `service/input_event_statistics/` | `input_event_statistics.h/cpp`，事件声明在 `service/hisysevent.yaml`，上报在 `service/dfx/src/dfx_hisysevent.cpp` |
 | 修改 Native API | `interfaces/native/innerkits/` | 对应模块的 `.h` 头文件 |
 | 修改 NAPI 绑定 | `frameworks/napi/` | 各事件类型目录下的绑定文件 |
 | 修改 ETS 接口 | `frameworks/ets/` | 对应模块的 `.taihe` IDL 文件 |

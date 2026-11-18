@@ -129,7 +129,9 @@ public:
         uint32_t below33ms, uint32_t below50ms, uint32_t above50ms);
     static int32_t ReportOriginalEventDispatchLatencyStat(uint32_t below2ms, uint32_t below4ms,
         uint32_t below8ms, uint32_t below16ms, uint32_t above16ms);
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     static int32_t ReportInputGestureStat(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount);
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
     static void ReportKnuckleClickEvent();
     static void ReportScreenCaptureGesture();
     static void ReportSingleKnuckleDoubleClickEvent(int32_t intervalTime, int32_t distanceInterval);
