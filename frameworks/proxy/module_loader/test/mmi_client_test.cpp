@@ -14,6 +14,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include "mmi_client.h"
 #include "mmi_log.h"
@@ -321,11 +322,17 @@ HWTEST_F(MMIClientTest, MMIClientTest_StartEventRunner_001, TestSize.Level1)
 {
     CALL_TEST_DEBUG;
     std::shared_ptr<MMIClient> client = std::make_shared<MMIClient>();
+    // fd 1 depends on the stdout type: epoll rejects regular files, so the test fails
+    // whenever output is redirected to a log file. Use a pipe fd instead.
+    int32_t pipeFds[2];
+    ASSERT_EQ(pipe(pipeFds), 0);
     client->isConnected_ = true;
-    client->fd_ = 1;
+    client->fd_ = pipeFds[0];
     client->eventHandler_ = nullptr;
     bool result = client->StartEventRunner();
     EXPECT_TRUE(result);
+    client->Stop();
+    close(pipeFds[1]);
 }
 
 /**

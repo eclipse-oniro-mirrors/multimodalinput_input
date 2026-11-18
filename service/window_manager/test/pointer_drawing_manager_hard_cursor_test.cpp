@@ -148,6 +148,13 @@ HWTEST_F(PointerDrawingManagerHardCursorTest, PointerDrawingManagerHardCursorTes
     pointerDrawingManager.screenPointers_.insert({0, mainSp});
     pointerDrawingManager.screenPointers_.insert({1, mirrorSp});
     pointerDrawingManager.screenPointers_.insert({2, extendSp});
+    // ScreenPointer::Move requires a published frame (currentBuffer_); publish the one-shot
+    // transparent buffer the same way the production draw path does.
+    RenderConfig publishCfg;
+    publishCfg.style_ = MOUSE_ICON::TRANSPARENT_ICON;
+    ASSERT_EQ(pointerDrawingManager.DrawHardCursor(mainSp, publishCfg), RET_OK);
+    ASSERT_EQ(pointerDrawingManager.DrawHardCursor(mirrorSp, publishCfg), RET_OK);
+    ASSERT_EQ(pointerDrawingManager.DrawHardCursor(extendSp, publishCfg), RET_OK);
     pointerDrawingManager.displayId_ = 0;
     std::unordered_set<uint64_t> failedScreens;
     int32_t ret = pointerDrawingManager.HardwareCursorMoveInner(0, 10, 20, failedScreens);
@@ -303,6 +310,11 @@ HWTEST_F(PointerDrawingManagerHardCursorTest, PointerDrawingManagerHardCursorTes
     auto sp = CreateScreenPointer(pointerDrawingManager.pointerRenderer_,
         pointerDrawingManager.hardwareCursorPointerManager_, pointerDrawingManager.handler_, ScreenInfo);
     ASSERT_NE(sp, nullptr);
+    // CheckHwcReady polls ScreenPointer::Move, which requires a published frame (currentBuffer_);
+    // publish the one-shot transparent buffer the same way the production draw path does.
+    RenderConfig publishCfg;
+    publishCfg.style_ = MOUSE_ICON::TRANSPARENT_ICON;
+    ASSERT_EQ(pointerDrawingManager.DrawHardCursor(sp, publishCfg), RET_OK);
     pointerDrawingManager.screenPointers_.insert({0, sp});
     pointerDrawingManager.lastPhysicalX_ = 10;
     pointerDrawingManager.lastPhysicalY_ = 20;
