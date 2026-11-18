@@ -225,7 +225,7 @@ typedef int32_t (*GET_LIBINPUT_EVENT_FOR_VKEYBOARD_TYPE)(
     libinput_event_touch *touch, int32_t& delayMs, std::vector<libinput_event*>& events);
 GET_LIBINPUT_EVENT_FOR_VKEYBOARD_TYPE getLibinputEventForVKeyboard_ = nullptr;
 typedef int32_t (*GET_LIBINPUT_EVENT_FOR_VTRACKPAD_TYPE)(
-    libinput_event_touch *touch, std::vector<libinput_event*>& events);
+    libinput_event *event, std::vector<libinput_event*>& events);
 GET_LIBINPUT_EVENT_FOR_VTRACKPAD_TYPE getLibinputEventForVTrackpad_ = nullptr;
 typedef void (*RESET_VTRACKPAD_STATE)();
 RESET_VTRACKPAD_STATE resetVTrackpadState_ = nullptr;
@@ -233,6 +233,13 @@ typedef void (*STOP_VTRACKPAD_TIMER)();
 STOP_VTRACKPAD_TIMER stopVTrackpadTimer_ = nullptr;
 typedef bool (*VKEYBOARD_ISINSIDEFULLKBD_TYPE)(double x, double y);
 VKEYBOARD_ISINSIDEFULLKBD_TYPE vkeyboard_isInsideFullKbd_ = nullptr;
+typedef int32_t (*HANDLE_PENPOINT_TYPE)(
+    double screenX, double screenY, int32_t pointerId, int32_t eventType, double pressure,
+    double tiltX, double tiltY, int32_t toolType);
+HANDLE_PENPOINT_TYPE handlePenPoint_ = nullptr;
+typedef int32_t (*GET_LIBINPUT_EVENT_FOR_VPEN_TYPE)(
+    libinput_event_tablet_tool *tabletEvent, int32_t& delayMs, std::vector<libinput_event*>& events);
+GET_LIBINPUT_EVENT_FOR_VPEN_TYPE getLibinputEventForVPen_ = nullptr;
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
 constexpr int32_t MMI_PRIORITY { 2 };
 } // namespace
@@ -485,7 +492,6 @@ int32_t MMIService::Init()
     SetRecvFun([this] (SessionPtr sess, NetPacket& pkt) {sMsgHandler_.OnMsgHandler(sess, pkt);});
     KeyMapMgr->GetConfigKeyValue("default_keymap", KeyMapMgr->GetDefaultKeyId());
     OHOS::system::SetParameter(INPUT_POINTER_DEVICES, "false");
-    INPUT_DEV_MGR->PublishEduInputDisabledState();
     AccountManager::GetInstance();
     if (!InitService()) {
         MMI_HILOGE("Saservice init failed");
@@ -4903,6 +4909,10 @@ void MMIService::InitVKeyboardFuncHandler()
                 g_VKeyboardHandle, "StopVTrackpadTimer");
             vkeyboard_isInsideFullKbd_ = (VKEYBOARD_ISINSIDEFULLKBD_TYPE)dlsym(
                 g_VKeyboardHandle, "IsInsideFullKeyboard");
+            handlePenPoint_ = (HANDLE_PENPOINT_TYPE)dlsym(
+                g_VKeyboardHandle, "HandlePenPoint");
+            getLibinputEventForVPen_ = (GET_LIBINPUT_EVENT_FOR_VPEN_TYPE)dlsym(
+                g_VKeyboardHandle, "GetLibinputEventForVPen");
             libinputAdapter_.InitVKeyboard(handleTouchPoint_,
                 vkeyboard_hardwareKeyEventDetected_,
                 vkeyboard_getKeyboardActivationState_,
@@ -4912,7 +4922,9 @@ void MMIService::InitVKeyboardFuncHandler()
                 getLibinputEventForVTrackpad_,
                 resetVTrackpadState_,
                 stopVTrackpadTimer_,
-                vkeyboard_isInsideFullKbd_);
+                vkeyboard_isInsideFullKbd_,
+                handlePenPoint_,
+                getLibinputEventForVPen_);
         }
     }
 }
@@ -5034,6 +5046,27 @@ ErrCode MMIService::SetCurrentUser(int32_t userId)
     }
 #endif // OHOS_BUILD_KNUCKLE
     return RET_OK;
+}
+
+ErrCode MMIService::SetTouchpadRawEventSwitch(bool enable)
+{
+    CALL_DEBUG_ENTER;
+    int32_t pid = GetCallingPid();
+    return delegateTasks_.PostSyncTask(
+        [this, pid, enable] {
+            return OnSetTouchpadRawEventSwitch(pid, enable);
+        }
+        );
+}
+
+int32_t MMIService::OnSetTouchpadRawEventSwitch(int32_t pid, bool enable)
+{
+    auto eventNormalizeHandler = InputHandler->GetEventNormalizeHandler();
+    if (eventNormalizeHandler == nullptr) {
+        MMI_HILOGE("eventNormalizeHandler is nullptr");
+        return RET_ERR;
+    }
+    return eventNormalizeHandler->SetTouchpadRawEventEnabled(pid, enable);
 }
 
 ErrCode MMIService::SetTouchpadThreeFingersTapSwitch(bool switchFlag)
@@ -5394,6 +5427,12 @@ void MMIService::OnSessionDelete(SessionPtr session)
         clientInfos_.erase(it);
         MMI_HILOGD("Clear the client info, programName:%{public}s", programName.c_str());
     }
+    auto eventNormalizeHandler = InputHandler->GetEventNormalizeHandler();
+    if (eventNormalizeHandler == nullptr) {
+        MMI_HILOGE("eventNormalizeHandler is nullptr");
+        return;
+    }
+    eventNormalizeHandler->RemoveTouchpadRawEventEnabled(session->GetPid());
 }
 
 ErrCode MMIService::SetClientInfo(int32_t pid, uint64_t readThreadId)
@@ -6358,11 +6397,9 @@ ErrCode MMIService::AddInputEventHook(HookEventType hookEventType)
     MMI_HILOGE("AddInputEventHook is disabled - feature not enabled");
     return ERROR_UNSUPPORT;
 #else
-    if (hookEventType & HOOK_EVENT_TYPE_KEY) {
-        if (!PER_HELPER->CheckKeyEventHook()) {
-            MMI_HILOGE("CheckKeyEventHook failed");
-            return ERROR_NO_PERMISSION;
-        }
+    if (!PER_HELPER->CheckInputEventHook()) {
+        MMI_HILOGE("CheckInputEventHook failed");
+        return ERROR_NO_PERMISSION;
     }
     int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), hookEventType] () -> int32_t {
         auto hookMgr = InputHandler->GetInputEventHook();
@@ -6407,60 +6444,29 @@ ErrCode MMIService::RemoveInputEventHook(HookEventType hookEventType)
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
-ErrCode MMIService::DispatchToNextHandler(const KeyEvent &keyEvent)
+ErrCode MMIService::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed)
 {
 #ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-    MMI_HILOGE("DispatchToNextHandler(KeyEvent) is disabled - feature not enabled");
+    MMI_HILOGE("NotifyHookEventResult is disabled - feature not enabled");
     return ERROR_UNSUPPORT;
 #else
-    auto keyEventPtr = std::make_shared<KeyEvent>(keyEvent);
-    CHKPR(keyEventPtr, ERROR_NULL_POINTER);
-    int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), keyEventPtr] () -> int32_t {
+    // Receipt is processed asynchronously: the synchronous mode would block the client dispatch
+    // thread waiting for a server DT-thread round trip; under high-frequency event streams receipts
+    // contend with event dispatching on DT and inevitably arrive late, tripping the 1.5S timeout
+    // disable. Receipts carry no return-value requirement, so async posting suffices
+    int32_t ret = delegateTasks_.PostAsyncTask(
+        [pid = GetCallingPid(), eventId, hookEventType, isConsumed] () -> int32_t {
         auto hookMgr = InputHandler->GetInputEventHook();
         CHKPR(hookMgr, RET_ERR);
-        if (int32_t result = hookMgr->DispatchToNextHandler(pid, keyEventPtr); result != RET_OK) {
-            MMI_HILOGE("DispatchToNextHandler failed, ret:%{public}d", result);
+        if (int32_t result = hookMgr->NotifyHookEventResult(pid, eventId, hookEventType, isConsumed);
+            result != RET_OK) {
+            MMI_HILOGE("NotifyHookEventResult failed, ret:%{public}d", result);
             return result;
         }
         return RET_OK;
     });
     if (ret != RET_OK) {
-        MMI_HILOGE("PostSyncTask DispatchToNextHandler failed, ret:%{public}d", ret);
-        return ret;
-    }
-    return RET_OK;
-#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-}
-
-ErrCode MMIService::DispatchToNextHandler(const PointerEvent &pointerEvent)
-{
-#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
-    MMI_HILOGE("DispatchToNextHandler(PointerEvent) is disabled - feature not enabled");
-    return ERROR_UNSUPPORT;
-#else
-    auto pointerEventPtr = std::make_shared<PointerEvent>(pointerEvent);
-    CHKPR(pointerEventPtr, ERROR_NULL_POINTER);
-    int32_t ret = delegateTasks_.PostSyncTask([pid = GetCallingPid(), pointerEventPtr] () -> int32_t {
-        auto sourceType = pointerEventPtr->GetSourceType();
-        auto hookMgr = InputHandler->GetInputEventHook();
-        CHKPR(hookMgr, RET_ERR);
-        if (sourceType == PointerEvent::SOURCE_TYPE_TOUCHSCREEN) {
-            if (int32_t result = hookMgr->DispatchTouchToNextHandler(pid, pointerEventPtr); result != RET_OK) {
-                MMI_HILOGE("DispatchTouchToNextHandler failed, ret:%{public}d", result);
-                return result;
-            }
-        } else if (sourceType == PointerEvent::SOURCE_TYPE_MOUSE) {
-            if (int32_t result = hookMgr->DispatchMouseToNextHandler(pid, pointerEventPtr); result != RET_OK) {
-                MMI_HILOGE("DispatchMouseToNextHandler failed, ret:%{public}d", result);
-                return result;
-            }
-        } else {
-            return RET_ERR;
-        }
-        return RET_OK;
-    });
-    if (ret != RET_OK) {
-        MMI_HILOGE("PostSyncTask DispatchToNextHandler failed, ret:%{public}d", ret);
+        MMI_HILOGE("PostAsyncTask NotifyHookEventResult failed, ret:%{public}d", ret);
         return ret;
     }
     return RET_OK;

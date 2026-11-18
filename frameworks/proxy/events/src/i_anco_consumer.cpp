@@ -213,5 +213,86 @@ AncoTripleFingerSnapshotState *AncoTripleFingerSnapshotState::Unmarshalling(Parc
     }
     return data;
 }
+
+bool CustomMessage::Marshalling(Parcel &parcel) const
+{
+    if (payload.size() > MAX_CUSTOM_MESSAGE_PAYLOAD_SIZE) {
+        MMI_HILOGE("CustomMessage marshal failed, msgType:%{public}u, payloadSize:%{public}zu"
+            " exceeds limit:%{public}u", msgType, payload.size(), MAX_CUSTOM_MESSAGE_PAYLOAD_SIZE);
+        return false;
+    }
+    if (!parcel.WriteUint32(msgType)) {
+        MMI_HILOGE("Failed to write CustomMessage msgType:%{public}u", msgType);
+        return false;
+    }
+    if (!parcel.WriteUint32(static_cast<uint32_t>(payload.size()))) {
+        MMI_HILOGE("Failed to write CustomMessage payloadSize:%{public}u, msgType:%{public}u",
+            static_cast<uint32_t>(payload.size()), msgType);
+        return false;
+    }
+    if (payload.empty()) {
+        MMI_HILOGD("CustomMessage payload is empty, msgType:%{public}u", msgType);
+        return true;
+    }
+    if (!parcel.WriteBuffer(payload.data(), payload.size())) {
+        MMI_HILOGE("Failed to write CustomMessage payload, msgType:%{public}u, payloadSize:%{public}zu",
+            msgType, payload.size());
+        return false;
+    }
+    return true;
+}
+
+bool CustomMessage::ReadFromParcel(Parcel &parcel)
+{
+    if (!parcel.ReadUint32(msgType)) {
+        MMI_HILOGE("Failed to read CustomMessage msgType");
+        return false;
+    }
+    uint32_t payloadSize {};
+    if (!parcel.ReadUint32(payloadSize)) {
+        MMI_HILOGE("Failed to read CustomMessage payloadSize, msgType:%{public}u", msgType);
+        return false;
+    }
+    if (payloadSize == 0) {
+        MMI_HILOGD("CustomMessage payloadSize is zero, msgType:%{public}u", msgType);
+        payload.clear();
+        return true;
+    }
+    if (payloadSize > MAX_CUSTOM_MESSAGE_PAYLOAD_SIZE) {
+        MMI_HILOGE("CustomMessage payloadSize:%{public}u exceeds limit:%{public}u, msgType:%{public}u",
+            payloadSize, MAX_CUSTOM_MESSAGE_PAYLOAD_SIZE, msgType);
+        return false;
+    }
+    const uint8_t *buffer = parcel.ReadBuffer(payloadSize);
+    if (buffer == nullptr) {
+        MMI_HILOGE("Failed to read CustomMessage payload, msgType:%{public}u, payloadSize:%{public}u",
+            msgType, payloadSize);
+        return false;
+    }
+    payload.assign(buffer, buffer + payloadSize);
+    return true;
+}
+
+bool AncoDisableState::Marshalling(std::vector<uint8_t> &payload) const
+{
+    Parcel parcel;
+    if (!parcel.WriteBool(disable)) {
+        MMI_HILOGE("Failed to write AncoDisableState, disable:%{public}d", disable);
+        return false;
+    }
+    const uint8_t *data = reinterpret_cast<const uint8_t *>(parcel.GetData());
+    payload.assign(data, data + parcel.GetDataSize());
+    return true;
+}
+
+CustomMessage *CustomMessage::Unmarshalling(Parcel &parcel)
+{
+    CustomMessage *data = new (std::nothrow) CustomMessage();
+    if (data && !data->ReadFromParcel(parcel)) {
+        delete data;
+        data = nullptr;
+    }
+    return data;
+}
 } // namespace MMI
 } // namespace OHOS

@@ -84,6 +84,7 @@ public:
     void NotifyBundleName(int32_t pid, int32_t uid, const std::string &bundleName, int32_t syncStatus);
     int32_t SetWindowInputEventConsumer(std::shared_ptr<IInputEventConsumer> inputEventConsumer,
         std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
+    int32_t EnableTouchpadRawEvent(bool enable);
     void ClearWindowPointerStyle(int32_t pid, int32_t windowId);
     int32_t SetNapStatus(int32_t pid, int32_t uid, const std::string &bundleName, int32_t napStatus);
     int32_t SetTouchpadThreeFingersTapSwitch(bool switchFlag);
@@ -281,7 +282,7 @@ public:
     int32_t GetExternalObject(const std::string &pluginName, sptr<IRemoteObject> &pluginRemoteStub);
     int32_t AddInputEventHook(std::shared_ptr<IInputEventConsumer> consumer, HookEventType hookEventType);
     int32_t RemoveInputEventHook(HookEventType hookEventType);
-    int32_t DispatchToNextHandler(int32_t eventId, HookEventType hookEventType);
+    int32_t NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed);
     int32_t SetKeyStatusRecord(bool enable, int32_t timeout);
     int32_t GetCurrentCursorInfo(bool& visible, PointerStyle& pointerStyle);
     int32_t GetUserDefinedCursorPixelMap(void *pixelMapPtr);

@@ -48,6 +48,9 @@ enum class MmiMessageId : int32_t {
     ON_HOOK_KEY_EVENT,
     ON_HOOK_TOUCH_EVENT,
     ON_HOOK_MOUSE_EVENT,
+    ON_HOOK_AXIS_EVENT,
+    ON_HOOK_DISABLE,
+    ON_INPUT_HOOK_KEY_EVENT,
 };
 
 enum TokenType : int32_t {

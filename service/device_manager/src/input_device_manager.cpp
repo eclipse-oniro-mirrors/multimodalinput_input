@@ -1882,17 +1882,6 @@ int32_t InputDeviceManager::DisableInputDeviceForPlugin(int32_t deviceId)
     return RET_OK;
 }
 
-void InputDeviceManager::PublishEduInputDisabledState() const
-{
-    const char *value = eduInputDisabled_ ? "true" : "false";
-    // Publication failure must not prevent local input control or session recovery.
-    if (!OHOS::system::SetParameter(EDU_INPUT_DISABLED_PARAMETER, value)) {
-        MMI_HILOGE("Failed to set %{public}s=%{public}s", EDU_INPUT_DISABLED_PARAMETER, value);
-        return;
-    }
-    MMI_HILOGI("Set %{public}s=%{public}s", EDU_INPUT_DISABLED_PARAMETER, value);
-}
-
 int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid)
 {
     CALL_DEBUG_ENTER;
@@ -1913,7 +1902,7 @@ int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid
         InitSessionLostCallback();
         eduInputDisabled_ = true;
         eduInputDisabledPid_ = pid;
-        PublishEduInputDisabledState();
+        WIN_MGR->PublishEduInputDisabledState(eduInputDisabled_);
 
         for (auto& [deviceId, deviceInfo] : inputDevice_) {
             if (deviceInfo.enable) {
@@ -1927,7 +1916,7 @@ int32_t InputDeviceManager::DisableInputEventDispatch(bool disabled, int32_t pid
     MMI_HILOGI("Enable overall input by session[%{private}d]", pid);
     eduInputDisabled_ = false;
     eduInputDisabledPid_ = -1;
-    PublishEduInputDisabledState();
+    WIN_MGR->PublishEduInputDisabledState(eduInputDisabled_);
 
     for (auto& [deviceId, deviceInfo] : inputDevice_) {
         DEVICE_STATE_MGR->EnableDevice(deviceId,
@@ -1951,7 +1940,7 @@ void InputDeviceManager::RecoverInputEnabled(SessionPtr session)
     MMI_HILOGI("Recover input enabled for session[%{private}d]", session->GetPid());
     eduInputDisabled_ = false;
     eduInputDisabledPid_ = -1;
-    PublishEduInputDisabledState();
+    WIN_MGR->PublishEduInputDisabledState(eduInputDisabled_);
 
     for (auto& [deviceId, deviceInfo] : inputDevice_) {
         DEVICE_STATE_MGR->EnableDevice(deviceId,

@@ -200,6 +200,8 @@ public:
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
     ErrCode SetPixelMapData(int32_t infoId, const CursorPixelMap& curPixelMap) override;
     ErrCode SetCurrentUser(int32_t userId) override;
+    ErrCode SetTouchpadRawEventSwitch(bool enable) override;
+    int32_t OnSetTouchpadRawEventSwitch(int32_t pid, bool enable);
     ErrCode SetTouchpadThreeFingersTapSwitch(bool switchFlag) override;
     ErrCode GetTouchpadThreeFingersTapSwitch(bool &switchFlag) override;
     ErrCode AddVirtualInputDevice(const InputDevice& device, int32_t& deviceId) override;
@@ -253,8 +255,7 @@ public:
     ErrCode QueryPointerRecord(int32_t count, std::vector<std::shared_ptr<PointerEvent>> &pointerList) override;
     ErrCode AddInputEventHook(HookEventType hookEventType) override;
     ErrCode RemoveInputEventHook(HookEventType hookEventType) override;
-    ErrCode DispatchToNextHandler(const KeyEvent &keyEvent) override;
-    ErrCode DispatchToNextHandler(const PointerEvent &pointerEvent) override;
+    ErrCode NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed) override;
     ErrCode SetKeyStatusRecord(bool enable, int32_t timeout) override;
     ErrCode GetCurrentCursorInfo(bool& visible, PointerStyle& pointerStyle) override;
     ErrCode GetUserDefinedCursorPixelMap(std::shared_ptr<PixelMap>& pixelMap) override;

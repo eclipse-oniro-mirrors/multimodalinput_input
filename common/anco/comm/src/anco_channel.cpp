@@ -82,5 +82,13 @@ ErrCode AncoChannel::UpdateTripleFingerSnapshotState(
     }
     return consumer_->UpdateTripleFingerSnapshotState(snapshotState);
 }
+
+ErrCode AncoChannel::SendCustomMessage(const CustomMessage &message)
+{
+    if (consumer_ == nullptr) {
+        return RET_ERR;
+    }
+    return consumer_->SendCustomMessage(message);
+}
 } // namespace MMI
 } // namespace OHOS

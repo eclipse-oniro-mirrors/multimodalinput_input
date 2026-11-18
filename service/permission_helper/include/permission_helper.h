@@ -51,6 +51,7 @@ public:
     bool CheckAuthorize();
     bool CheckControlDevicePermission();
     bool CheckKeyEventHook();
+    bool CheckInputEventHook();
     bool CheckInputDeviceController();
     bool CheckFunctionKeyEnabled();
     bool CheckManageEdmPolicy();

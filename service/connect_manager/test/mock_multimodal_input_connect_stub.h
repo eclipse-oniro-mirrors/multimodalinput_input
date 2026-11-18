@@ -175,6 +175,7 @@ public:
     MOCK_METHOD(int32_t, CreateVKeyboardDevice, (sptr<IRemoteObject> & vkeyboardDevice), (override));
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
     MOCK_METHOD(int32_t, SetCurrentUser, (int32_t userId), (override));
+    MOCK_METHOD(int32_t, SetTouchpadRawEventSwitch, (bool enable), (override));
     MOCK_METHOD(int32_t, SetTouchpadThreeFingersTapSwitch, (bool switchFlag), (override));
     MOCK_METHOD(int32_t, GetTouchpadThreeFingersTapSwitch, (bool &switchFlag), (override));
     MOCK_METHOD(int32_t, AddVirtualInputDevice, (std::shared_ptr<InputDevice> device, int32_t &deviceId), (override));

@@ -97,12 +97,16 @@ void ClientMsgHandler::Init()
             return this->ReportDeviceConsumer(client, pkt); }},
         { MmiMessageId::ON_SUBSCRIBE_INPUT_ACTIVE, [this] (const UDSClient &client, NetPacket &pkt) {
             return this->OnSubscribeInputActiveCallback(client, pkt); }},
-        { MmiMessageId::ON_HOOK_KEY_EVENT, [this] (const UDSClient &client, NetPacket &pkt) {
+        { MmiMessageId::ON_INPUT_HOOK_KEY_EVENT, [this] (const UDSClient &client, NetPacket &pkt) {
             return this->OnHookKey(client, pkt); }},
         { MmiMessageId::ON_HOOK_TOUCH_EVENT, [this] (const UDSClient &client, NetPacket &pkt) {
             return this->OnHookTouch(client, pkt); }},
         { MmiMessageId::ON_HOOK_MOUSE_EVENT, [this] (const UDSClient &client, NetPacket &pkt) {
             return this->OnHookMouse(client, pkt); }},
+        { MmiMessageId::ON_HOOK_AXIS_EVENT, [this] (const UDSClient &client, NetPacket &pkt) {
+            return this->OnHookAxis(client, pkt); }},
+        { MmiMessageId::ON_HOOK_DISABLE, [this] (const UDSClient &client, NetPacket &pkt) {
+            return this->OnHookDisable(client, pkt); }},
     };
     for (auto &it : funs) {
         if (!RegistrationEvent(it)) {
@@ -277,6 +281,15 @@ int32_t ClientMsgHandler::OnPointerEvent(const UDSClient& client, NetPacket& pkt
             item.GetDisplayXPos(), item.GetDisplayYPos(),
             item.GetWindowXPos(), item.GetWindowYPos(),
             item.GetGlobalX(), item.GetGlobalY(), item.GetToolType());
+    }
+    if (pointerEvent->HasTouchpadRawExt()) {
+        const auto &rawExt = pointerEvent->GetTouchpadRawExt();
+        MMI_HILOGD("Report touchpad raw ext,seatSlot:%{public}d,deviceWidth:%{private}f,deviceHeight:%{private}f",
+            rawExt.GetSeatSlot(), rawExt.GetDeviceWidth(), rawExt.GetDeviceHeight());
+        for (const auto &rawPoint : rawExt.GetRawPoints()) {
+            MMI_HILOGD("Report touchpad raw point,seatSlot:%{public}d,x:%{private}f,y:%{private}f",
+                rawPoint.GetSeatSlot(), rawPoint.GetX(), rawPoint.GetY());
+        }
     }
     InputMgrImpl.OnPointerEvent(pointerEvent);
     if (pointerEvent->GetSourceType() == PointerEvent::SOURCE_TYPE_JOYSTICK) {
@@ -658,6 +671,34 @@ int32_t ClientMsgHandler::OnHookMouse(const UDSClient &client, NetPacket &pkt)
     }
 #ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
     INPUT_EVENT_HOOK_HANDLER.OnPointerEvent(pointerEvent);
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    return RET_OK;
+}
+
+int32_t ClientMsgHandler::OnHookAxis(const UDSClient &client, NetPacket &pkt)
+{
+    auto pointerEvent = PointerEvent::Create();
+    CHKPR(pointerEvent, ERROR_NULL_POINTER);
+    if (InputEventDataTransformation::Unmarshalling(pkt, pointerEvent) != RET_OK) {
+        MMI_HILOGE("Read net packet failed");
+        return PACKET_READ_FAIL;
+    }
+#ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    INPUT_EVENT_HOOK_HANDLER.OnAxisEvent(pointerEvent);
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    return RET_OK;
+}
+
+int32_t ClientMsgHandler::OnHookDisable(const UDSClient &client, NetPacket &pkt)
+{
+    uint32_t hookEventType { 0 };
+    pkt >> hookEventType;
+    if (pkt.ChkRWError()) {
+        MMI_HILOGE("Read net packet failed");
+        return PACKET_READ_FAIL;
+    }
+#ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    INPUT_EVENT_HOOK_HANDLER.OnHookDisabledByServer(static_cast<HookEventType>(hookEventType));
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
     return RET_OK;
 }

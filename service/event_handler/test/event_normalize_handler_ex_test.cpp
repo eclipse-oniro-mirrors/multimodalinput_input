@@ -488,5 +488,143 @@ HWTEST_F(EventNormalizeHandlerEXTest, EventNormalizeHandlerEXTest_TouchPadKnuckl
     g_touchpad_pressure = 0.0;
 }
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
+
+/**
+ * @tc.name: SetTouchpadRawEventEnabled_001
+ * @tc.desc: Test the state machine of the touchpad raw event switch
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(EventNormalizeHandlerEXTest, SetTouchpadRawEventEnabled_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EventNormalizeHandler handler;
+    const int32_t pid = 1234;
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, true), RET_OK);
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, true), MMI_RAW_ERR_REPEAT_OPERATION);
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, false), RET_OK);
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, false), MMI_RAW_ERR_REPEAT_OPERATION);
+}
+
+/**
+ * @tc.name: RemoveTouchpadRawEventEnabled_001
+ * @tc.desc: Test RemoveTouchpadRawEventEnabled clears the switch state
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(EventNormalizeHandlerEXTest, RemoveTouchpadRawEventEnabled_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EventNormalizeHandler handler;
+    const int32_t pid = 5678;
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, true), RET_OK);
+    handler.RemoveTouchpadRawEventEnabled(pid);
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, true), RET_OK);
+    handler.RemoveTouchpadRawEventEnabled(9999);
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(pid, false), RET_OK);
+}
+
+/**
+ * @tc.name: DumpTouchpadRawEventSwitch_001
+ * @tc.desc: Test DumpTouchpadRawEventSwitch does not crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(EventNormalizeHandlerEXTest, DumpTouchpadRawEventSwitch_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EventNormalizeHandler handler;
+    EXPECT_NO_FATAL_FAILURE(handler.DumpTouchpadRawEventSwitch(1));
+    EXPECT_EQ(handler.SetTouchpadRawEventEnabled(4321, true), RET_OK);
+    EXPECT_NO_FATAL_FAILURE(handler.DumpTouchpadRawEventSwitch(1));
+}
+
+/**
+ * @tc.name: SendFreetouchRawTouchpadCancel_001
+ * @tc.desc: Test SendFreetouchRawTouchpadCancel with null and valid events
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(EventNormalizeHandlerEXTest, SendFreetouchRawTouchpadCancel_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EventNormalizeHandler handler;
+    EXPECT_NO_FATAL_FAILURE(handler.SendFreetouchRawTouchpadCancel(nullptr, 1));
+    libinput_event event;
+    event.type = LIBINPUT_EVENT_TOUCHPAD_MOTION;
+    struct libinput_device libDev {
+        .udevDev { 3 },
+        .busType = 3,
+        .version = 1,
+        .product = 1,
+        .vendor = 1,
+        .name = "test",
+    };
+    event.device = &libDev;
+    libinput_event_touch touchpadEvent {};
+    g_touchpad_event = &touchpadEvent;
+    EXPECT_NO_FATAL_FAILURE(handler.SendFreetouchRawTouchpadCancel(&event, 1));
+    g_touchpad_event = nullptr;
+    g_touchpad_pressure = 0.0;
+}
+
+/**
+ * @tc.name: TouchPadKnuckleDoubleClickHandle_Cancel_001
+ * @tc.desc: Test the knuckle double click branches trigger the raw cancel without crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(EventNormalizeHandlerEXTest, TouchPadKnuckleDoubleClickHandle_Cancel_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EventNormalizeHandler handler;
+    libinput_event event;
+    event.type = LIBINPUT_EVENT_TOUCHPAD_MOTION;
+    struct libinput_device libDev {
+        .udevDev { 3 },
+        .busType = 3,
+        .version = 1,
+        .product = 1,
+        .vendor = 1,
+        .name = "test",
+    };
+    event.device = &libDev;
+    handler.nextHandler_ = std::make_shared<EventTestHandler>();
+    libinput_event_touch touchpadEvent {};
+    g_touchpad_event = &touchpadEvent;
+    g_touchpad_pressure = SINGLE_KNUCKLE_ABS_PRESSURE_VALUE;
+    EXPECT_NO_FATAL_FAILURE(handler.TouchPadKnuckleDoubleClickHandle(&event));
+    EXPECT_TRUE(handler.TouchPadKnuckleDoubleClickHandle(&event));
+    g_touchpad_pressure = DOUBLE_KNUCKLE_ABS_PRESSURE_VALUE;
+    EXPECT_TRUE(handler.TouchPadKnuckleDoubleClickHandle(&event));
+    g_touchpad_event = nullptr;
+    g_touchpad_pressure = 0.0;
+}
+
+/**
+ * @tc.name: SendRawTouchpadCancel_001
+ * @tc.desc: Test SendRawTouchpadCancel with a non-gesture event
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(EventNormalizeHandlerEXTest, SendRawTouchpadCancel_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EventNormalizeHandler handler;
+    EXPECT_NO_FATAL_FAILURE(handler.SendRawTouchpadCancel(nullptr));
+    libinput_event event;
+    event.type = LIBINPUT_EVENT_TOUCHPAD_MOTION;
+    struct libinput_device libDev {
+        .udevDev { 3 },
+        .busType = 3,
+        .version = 1,
+        .product = 1,
+        .vendor = 1,
+        .name = "test",
+    };
+    event.device = &libDev;
+    // Touchpad event carries no gesture data, the multi-finger cancel path is skipped
+    EXPECT_NO_FATAL_FAILURE(handler.SendRawTouchpadCancel(&event));
+}
 } // namespace MMI
 } // namespace OHOS

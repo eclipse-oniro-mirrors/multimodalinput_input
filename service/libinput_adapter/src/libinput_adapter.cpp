@@ -67,6 +67,7 @@ enum class VKeyboardTouchEventType : int32_t {
 constexpr int32_t WAIT_TIME_MS_STAP { 180 };  // milliseconds touch up delay for Single TAP
 constexpr int32_t WAIT_TIME_MS_DTAP { 60 };  // milliseconds touch up delay for Double TAP
 constexpr int32_t EXPIRED_TIMER_ID { -1 };
+constexpr int32_t DEFAULT_PEN_POINTER_ID { 100 };
 #else // OHOS_BUILD_ENABLE_VKEYBOARD
 constexpr uint32_t KEY_CAPSLOCK { 58 };
 #endif // OHOS_BUILD_ENABLE_VKEYBOARD
@@ -299,7 +300,9 @@ void LibinputAdapter::InitVKeyboard(HandleTouchPoint handleTouchPoint,
     GetLibinputEventForVTrackpad getLibinputEventForVTrackpad,
     ResetVTrackpadState resetVTrackpadState,
     StopVTrackpadTimer stopVTrackpadTimer,
-    IsInsideFullKbd isInsideFullKbd)
+    IsInsideFullKbd isInsideFullKbd,
+    HandlePenPoint handlePenPoint,
+    GetLibinputEventForVPen getLibinputEventForVPen)
 {
     handleTouchPoint_ = handleTouchPoint;
     hardwareKeyEventDetected_ = hardwareKeyEventDetected;
@@ -311,6 +314,8 @@ void LibinputAdapter::InitVKeyboard(HandleTouchPoint handleTouchPoint,
     resetVTrackpadState_ = resetVTrackpadState;
     stopVTrackpadTimer_ = stopVTrackpadTimer;
     isInsideFullKbd_ = isInsideFullKbd;
+    handlePenPoint_ = handlePenPoint;
+    getLibinputEventForVPen_ = getLibinputEventForVPen;
     // init touch device Id.
     deviceId_ = -1;
 }
@@ -333,11 +338,11 @@ void LibinputAdapter::DelayInjectKeyEventCallback()
     vkbTimerId_ = EXPIRED_TIMER_ID;
 }
 
-libinput_event_touch* LibinputAdapter::SafeGetVTrackPadTouchEvent()
+libinput_event* LibinputAdapter::SafeGetVTrackPadTouchEvent()
 {
     std::lock_guard<std::mutex> guard(vtrDelayedMutex_);
     CHKPP(vtpDelayedEvent_);
-    return libinput_event_get_touch_event(vtpDelayedEvent_);
+    return vtpDelayedEvent_;
 }
 
 void LibinputAdapter::SafeDestroyVKeyboardDelayedEvent()
@@ -410,12 +415,12 @@ void LibinputAdapter::HandleVFullKeyboardMessages(
     // handle trackpad messages.
     while (true) {
         std::vector<libinput_event*> events;
-        VTrackpadEventType eventType = (VTrackpadEventType)getLibinputEventForVTrackpad_(touch, events);
+        VTrackpadEventType eventType = (VTrackpadEventType)getLibinputEventForVTrackpad_(event, events);
         if (eventType == VTrackpadEventType::NoTrackpadEvent) {
             break;
         }
 
-        HandleVTrackpadMessage(eventType, events, frameTime, touch, event, delayvtpDestroy);
+        HandleVTrackpadMessage(eventType, events, frameTime, event, delayvtpDestroy);
     }
 
     // handle keyboard messages.
@@ -504,8 +509,7 @@ void LibinputAdapter::HandleVKeyboardMessage(VKeyboardEventType eventType,
 }
 
 void LibinputAdapter::HandleVTrackpadMessage(VTrackpadEventType eventType, std::vector<libinput_event*> &events,
-                                             int64_t frameTime, libinput_event_touch *touch,
-                                             libinput_event *event, bool& delayvtpDestroy)
+                                             int64_t frameTime, libinput_event *event, bool& delayvtpDestroy)
 {
     if (eventType == VTrackpadEventType::NoTrackpadEvent) {
         return;
@@ -518,16 +522,16 @@ void LibinputAdapter::HandleVTrackpadMessage(VTrackpadEventType eventType, std::
         vtpEvent = nullptr;
 
         if (injectEventType == libinput_event_type::LIBINPUT_EVENT_GESTURE_PINCH_BEGIN) {
-            InjectEventForTwoFingerOnTouchpad(touch, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_DOWN,
+            InjectEventForTwoFingerOnTouchpad(event, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_DOWN,
                                               frameTime);
         } else if (injectEventType == libinput_event_type::LIBINPUT_EVENT_GESTURE_PINCH_UPDATE) {
-            InjectEventForTwoFingerOnTouchpad(touch, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_MOTION,
+            InjectEventForTwoFingerOnTouchpad(event, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_MOTION,
                                               frameTime);
         } else if (injectEventType == libinput_event_type::LIBINPUT_EVENT_GESTURE_PINCH_END) {
             if (IsCursorInCastWindow()) {
-                InjectEventForCastWindow(touch);
+                InjectEventForCastWindow(event);
             } else {
-                InjectEventForTwoFingerOnTouchpad(touch, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_UP,
+                InjectEventForTwoFingerOnTouchpad(event, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_UP,
                                                   frameTime);
             }
         }
@@ -554,8 +558,8 @@ void LibinputAdapter::HandleVTrackpadMessage(VTrackpadEventType eventType, std::
 
 void LibinputAdapter::DelayInjectPressReleaseCallback()
 {
-    libinput_event_touch *touch = SafeGetVTrackPadTouchEvent();
-    if (touch == nullptr || funInputEvent_ == nullptr) {
+    libinput_event *event = SafeGetVTrackPadTouchEvent();
+    if (event == nullptr || funInputEvent_ == nullptr) {
         SafeDestroyVTrackPadDelayedEvent();
         return;
     }
@@ -566,7 +570,7 @@ void LibinputAdapter::DelayInjectPressReleaseCallback()
     pDownEvent.button = VKEY_TP_LB_ID;
     pDownEvent.seat_button_count = VKEY_TP_SEAT_BTN_COUNT_NONE;
     pDownEvent.state = libinput_button_state::LIBINPUT_BUTTON_STATE_PRESSED;
-    libinput_event_pointer *lpDownEvent = libinput_create_pointer_event(touch, pDownEvent);
+    libinput_event_pointer *lpDownEvent = libinput_create_pointer_event(event, pDownEvent);
     if (lpDownEvent != nullptr) {
         funInputEvent_((libinput_event *)lpDownEvent, frameTime);
         free(lpDownEvent);
@@ -578,7 +582,7 @@ void LibinputAdapter::DelayInjectPressReleaseCallback()
     pUpEvent.button = VKEY_TP_LB_ID;
     pUpEvent.seat_button_count = VKEY_TP_SEAT_BTN_COUNT_NONE;
     pUpEvent.state = libinput_button_state::LIBINPUT_BUTTON_STATE_RELEASED;
-    libinput_event_pointer *lpUpEvent = libinput_create_pointer_event(touch, pUpEvent);
+    libinput_event_pointer *lpUpEvent = libinput_create_pointer_event(event, pUpEvent);
     if (lpUpEvent != nullptr) {
         funInputEvent_((libinput_event *)lpUpEvent, frameTime);
         free(lpUpEvent);
@@ -591,8 +595,8 @@ void LibinputAdapter::DelayInjectPressReleaseCallback()
 
 void LibinputAdapter::DelayInjectReleaseCallback()
 {
-    libinput_event_touch *touch = SafeGetVTrackPadTouchEvent();
-    if (touch == nullptr || funInputEvent_ == nullptr) {
+    libinput_event *event = SafeGetVTrackPadTouchEvent();
+    if (event == nullptr || funInputEvent_ == nullptr) {
         SafeDestroyVTrackPadDelayedEvent();
         return;
     }
@@ -602,7 +606,7 @@ void LibinputAdapter::DelayInjectReleaseCallback()
     pEvent.button = VKEY_TP_LB_ID;
     pEvent.seat_button_count = VKEY_TP_SEAT_BTN_COUNT_NONE;
     pEvent.state = libinput_button_state::LIBINPUT_BUTTON_STATE_RELEASED;
-    libinput_event_pointer *lpEvent = libinput_create_pointer_event(touch, pEvent);
+    libinput_event_pointer *lpEvent = libinput_create_pointer_event(event, pEvent);
     if (lpEvent != nullptr) {
         funInputEvent_((libinput_event *)lpEvent, frameTime);
         free(lpEvent);
@@ -613,20 +617,20 @@ void LibinputAdapter::DelayInjectReleaseCallback()
     SafeDestroyVTrackPadDelayedEvent();
 }
 
-void LibinputAdapter::InjectEventForTwoFingerOnTouchpad(libinput_event_touch* touch,
+void LibinputAdapter::InjectEventForTwoFingerOnTouchpad(libinput_event* event,
     libinput_event_type eventType, int64_t frameTime)
 {
     event_touch tEvent;
     tEvent.event_type = eventType;
     tEvent.seat_slot = VKEY_PINCH_FIRST_FINGER_ID;
-    libinput_event_touch* ltEvent = libinput_create_touch_event(touch, tEvent);
+    libinput_event_touch* ltEvent = libinput_create_touch_event(event, tEvent);
     if (ltEvent != nullptr) {
         funInputEvent_((libinput_event*)ltEvent, frameTime);
         free(ltEvent);
         ltEvent = nullptr;
     }
     tEvent.seat_slot = VKEY_PINCH_SECOND_FINGER_ID;
-    ltEvent = libinput_create_touch_event(touch, tEvent);
+    ltEvent = libinput_create_touch_event(event, tEvent);
     if (ltEvent != nullptr) {
         funInputEvent_((libinput_event*)ltEvent, frameTime);
         free(ltEvent);
@@ -634,10 +638,10 @@ void LibinputAdapter::InjectEventForTwoFingerOnTouchpad(libinput_event_touch* to
     }
 }
 
-void LibinputAdapter::InjectEventForCastWindow(libinput_event_touch* touch)
+void LibinputAdapter::InjectEventForCastWindow(libinput_event* event)
 {
     int64_t frameTime = GetSysClockTime();
-    InjectEventForTwoFingerOnTouchpad(touch, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_UP, frameTime);
+    InjectEventForTwoFingerOnTouchpad(event, libinput_event_type::LIBINPUT_EVENT_TOUCHPAD_UP, frameTime);
 
     event_touch tEvent;
     tEvent.seat_slot = VKEY_PINCH_FIRST_FINGER_ID;
@@ -648,7 +652,7 @@ void LibinputAdapter::InjectEventForCastWindow(libinput_event_touch* touch)
     tEvent.y = mouseInfo.physicalY * VKEY_RAW_COORDINATE_RATIO;
     tEvent.seat_slot = 0;
     tEvent.slot = 0;
-    libinput_event_touch* ltEvent = libinput_create_touch_event(touch, tEvent);
+    libinput_event_touch* ltEvent = libinput_create_touch_event(event, tEvent);
     if (ltEvent != nullptr) {
         funInputEvent_((libinput_event*)ltEvent, frameTime);
         free(ltEvent);
@@ -656,7 +660,7 @@ void LibinputAdapter::InjectEventForCastWindow(libinput_event_touch* touch)
     }
 
     tEvent.event_type = libinput_event_type::LIBINPUT_EVENT_TOUCH_UP;
-    ltEvent = libinput_create_touch_event(touch, tEvent);
+    ltEvent = libinput_create_touch_event(event, tEvent);
     if (ltEvent != nullptr) {
         funInputEvent_((libinput_event*)ltEvent, frameTime);
         free(ltEvent);
@@ -667,7 +671,7 @@ void LibinputAdapter::InjectEventForCastWindow(libinput_event_touch* touch)
     pEvent.event_type = libinput_event_type::LIBINPUT_EVENT_POINTER_MOTION_TOUCHPAD;
     pEvent.delta_raw_x = VKEY_PINCH_CURSOR_FAKE_DX;
     pEvent.delta_raw_y = 0;
-    libinput_event_pointer* lpEvent = libinput_create_pointer_event(touch, pEvent);
+    libinput_event_pointer* lpEvent = libinput_create_pointer_event(event, pEvent);
     if (lpEvent != nullptr) {
         funInputEvent_((libinput_event*)lpEvent, frameTime);
         free(lpEvent);
@@ -986,6 +990,14 @@ void LibinputAdapter::OnEventHandler()
 }
 
 #ifdef OHOS_BUILD_ENABLE_VKEYBOARD
+bool LibinputAdapter::IsTabletToolEvent(libinput_event_type eventType)
+{
+    return eventType == LIBINPUT_EVENT_TABLET_TOOL_AXIS
+        || eventType == LIBINPUT_EVENT_TABLET_TOOL_PROXIMITY
+        || eventType == LIBINPUT_EVENT_TABLET_TOOL_TIP
+        || eventType == LIBINPUT_EVENT_TABLET_TOOL_BUTTON;
+}
+
 void LibinputAdapter::ProcessEventAsVKeyboardEvent(libinput_event *event, int64_t frameTime)
 {
     libinput_event_type eventType = libinput_event_get_type(event);
@@ -1000,6 +1012,8 @@ void LibinputAdapter::ProcessEventAsVKeyboardEvent(libinput_event *event, int64_
         || eventType == LIBINPUT_EVENT_TOUCH_CANCEL
         || eventType == LIBINPUT_EVENT_TOUCH_FRAME) && isBootCompleted_) {
         ProcessTouchEventAsVKeyboardEvent(event, eventType, frameTime);
+    } else if (IsTabletToolEvent(eventType) && isBootCompleted_) {
+        ProcessTabletToolEventAsVKeyboardEvent(event, eventType, frameTime);
     } else if (eventType == LIBINPUT_EVENT_KEYBOARD_KEY) {
         struct libinput_event_keyboard* keyboardEvent = libinput_event_get_keyboard_event(event);
         std::shared_ptr<KeyEvent> keyEvent = KeyEventHdr->GetKeyEvent();
@@ -1026,6 +1040,162 @@ void LibinputAdapter::ProcessEventAsVKeyboardEvent(libinput_event *event, int64_
         if (!ProcessEventBeforeLibinputStage(event, frameTime)) {
             funInputEvent_(event, frameTime);
         }
+        libinput_event_destroy(event);
+    }
+}
+
+int32_t LibinputAdapter::ConvertToPenEventType(libinput_event_type eventType,
+    libinput_event_tablet_tool *tabletEvent)
+{
+    switch (eventType) {
+        case LIBINPUT_EVENT_TABLET_TOOL_TIP: {
+            if (tabletEvent != nullptr &&
+                libinput_event_tablet_tool_get_tip_state(tabletEvent) == LIBINPUT_TABLET_TOOL_TIP_DOWN) {
+                return static_cast<int32_t>(VPenEventType::PEN_DOWN);
+            }
+            return static_cast<int32_t>(VPenEventType::PEN_UP);
+        }
+        case LIBINPUT_EVENT_TABLET_TOOL_AXIS: {
+            return static_cast<int32_t>(VPenEventType::PEN_MOTION);
+        }
+        case LIBINPUT_EVENT_TABLET_TOOL_PROXIMITY: {
+            if (tabletEvent != nullptr &&
+                libinput_event_tablet_tool_get_proximity_state(tabletEvent) ==
+                LIBINPUT_TABLET_TOOL_PROXIMITY_STATE_IN) {
+                return static_cast<int32_t>(VPenEventType::PEN_PROXIMITY_IN);
+            }
+            return static_cast<int32_t>(VPenEventType::PEN_PROXIMITY_OUT);
+        }
+        case LIBINPUT_EVENT_TABLET_TOOL_BUTTON: {
+            return static_cast<int32_t>(VPenEventType::PEN_BUTTON);
+        }
+        default: {
+            return static_cast<int32_t>(VPenEventType::PEN_MOTION);
+        }
+    }
+}
+
+void LibinputAdapter::CalculatePenCoordinates(libinput_event_type eventType, int32_t penEventType,
+    libinput_event_tablet_tool *tabletEvent, double &x, double &y)
+{
+    // Map tablet tool coordinates to screen coordinates.
+    if (eventType == LIBINPUT_EVENT_TABLET_TOOL_AXIS || eventType == LIBINPUT_EVENT_TABLET_TOOL_TIP) {
+        int32_t targetDisplayId = -1;
+        PhysicalCoordinate coord { -1.0, -1.0 };
+        PointerEvent::PointerItem pointerItem;
+        pointerItem.SetToolType(PointerEvent::TOOL_TYPE_PEN);
+        pointerItem.SetDeviceId(deviceId_);
+        if (WIN_MGR->CalculateTipPoint(tabletEvent, targetDisplayId, coord, pointerItem, deviceId_)) {
+            x = coord.x;
+            y = coord.y;
+            penPoints_[DEFAULT_PEN_POINTER_ID] ={ x, y };
+        } else {
+            // Coordinate calculation failed(out of display), use last known position.
+            auto pos = penPoints_.find(DEFAULT_PEN_POINTER_ID);
+            if (pos != penPoints_.end()) {
+                x = (pos->second).first;
+                y = (pos->second).second;
+            }
+        }
+    } else if (penEventType == static_cast<int32_t>(VPenEventType::PEN_UP)) {
+        // TIP_UP: use cached coordinates from the last AXIS/TIP_DOWN event.
+        auto pos = penPoints_.find(DEFAULT_PEN_POINTER_ID);
+        if (pos != penPoints_.end()) {
+            x = (pos->second).first;
+            y = (pos->second).second;
+        }
+    }
+}
+
+void LibinputAdapter::ProcessTabletToolEventAsVKeyboardEvent(
+    libinput_event *event, libinput_event_type eventType, int64_t frameTime)
+{
+    CHKPV(event);
+    auto tabletEvent = libinput_event_get_tablet_tool_event(event);
+    CHKPV(tabletEvent);
+
+    // Obtain device id for coordinate mapping.
+    libinput_device* device = libinput_event_get_device(event);
+    deviceId_ = INPUT_DEV_MGR->FindInputDeviceId(device);
+
+    // Extract pen event attributes.
+    double x = 0.0;
+    double y = 0.0;
+    double pressure = libinput_event_tablet_tool_get_pressure(tabletEvent);
+    double tiltX = libinput_event_tablet_tool_get_tilt_x(tabletEvent);
+    double tiltY = libinput_event_tablet_tool_get_tilt_y(tabletEvent);
+    int32_t penEventType = ConvertToPenEventType(eventType, tabletEvent);
+    CalculatePenCoordinates(eventType, penEventType, tabletEvent, x, y);
+    
+    // Invoke vendor callback to check whether the pen point is inside the virtual keyboard area.
+    int32_t penPointRet = -1;
+    if (handlePenPoint_ != nullptr) {
+        penPointRet = handlePenPoint_(x, y, DEFAULT_PEN_POINTER_ID, penEventType, pressure,
+            tiltX, tiltY, PointerEvent::TOOL_TYPE_PEN);
+    } else {
+        MMI_HILOGW("HandlePenPoint is null, fall back to passthrough");
+    }
+    if (penPointRet == 0) {
+        HandleVPenMessages(event, frameTime, eventType, tabletEvent);
+    } else {
+        // Pen point is outside the keyboard area, pass through to the normal event pipeline.
+        if (penEventType == static_cast<int32_t>(VPenEventType::PEN_UP) ||
+            penEventType == static_cast<int32_t>(VPenEventType::PEN_PROXIMITY_OUT)) {
+            penPoints_.erase(DEFAULT_PEN_POINTER_ID);
+        }
+        if (!ProcessEventBeforeLibinputStage(event, frameTime)) {
+            funInputEvent_(event, frameTime);
+        }
+        libinput_event_destroy(event);
+    }
+}
+
+void LibinputAdapter::HandleVPenMessages(libinput_event *event, int64_t frameTime,
+    libinput_event_type eventType, libinput_event_tablet_tool *tabletEvent)
+{
+    if (getLibinputEventForVPen_ == nullptr) {
+        MMI_HILOGW("getLibinputEventForVPen_ is nullptr, pass through event");
+        if (!ProcessEventBeforeLibinputStage(event, frameTime)) {
+            funInputEvent_(event, frameTime);
+        }
+        libinput_event_destroy(event);
+        return;
+    }
+
+    auto *trackpadEvent = event;
+    bool delayvtpDestroy = false;
+    
+    // Consume trackpad messages.
+    if (getLibinputEventForVTrackpad_ != nullptr) {
+        while (true) {
+            std::vector<libinput_event*> vtpEvents;
+            VTrackpadEventType vtpEventType =
+                static_cast<VTrackpadEventType>(getLibinputEventForVTrackpad_(trackpadEvent, vtpEvents));
+            if (vtpEventType == VTrackpadEventType::NoTrackpadEvent) {
+                break;
+            }
+            HandleVTrackpadMessage(vtpEventType, vtpEvents, frameTime, trackpadEvent, delayvtpDestroy);
+        }
+    }
+
+    // Consume keyboard messages.
+    while (true) {
+        int32_t delayMs = 0;
+        std::vector<libinput_event*> keyEvents;
+        VKeyboardEventType penEventType =
+            static_cast<VKeyboardEventType>(getLibinputEventForVPen_(tabletEvent, delayMs, keyEvents));
+        if (penEventType == VKeyboardEventType::NoKeyboardEvent ||
+            (keyEvents.empty() && penEventType != VKeyboardEventType::HideCursor)) {
+            break;
+        }
+        if (delayMs > 0 && penEventType == VKeyboardEventType::StopLongPress &&
+            CreateVKeyboardDelayTimer(delayMs, keyEvents.front())) {
+            continue;
+        }
+        HandleVKeyboardMessage(penEventType, keyEvents, frameTime);
+    }
+    
+    if (!delayvtpDestroy) {
         libinput_event_destroy(event);
     }
 }

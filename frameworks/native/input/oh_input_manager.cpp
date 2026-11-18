@@ -16,6 +16,8 @@
 #include "oh_input_manager.h"
 
 #include <atomic>
+#include <cinttypes>
+#include <map>
 #include <vector>
 
 #include "securec.h"
@@ -41,6 +43,14 @@
 #undef MMI_LOG_TAG
 #define MMI_LOG_TAG "OHInputManager"
 
+// Unified event base, modeled after the libinput_event polymorphism (libinput-private.h struct
+// libinput_event): it only carries a type tag; event structs such as Input_KeyEvent embed base as
+// their first member so they can be upcast for the callback, and OH_Input_Event_As* validates the
+// type tag before downcasting back.
+struct OH_Input_Event {
+    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+};
+
 struct Input_KeyState {
     int32_t keyCode;
     int32_t keyState;
@@ -48,6 +58,7 @@ struct Input_KeyState {
 };
 
 struct Input_KeyEvent {
+    OH_Input_Event base;
     int32_t id { -1 };
     int32_t action { -1 };
     int32_t keyCode { -1 };
@@ -64,6 +75,7 @@ struct Input_CursorInfo {
 };
 
 struct Input_MouseEvent {
+    OH_Input_Event base;
     int32_t action;
     int32_t displayX;
     int32_t displayY;
@@ -79,6 +91,7 @@ struct Input_MouseEvent {
 };
 
 struct Input_TouchEvent {
+    OH_Input_Event base;
     int32_t action;
     int32_t id;
     int32_t displayX;
@@ -96,6 +109,7 @@ struct Input_TouchEvent {
 };
 
 struct Input_AxisEvent {
+    OH_Input_Event base;
     int32_t axisAction;
     float displayX;
     float displayY;
@@ -141,6 +155,13 @@ struct Input_CustomCursor {
 
 struct Input_CursorConfig {
     bool followSystem { false };
+};
+
+struct OH_Input_EventHandler {
+    OH_Input_EventTypeMask mask { 0 };
+    OH_Input_EventHandler_OnEventFunc onEventFunc { nullptr };
+    OH_Input_EventHandler_OnDisabledFunc onDisabledFunc { nullptr };
+    std::atomic<bool> enabled { false };
 };
 
 typedef std::map<std::string, std::list<Input_HotkeyInfo *>> Callbacks;
@@ -372,6 +393,7 @@ struct Input_KeyEvent* OH_Input_CreateKeyEvent()
 {
     Input_KeyEvent* keyEvent = new (std::nothrow) Input_KeyEvent();
     CHKPL(keyEvent);
+    keyEvent->base.type = OH_INPUT_EVENT_KEY;
     return keyEvent;
 }
 
@@ -641,6 +663,7 @@ struct Input_MouseEvent* OH_Input_CreateMouseEvent()
     CALL_DEBUG_ENTER;
     Input_MouseEvent* mouseEvent = new (std::nothrow) Input_MouseEvent();
     CHKPL(mouseEvent);
+    mouseEvent->base.type = OH_INPUT_EVENT_MOUSE;
     return mouseEvent;
 }
 
@@ -993,6 +1016,7 @@ struct Input_TouchEvent* OH_Input_CreateTouchEvent()
     CALL_DEBUG_ENTER;
     Input_TouchEvent* touchEvent = new (std::nothrow) Input_TouchEvent();
     CHKPL(touchEvent);
+    touchEvent->base.type = OH_INPUT_EVENT_TOUCH;
     return touchEvent;
 }
 
@@ -1270,6 +1294,7 @@ Input_AxisEvent* OH_Input_CreateAxisEvent(void)
 {
     Input_AxisEvent* axisEvent = new (std::nothrow) Input_AxisEvent();
     CHKPP(axisEvent);
+    axisEvent->base.type = OH_INPUT_EVENT_AXIS;
     return axisEvent;
 }
 
@@ -3476,6 +3501,520 @@ Input_Result OH_Input_DispatchToNextHandler(int32_t eventId)
         return errCode;
     }
     MMI_HILOGD("OH_Input_DispatchToNextHandler success, eventId:%{public}d", eventId);
+    return INPUT_SUCCESS;
+}
+
+namespace {
+constexpr OH_Input_EventTypeMask SUPPORTED_EVENT_MASK = OH_INPUT_EVENT_TYPE_MASK_KEY |
+    OH_INPUT_EVENT_TYPE_MASK_MOUSE | OH_INPUT_EVENT_TYPE_MASK_TOUCH | OH_INPUT_EVENT_TYPE_MASK_AXIS;
+
+// Registry of created handlers: key is the opaque handle, value owns the handler.
+// The event callback snapshots the handler before invoking the user callback, while Destroy removes
+// the registration synchronously; destruction during an in-flight callback is deferred by the snapshot.
+std::map<OH_Input_EventHandler*, std::shared_ptr<OH_Input_EventHandler>> g_inputEventHandlers;
+// Set of enabled handlers; at most one enabled handler per event type bit
+// (the underlying InputEventHookHandler allows a single callback per event type)
+std::vector<std::shared_ptr<OH_Input_EventHandler>> g_enabledHandlers;
+
+// Converts the event type mask to HookEventType. The bit orders differ (mask MOUSE=1<<1, TOUCH=1<<2;
+// HookEventType TOUCH=1<<1, MOUSE=1<<2) so a direct cast is not allowed.
+// The AXIS bit (mask 1<<3) matches HOOK_EVENT_TYPE_AXIS (1<<3) and is mapped separately.
+OHOS::MMI::HookEventType EventTypeMaskToHookEventType(OH_Input_EventTypeMask mask)
+{
+    OHOS::MMI::HookEventType hookEventType { OHOS::MMI::HOOK_EVENT_TYPE_NONE };
+    if ((mask & OH_INPUT_EVENT_TYPE_MASK_KEY) != 0) {
+        hookEventType |= OHOS::MMI::HOOK_EVENT_TYPE_KEY;
+    }
+    if ((mask & OH_INPUT_EVENT_TYPE_MASK_MOUSE) != 0) {
+        hookEventType |= OHOS::MMI::HOOK_EVENT_TYPE_MOUSE;
+    }
+    if ((mask & OH_INPUT_EVENT_TYPE_MASK_TOUCH) != 0) {
+        hookEventType |= OHOS::MMI::HOOK_EVENT_TYPE_TOUCH;
+    }
+    if ((mask & OH_INPUT_EVENT_TYPE_MASK_AXIS) != 0) {
+        hookEventType |= OHOS::MMI::HOOK_EVENT_TYPE_AXIS;
+    }
+    return hookEventType;
+}
+
+std::shared_ptr<OH_Input_EventHandler> GetRegisteredHandler(OH_Input_EventHandler* handler)
+{
+    std::lock_guard guard(g_mutex);
+    auto iter = g_inputEventHandlers.find(handler);
+    if (iter == g_inputEventHandlers.end()) {
+        return nullptr;
+    }
+    return iter->second;
+}
+
+bool FillKeyEvent(std::shared_ptr<OHOS::MMI::KeyEvent> event, Input_KeyEvent& keyEvent)
+{
+    CHKPF(event);
+    if (!SetKeyEventAction(&keyEvent, event->GetKeyAction())) {
+        return false;
+    }
+    keyEvent.id = event->GetId();
+    keyEvent.keyCode = event->GetKeyCode();
+    keyEvent.actionTime = event->GetActionTime();
+    keyEvent.windowId = event->GetTargetWindowId();
+    keyEvent.displayId = event->GetTargetDisplayId();
+    return true;
+}
+
+bool FillMouseEvent(std::shared_ptr<OHOS::MMI::PointerEvent> event, Input_MouseEvent& mouseEvent)
+{
+    CHKPF(event);
+    OHOS::MMI::PointerEvent::PointerItem item;
+    if (!(event->GetPointerItem(event->GetPointerId(), item))) {
+        MMI_HILOGE("Can not get pointerItem for the pointer event");
+        return false;
+    }
+    if (!SetMouseEventAction(&mouseEvent, event->GetPointerAction())) {
+        return false;
+    }
+    if (!SetMouseEventButton(&mouseEvent, event->GetButtonId())) {
+        return false;
+    }
+    mouseEvent.displayX = item.GetDisplayX();
+    mouseEvent.displayY = item.GetDisplayY();
+    mouseEvent.globalX = item.GetGlobalX();
+    mouseEvent.globalY = item.GetGlobalY();
+    mouseEvent.actionTime = event->GetActionTime();
+    mouseEvent.windowId = event->GetTargetWindowId();
+    mouseEvent.displayId = event->GetTargetDisplayId();
+    SetCursorInfo(item, &mouseEvent);
+    return true;
+}
+
+bool FillTouchEvent(std::shared_ptr<OHOS::MMI::PointerEvent> event, Input_TouchEvent& touchEvent)
+{
+    CHKPF(event);
+    OHOS::MMI::PointerEvent::PointerItem item;
+    if (!(event->GetPointerItem(event->GetPointerId(), item))) {
+        MMI_HILOGE("Can not get pointerItem for the pointer event");
+        return false;
+    }
+    if (!SetTouchEventAction(&touchEvent, event->GetPointerAction())) {
+        return false;
+    }
+    touchEvent.id = event->GetPointerId();
+    touchEvent.displayX = item.GetDisplayX();
+    touchEvent.displayY = item.GetDisplayY();
+    touchEvent.globalX = item.GetGlobalX();
+    touchEvent.globalY = item.GetGlobalY();
+    touchEvent.actionTime = event->GetActionTime();
+    touchEvent.windowId = event->GetTargetWindowId();
+    touchEvent.displayId = event->GetTargetDisplayId();
+    touchEvent.windowX = item.GetWindowX();
+    touchEvent.windowY = item.GetWindowY();
+    touchEvent.downTime = item.GetDownTime();
+    auto toolType = item.GetToolType();
+    if (toolType >= Input_TouchEventToolType::TOOL_TYPE_FINGER &&
+        toolType <= Input_TouchEventToolType::TOOL_TYPE_LENS) {
+        touchEvent.toolType = static_cast<Input_TouchEventToolType>(toolType);
+    }
+    touchEvent.pressure = item.GetPressure();
+    return true;
+}
+
+bool FillAxisEvent(std::shared_ptr<OHOS::MMI::PointerEvent> event, Input_AxisEvent& axisEvent)
+{
+    CHKPF(event);
+    OHOS::MMI::PointerEvent::PointerItem item;
+    if (!(event->GetPointerItem(event->GetPointerId(), item))) {
+        MMI_HILOGE("Can not get pointerItem for the pointer event");
+        return false;
+    }
+    int32_t axisEventType = event->GetAxisEventType();
+    if (axisEventType == OHOS::MMI::PointerEvent::AXIS_EVENT_TYPE_UNKNOWN &&
+        (OHOS::MMI::PointerEvent::HasAxis(event->GetAxes(), OHOS::MMI::PointerEvent::AXIS_TYPE_SCROLL_VERTICAL) ||
+        OHOS::MMI::PointerEvent::HasAxis(event->GetAxes(), OHOS::MMI::PointerEvent::AXIS_TYPE_SCROLL_HORIZONTAL))) {
+        // Injected axis events (e.g. from uinput) may lack the axis type: derive SCROLL from the scroll
+        // axes actually present so hooked axis events are not silently passed through (spec 6)
+        axisEventType = OHOS::MMI::PointerEvent::AXIS_EVENT_TYPE_SCROLL;
+    }
+    if (!SetAxisValueByAxisEventType(event, &axisEvent, axisEventType)) {
+        return false;
+    }
+    SetAxisEventAction(&axisEvent, event->GetPointerAction());
+    axisEvent.displayX = item.GetDisplayX();
+    axisEvent.displayY = item.GetDisplayY();
+    axisEvent.globalX = item.GetGlobalX();
+    axisEvent.globalY = item.GetGlobalY();
+    axisEvent.actionTime = event->GetActionTime();
+    axisEvent.sourceType = event->GetSourceType();
+    axisEvent.windowId = event->GetTargetWindowId();
+    axisEvent.displayId = event->GetTargetDisplayId();
+    return true;
+}
+
+class OHInputEventHandlerConsumer final : public OHOS::MMI::IInputEventConsumer {
+public:
+    OHInputEventHandlerConsumer() = default;
+    ~OHInputEventHandlerConsumer() override = default;
+    OHInputEventHandlerConsumer(const OHInputEventHandlerConsumer&) = delete;
+    OHInputEventHandlerConsumer& operator=(const OHInputEventHandlerConsumer&) = delete;
+
+    void OnInputEvent(std::shared_ptr<OHOS::MMI::KeyEvent> keyEvent) const override
+    {
+        CHKPV(keyEvent);
+        auto handler = GetEnabledHandler(OH_INPUT_EVENT_TYPE_MASK_KEY);
+        CHKPV(handler);
+        Input_KeyEvent keyEventC {};
+        keyEventC.base.type = OH_INPUT_EVENT_KEY;
+        if (!FillKeyEvent(keyEvent, keyEventC)) {
+            MMI_HILOGE("Transform key event failed, dispatch it by default");
+            NotifyHookEventResult(keyEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_KEY, false);
+            return;
+        }
+        HandleEvent(handler, &keyEventC.base, keyEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_KEY);
+    }
+
+    void OnInputEvent(std::shared_ptr<OHOS::MMI::PointerEvent> pointerEvent) const override
+    {
+        CHKPV(pointerEvent);
+        if (pointerEvent->GetSourceType() == OHOS::MMI::PointerEvent::SOURCE_TYPE_TOUCHSCREEN) {
+            auto handler = GetEnabledHandler(OH_INPUT_EVENT_TYPE_MASK_TOUCH);
+            if (handler == nullptr) {
+                MMI_HILOGW("No enabled handler for touch event, dispatch it by default, id:%{public}d",
+                    pointerEvent->GetId());
+                NotifyHookEventResult(pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_TOUCH, false);
+                return;
+            }
+            HandleTouchEvent(handler, pointerEvent);
+        } else if (pointerEvent->GetSourceType() == OHOS::MMI::PointerEvent::SOURCE_TYPE_MOUSE) {
+            if (IsAxisEvent(pointerEvent->GetPointerAction())) {
+                auto handler = GetEnabledHandler(OH_INPUT_EVENT_TYPE_MASK_AXIS);
+                if (handler == nullptr) {
+                    MMI_HILOGW("No enabled handler for axis event, dispatch it by default, id:%{public}d",
+                        pointerEvent->GetId());
+                    NotifyHookEventResult(pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_AXIS, false);
+                    return;
+                }
+                HandleAxisEvent(handler, pointerEvent);
+            } else {
+                auto handler = GetEnabledHandler(OH_INPUT_EVENT_TYPE_MASK_MOUSE);
+                if (handler == nullptr) {
+                    MMI_HILOGW("No enabled handler for mouse event, dispatch it by default, id:%{public}d",
+                        pointerEvent->GetId());
+                    NotifyHookEventResult(pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_MOUSE, false);
+                    return;
+                }
+                HandleMouseEvent(handler, pointerEvent);
+            }
+        } else {
+            MMI_HILOGW("Unsupported sourceType:%{public}d for hooked event, id:%{public}d",
+                pointerEvent->GetSourceType(), pointerEvent->GetId());
+        }
+    }
+
+    void OnInputEvent(std::shared_ptr<OHOS::MMI::AxisEvent> axisEvent) const override {}
+
+    // Notifies upward after the handler-layer timeout auto-disable: marks the handler disabled, removes
+    // it from the enabled set and invokes onDisabledFunc. The server replays pending events upon hook
+    // removal, so replaying the current event here is unnecessary (and must be avoided).
+    void OnHookDisabled(OHOS::MMI::HookEventType hookEventType) const override
+    {
+        std::shared_ptr<OH_Input_EventHandler> handlerPtr;
+        {
+            std::lock_guard guard(g_mutex);
+            for (auto iter = g_enabledHandlers.begin(); iter != g_enabledHandlers.end(); ++iter) {
+                if ((EventTypeMaskToHookEventType((*iter)->mask) & hookEventType) != 0) {
+                    handlerPtr = *iter;
+                    handlerPtr->enabled.store(false);
+                    g_enabledHandlers.erase(iter);
+                    break;
+                }
+            }
+        }
+        if (handlerPtr && handlerPtr->onDisabledFunc != nullptr) {
+            handlerPtr->onDisabledFunc(handlerPtr.get());
+        }
+    }
+
+private:
+    static std::shared_ptr<OH_Input_EventHandler> GetEnabledHandler(OH_Input_EventTypeMask maskBit)
+    {
+        std::lock_guard guard(g_mutex);
+        for (const auto &handler : g_enabledHandlers) {
+            if ((handler->mask & maskBit) != 0) {
+                return handler;
+            }
+        }
+        return nullptr;
+    }
+
+    static void NotifyHookEventResult(int32_t eventId, OHOS::MMI::HookEventType hookEventType, bool isConsumed)
+    {
+        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().NotifyHookEventResult(eventId,
+            hookEventType, isConsumed);
+        if (ret != RET_OK) {
+            MMI_HILOGE("NotifyHookEventResult failed, eventId:%{public}d, hookEventType:%{public}u, "
+                "isConsumed:%{public}d, ret:%{public}d", eventId, hookEventType,
+                static_cast<int32_t>(isConsumed), ret);
+        }
+    }
+
+    // The synchronous callback decides pass-through/consume: non-NULL return (pass-through) ->
+    // isConsumed=false; NULL return (consume) -> isConsumed=true.
+    // Both are reported to the server via NotifyHookEventResult.
+    static void HandleEvent(const std::shared_ptr<OH_Input_EventHandler>& handler, const OH_Input_Event* event,
+        int32_t eventId, OHOS::MMI::HookEventType hookEventType)
+    {
+        CHKPV(handler->onEventFunc);
+        const OH_Input_Event* result = handler->onEventFunc(handler.get(), event);
+        NotifyHookEventResult(eventId, hookEventType, result == nullptr);
+    }
+
+    void HandleTouchEvent(const std::shared_ptr<OH_Input_EventHandler>& handler,
+        std::shared_ptr<OHOS::MMI::PointerEvent> pointerEvent) const
+    {
+        Input_TouchEvent touchEventC {};
+        touchEventC.base.type = OH_INPUT_EVENT_TOUCH;
+        if (!FillTouchEvent(pointerEvent, touchEventC)) {
+            MMI_HILOGE("Transform touch event failed, dispatch it by default");
+            NotifyHookEventResult(pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_TOUCH, false);
+            return;
+        }
+        HandleEvent(handler, &touchEventC.base, pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_TOUCH);
+    }
+
+    void HandleMouseEvent(const std::shared_ptr<OH_Input_EventHandler>& handler,
+        std::shared_ptr<OHOS::MMI::PointerEvent> pointerEvent) const
+    {
+        Input_MouseEvent mouseEventC {};
+        mouseEventC.base.type = OH_INPUT_EVENT_MOUSE;
+        if (!FillMouseEvent(pointerEvent, mouseEventC)) {
+            MMI_HILOGE("Transform mouse event failed, dispatch it by default");
+            NotifyHookEventResult(pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_MOUSE, false);
+            return;
+        }
+        HandleEvent(handler, &mouseEventC.base, pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_MOUSE);
+    }
+
+    void HandleAxisEvent(const std::shared_ptr<OH_Input_EventHandler>& handler,
+        std::shared_ptr<OHOS::MMI::PointerEvent> pointerEvent) const
+    {
+        Input_AxisEvent axisEventC {};
+        axisEventC.base.type = OH_INPUT_EVENT_AXIS;
+        if (!FillAxisEvent(pointerEvent, axisEventC)) {
+            MMI_HILOGE("Transform axis event failed, dispatch it by default");
+            NotifyHookEventResult(pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_AXIS, false);
+            return;
+        }
+        HandleEvent(handler, &axisEventC.base, pointerEvent->GetId(), OHOS::MMI::HOOK_EVENT_TYPE_AXIS);
+    }
+};
+
+const std::shared_ptr<OHInputEventHandlerConsumer> g_hookEventConsumer =
+    std::make_shared<OHInputEventHandlerConsumer>();
+} // namespace
+
+Input_Result OH_Input_EventHandler_Create(OH_Input_EventTypeMask mask,
+    OH_Input_EventHandler_OnEventFunc onEventFunc, OH_Input_EventHandler_OnDisabledFunc onDisabledFunc,
+    OH_Input_EventHandler** handler)
+{
+    CALL_DEBUG_ENTER;
+    MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_EventHandler_Create.Call", true);
+    CHKPR(handler, INPUT_PARAMETER_ERROR);
+    CHKPR(onEventFunc, INPUT_PARAMETER_ERROR);
+    CHKPR(onDisabledFunc, INPUT_PARAMETER_ERROR);
+    if (mask == 0 || (mask & ~SUPPORTED_EVENT_MASK) != 0) {
+        MMI_HILOGE("Invalid mask:%{public}" PRIu64, mask);
+        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Create.Error", INPUT_PARAMETER_ERROR);
+        return INPUT_PARAMETER_ERROR;
+    }
+    // Permission and product-form checks are handled by the server/permission side; the client does
+    // no permission check
+    auto handlerPtr = std::make_shared<OH_Input_EventHandler>();
+    handlerPtr->mask = mask;
+    handlerPtr->onEventFunc = onEventFunc;
+    handlerPtr->onDisabledFunc = onDisabledFunc;
+    {
+        std::lock_guard guard(g_mutex);
+        g_inputEventHandlers[handlerPtr.get()] = handlerPtr;
+    }
+    *handler = handlerPtr.get();
+    MMI_HILOGI("OH_Input_EventHandler_Create success, mask:%{public}" PRIu64, mask);
+    return INPUT_SUCCESS;
+}
+
+void OH_Input_EventHandler_Destroy(OH_Input_EventHandler* handler)
+{
+    CALL_DEBUG_ENTER;
+    MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_EventHandler_Destroy.Call", true);
+    if (handler == nullptr) {
+        return;
+    }
+    std::shared_ptr<OH_Input_EventHandler> handlerPtr;
+    bool needRemoveHook { false };
+    OHOS::MMI::HookEventType hookEventType { OHOS::MMI::HOOK_EVENT_TYPE_NONE };
+    {
+        std::lock_guard guard(g_mutex);
+        auto iter = g_inputEventHandlers.find(handler);
+        if (iter == g_inputEventHandlers.end()) {
+            MMI_HILOGW("Handler is not registered, ignore destroy");
+            return;
+        }
+        handlerPtr = iter->second;
+        g_inputEventHandlers.erase(iter);
+        for (auto enabledIter = g_enabledHandlers.begin(); enabledIter != g_enabledHandlers.end(); ++enabledIter) {
+            if (*enabledIter == handlerPtr) {
+                g_enabledHandlers.erase(enabledIter);
+                needRemoveHook = true;
+                hookEventType = EventTypeMaskToHookEventType(handlerPtr->mask);
+                break;
+            }
+        }
+    }
+    if (needRemoveHook) {
+        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().RemoveInputEventHook(hookEventType);
+        if (ret != RET_OK) {
+            MMI_HILOGE("RemoveInputEventHook failed, hookEventType:%{public}u, ret:%{public}d",
+                hookEventType, ret);
+        }
+    }
+    // handlerPtr is destroyed when leaving scope; destruction during an in-flight callback is deferred
+    // by the snapshot held by the callback
+}
+
+Input_Result OH_Input_EventHandler_Enable(OH_Input_EventHandler* handler, bool enable)
+{
+    CALL_DEBUG_ENTER;
+    MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_EventHandler_Enable.Call", true);
+    CHKPR(handler, INPUT_PARAMETER_ERROR);
+    std::lock_guard guard(g_mutex);
+    auto iter = g_inputEventHandlers.find(handler);
+    if (iter == g_inputEventHandlers.end()) {
+        MMI_HILOGE("Handler is not registered");
+        return INPUT_PARAMETER_ERROR;
+    }
+    auto handlerPtr = iter->second;
+    if (enable) {
+        if (handlerPtr->enabled.load()) {
+            MMI_HILOGD("Handler is already enabled");
+            return INPUT_SUCCESS;
+        }
+        // Permission is verified by the server at AddInputEventHook (ERROR_NO_PERMISSION ->
+        // INPUT_PERMISSION_DENIED); the per-process handler count limit is not enforced yet
+        // (the underlying InputEventHookHandler still allows a single callback per event type)
+        OHOS::MMI::HookEventType hookEventType = EventTypeMaskToHookEventType(handlerPtr->mask);
+        int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().AddInputEventHook(g_hookEventConsumer,
+            hookEventType);
+        if (ret != RET_OK) {
+            auto errCode = NormalizeHookResult(ret);
+            MMI_HILOGE("AddInputEventHook failed, hookEventType:%{public}u, errCode:%{public}d",
+                hookEventType, errCode);
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Enable.Error", errCode);
+            return errCode;
+        }
+        handlerPtr->enabled.store(true);
+        g_enabledHandlers.push_back(handlerPtr);
+        MMI_HILOGI("OH_Input_EventHandler_Enable(true) success, mask:%{public}" PRIu64, handlerPtr->mask);
+        return INPUT_SUCCESS;
+    }
+    // Enable(false) skips the permission check
+    if (!handlerPtr->enabled.load()) {
+        MMI_HILOGD("Handler is already disabled");
+        return INPUT_SUCCESS;
+    }
+    OHOS::MMI::HookEventType hookEventType = EventTypeMaskToHookEventType(handlerPtr->mask);
+    int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().RemoveInputEventHook(hookEventType);
+    if (ret != RET_OK) {
+        auto errCode = NormalizeHookResult(ret);
+        MMI_HILOGE("RemoveInputEventHook failed, hookEventType:%{public}u, errCode:%{public}d",
+            hookEventType, errCode);
+        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Enable.Error", errCode);
+        return errCode;
+    }
+    handlerPtr->enabled.store(false);
+    for (auto iter = g_enabledHandlers.begin(); iter != g_enabledHandlers.end(); ++iter) {
+        if (*iter == handlerPtr) {
+            g_enabledHandlers.erase(iter);
+            break;
+        }
+    }
+    MMI_HILOGI("OH_Input_EventHandler_Enable(false) success, mask:%{public}" PRIu64, handlerPtr->mask);
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_EventHandler_IsEnabled(const OH_Input_EventHandler* handler, bool* enabled)
+{
+    CALL_DEBUG_ENTER;
+    CHKPR(handler, INPUT_PARAMETER_ERROR);
+    CHKPR(enabled, INPUT_PARAMETER_ERROR);
+    if (GetRegisteredHandler(const_cast<OH_Input_EventHandler*>(handler)) == nullptr) {
+        MMI_HILOGE("Handler is not registered");
+        return INPUT_PARAMETER_ERROR;
+    }
+    *enabled = handler->enabled.load();
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_EventHandler_GetMask(const OH_Input_EventHandler* handler, OH_Input_EventTypeMask* mask)
+{
+    CALL_DEBUG_ENTER;
+    CHKPR(handler, INPUT_PARAMETER_ERROR);
+    CHKPR(mask, INPUT_PARAMETER_ERROR);
+    auto handlerPtr = GetRegisteredHandler(const_cast<OH_Input_EventHandler*>(handler));
+    CHKPR(handlerPtr, INPUT_PARAMETER_ERROR);
+    *mask = handlerPtr->mask;
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_Event_GetType(const OH_Input_Event* event, OH_Input_EventType* type)
+{
+    CHKPR(event, INPUT_PARAMETER_ERROR);
+    CHKPR(type, INPUT_PARAMETER_ERROR);
+    *type = event->type;
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_Event_AsKeyEvent(const OH_Input_Event* event, const Input_KeyEvent** keyEvent)
+{
+    CHKPR(event, INPUT_PARAMETER_ERROR);
+    CHKPR(keyEvent, INPUT_PARAMETER_ERROR);
+    if (event->type != OH_INPUT_EVENT_KEY) {
+        MMI_HILOGE("Event type:%{public}d is not key event", event->type);
+        return INPUT_PARAMETER_ERROR;
+    }
+    *keyEvent = reinterpret_cast<const Input_KeyEvent*>(event);
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_Event_AsMouseEvent(const OH_Input_Event* event, const Input_MouseEvent** mouseEvent)
+{
+    CHKPR(event, INPUT_PARAMETER_ERROR);
+    CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
+    if (event->type != OH_INPUT_EVENT_MOUSE) {
+        MMI_HILOGE("Event type:%{public}d is not mouse event", event->type);
+        return INPUT_PARAMETER_ERROR;
+    }
+    *mouseEvent = reinterpret_cast<const Input_MouseEvent*>(event);
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_Event_AsTouchEvent(const OH_Input_Event* event, const Input_TouchEvent** touchEvent)
+{
+    CHKPR(event, INPUT_PARAMETER_ERROR);
+    CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
+    if (event->type != OH_INPUT_EVENT_TOUCH) {
+        MMI_HILOGE("Event type:%{public}d is not touch event", event->type);
+        return INPUT_PARAMETER_ERROR;
+    }
+    *touchEvent = reinterpret_cast<const Input_TouchEvent*>(event);
+    return INPUT_SUCCESS;
+}
+
+Input_Result OH_Input_Event_AsAxisEvent(const OH_Input_Event* event, const Input_AxisEvent** axisEvent)
+{
+    CHKPR(event, INPUT_PARAMETER_ERROR);
+    CHKPR(axisEvent, INPUT_PARAMETER_ERROR);
+    if (event->type != OH_INPUT_EVENT_AXIS) {
+        MMI_HILOGE("Event type:%{public}d is not axis event", event->type);
+        return INPUT_PARAMETER_ERROR;
+    }
+    *axisEvent = reinterpret_cast<const Input_AxisEvent*>(event);
     return INPUT_SUCCESS;
 }
 

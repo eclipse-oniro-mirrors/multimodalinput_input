@@ -204,6 +204,11 @@ void TouchDrawingHandler::UpdateDisplayInfo(const OLD::DisplayInfo& displayInfo)
     }
 }
 
+uint64_t TouchDrawingHandler::GetDisplayRsId() const
+{
+    return displayInfo_.rsId;
+}
+
 bool TouchDrawingHandler::IsValidScaleInfo()
 {
     if (scaleW_ != 0 && scaleH_ != 0) {
@@ -942,6 +947,8 @@ void TouchDrawingHandler::OnDisplayModeChange()
     MMI_HILOGI("OnDisplayModeChange");
     if (surfaceNode_ != nullptr) {
         surfaceNode_->ClearChildren();
+        surfaceNode_->SetBounds(0, 0, screenWidth_, screenHeight_);
+        surfaceNode_->SetFrame(0, 0, screenWidth_, screenHeight_);
     }
     if (trackerCanvasNode_ != nullptr) {
         trackerCanvasNode_.reset();

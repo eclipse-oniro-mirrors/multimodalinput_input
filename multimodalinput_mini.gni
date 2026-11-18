@@ -62,7 +62,6 @@ declare_args() {
   input_feature_watch_cfg_source = false
   input_feature_upgrade_skia = false
   input_feature_mistouch_prevention = false
-  input_feature_input_event_hook = false
   input_feature_external_screen = true
   input_ext_feature_anco_game_event_mapping = false
   input_feature_drag_security = false
@@ -123,7 +122,6 @@ declare_args() {
     "event_handler/src/input_active_subscribe_manager.cpp",
     "event_handler/src/input_device_consumer_proxy.cpp",
     "event_handler/src/input_device_impl.cpp",
-    "event_handler/src/input_event_stager.cpp",
     "event_handler/src/input_handler_manager.cpp",
     "event_handler/src/input_manager_impl.cpp",
     "event_handler/src/long_press_event_subscribe_manager.cpp",
@@ -320,6 +318,17 @@ declare_args() {
   ]
 }
 
+declare_args() {
+  # 输入事件末端拦截：默认开启。暂不按产品形态门控（当前测试环境无 PC 形态），
+  # 后续按验收平台收紧时再恢复 input_feature_product == "pc" 判定。
+  input_feature_input_event_hook = true
+
+  # 端到端验证用测试二进制 input_event_hook，默认不参与门禁/整包编译；
+  # 本地手测可用 --gn-args input_feature_input_event_hook_tool=true 单独启用
+  # （目标带完整 sanitize 配置，开启后亦可通过门禁 sanitizer 检查）。
+  input_feature_input_event_hook_tool = false
+}
+
 if (defined(global_parts_info) &&
     (!defined(global_parts_info.multimodalinput_input_ext) ||
      !global_parts_info.multimodalinput_input_ext)) {
@@ -399,10 +408,7 @@ if (input_feature_input_event_hook) {
     "event_hook/src/hook/input_event_hook.cpp",
     "event_hook/src/hook/key_event_hook.cpp",
     "event_hook/src/hook/pointer_event_hook.cpp",
-    "event_hook/src/checker/dispatch_order_checker.cpp",
     "event_hook/src/checker/expiration_checker.cpp",
-    "event_hook/src/checker/key_loop_closure_checker.cpp",
-    "event_hook/src/checker/pointer_loop_closure_checker.cpp",
   ]
 }
 

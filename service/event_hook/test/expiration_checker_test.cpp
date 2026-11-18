@@ -14,10 +14,9 @@
  */
 
 #include <gtest/gtest.h>
+#include <chrono>
 
 #include "expiration_checker.h"
-#include "define_multimodal.h"
-#include "error_multimodal.h"
 #include "key_event.h"
 
 #undef MMI_LOG_TAG
@@ -27,6 +26,23 @@ namespace OHOS {
 namespace MMI {
 namespace {
 using namespace testing::ext;
+
+std::shared_ptr<KeyEvent> MakeKeyEvent(int32_t eventId)
+{
+    auto keyEvent = KeyEvent::Create();
+    if (keyEvent != nullptr) {
+        keyEvent->SetId(eventId);
+        keyEvent->SetKeyCode(KeyEvent::KEYCODE_A);
+        keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    }
+    return keyEvent;
+
+}
+int64_t NowMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 }  // namespace
 
 class ExpirationCheckerTest : public testing::Test {
@@ -36,146 +52,112 @@ public:
 };
 
 /**
- * @tc.name: ExpirationCheckerTest_CheckExpiration001
- * @tc.desc: Test CheckExpiration
+ * @tc.name: ExpirationCheckerTest_UpdateAndGet001
+ * @tc.desc: Update then Get round-trip; unknown id returns null
  * @tc.type: FUNC
- * @tc.require:
  */
-HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_CheckExpiration001, TestSize.Level0)
+HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_UpdateAndGet001, TestSize.Level0)
 {
     ExpirationChecker checker;
-    int32_t eventId = 1;
+    EXPECT_EQ(checker.GetEvent(1), nullptr);
 
-    bool result = checker.CheckExpiration(eventId);
-    EXPECT_FALSE(result);
-
-    auto keyEvent = KeyEvent::Create();
+    auto keyEvent = MakeKeyEvent(1);
     ASSERT_NE(keyEvent, nullptr);
-
-    keyEvent->SetId(eventId);
     checker.UpdateInputEvent(keyEvent);
-
-    result = checker.CheckExpiration(eventId);
-    EXPECT_TRUE(result);
+    EXPECT_EQ(checker.GetEvent(1), keyEvent);
 }
 
 /**
- * @tc.name: ExpirationCheckerTest_CheckValid001
- * @tc.desc: Test CheckValid
+ * @tc.name: ExpirationCheckerTest_RemoveEvent001
+ * @tc.desc: RemoveEvent removes the stashed event by id
  * @tc.type: FUNC
- * @tc.require:
  */
-HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_CheckValid001, TestSize.Level0)
+HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_RemoveEvent001, TestSize.Level0)
 {
     ExpirationChecker checker;
-    auto keyEvent = KeyEvent::Create();
+    auto keyEvent = MakeKeyEvent(1);
     ASSERT_NE(keyEvent, nullptr);
-    keyEvent->SetId(1);
-
-    bool result = checker.CheckValid(keyEvent);
-    EXPECT_FALSE(result);
-
     checker.UpdateInputEvent(keyEvent);
-    result = checker.CheckValid(keyEvent);
-    EXPECT_TRUE(result);
+    checker.RemoveEvent(1);
+    EXPECT_EQ(checker.GetEvent(1), nullptr);
+    // Repeated removal is harmless
+    checker.RemoveEvent(1);
+    EXPECT_EQ(checker.GetEvent(1), nullptr);
 }
 
 /**
- * @tc.name: ExpirationCheckerTest_UpdateInputEvent001
- * @tc.desc: Test UpdateInputEvent
+ * @tc.name: ExpirationCheckerTest_TakeExpiredEvents001
+ * @tc.desc: TakeExpiredEvents takes stale events and keeps fresh ones
  * @tc.type: FUNC
- * @tc.require:
  */
-HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_UpdateInputEvent001, TestSize.Level0)
+HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_TakeExpiredEvents001, TestSize.Level0)
 {
     ExpirationChecker checker;
-    auto keyEvent = KeyEvent::Create();
-    ASSERT_NE(keyEvent, nullptr);
-    keyEvent->SetId(1);
+    auto staleEvent = MakeKeyEvent(1);
+    ASSERT_NE(staleEvent, nullptr);
+    checker.UpdateInputEvent(staleEvent, NowMs() - 5000);
+    auto freshEvent = MakeKeyEvent(2);
+    ASSERT_NE(freshEvent, nullptr);
+    checker.UpdateInputEvent(freshEvent, NowMs());
 
-    checker.UpdateInputEvent(keyEvent);
-
-    bool result = checker.CheckExpiration(keyEvent->GetId());
-    EXPECT_TRUE(result);
-
-    result = checker.CheckValid(keyEvent);
-    EXPECT_TRUE(result);
+    auto expired = checker.TakeExpiredEvents();
+    ASSERT_EQ(expired.size(), 1u);
+    EXPECT_EQ(expired[0]->GetId(), 1);
+    // The expired event is out of the stash
+    EXPECT_EQ(checker.GetEvent(1), nullptr);
+    EXPECT_NE(checker.GetEvent(2), nullptr);
 }
 
 /**
- * @tc.name: ExpirationCheckerTest_RemoveExpiredEvent001
- * @tc.desc: Test RemoveExpiredEvent
+ * @tc.name: ExpirationCheckerTest_TakeExpiredEvents002
+ * @tc.desc: TakeExpiredEvents with empty or all-fresh stash returns empty
  * @tc.type: FUNC
- * @tc.require:
  */
-HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_RemoveExpiredEvent001, TestSize.Level0)
+HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_TakeExpiredEvents002, TestSize.Level0)
 {
     ExpirationChecker checker;
-    auto keyEvent1 = KeyEvent::Create();
+    EXPECT_TRUE(checker.TakeExpiredEvents().empty());
+
+    auto keyEvent = MakeKeyEvent(1);
+    ASSERT_NE(keyEvent, nullptr);
+    checker.UpdateInputEvent(keyEvent, NowMs());
+    EXPECT_TRUE(checker.TakeExpiredEvents().empty());
+    EXPECT_NE(checker.GetEvent(1), nullptr);
+}
+
+/**
+ * @tc.name: ExpirationCheckerTest_DrainStashEvents001
+ * @tc.desc: DrainStashEvents returns all events and clears stash
+ * @tc.type: FUNC
+ */
+HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_DrainStashEvents001, TestSize.Level0)
+{
+    ExpirationChecker checker;
+    auto keyEvent1 = MakeKeyEvent(1);
     ASSERT_NE(keyEvent1, nullptr);
-    keyEvent1->SetId(1);
-    checker.UpdateInputEvent(keyEvent1);
-
-    bool result = checker.CheckExpiration(1);
-    EXPECT_TRUE(result);
-
-    {
-        std::unique_lock<std::shared_mutex> lock(checker.rwMutex_);
-        checker.stashEvents_.clear();
-
-        auto now = std::chrono::steady_clock::now();
-        auto past_time = now - std::chrono::milliseconds(5000);
-        auto timeStampRcvd = std::chrono::duration_cast<std::chrono::milliseconds>(
-            past_time.time_since_epoch()).count();
-            
-        ExpirationChecker::StashEvent expiredEvent {
-            .timeStampRcvd = timeStampRcvd,
-            .eventId = 1,
-            .hashCode = keyEvent1->Hash()
-        };
-        checker.stashEvents_.push_back(expiredEvent);
-    }
-
-    checker.RemoveExpiredEvent();
-
-    result = checker.CheckExpiration(1);
-    EXPECT_FALSE(result);
-
-    auto keyEvent2 = KeyEvent::Create();
+    auto keyEvent2 = MakeKeyEvent(2);
     ASSERT_NE(keyEvent2, nullptr);
-    keyEvent2->SetId(2);
+    checker.UpdateInputEvent(keyEvent1);
     checker.UpdateInputEvent(keyEvent2);
 
-    result = checker.CheckExpiration(1);
-    EXPECT_FALSE(result);
-
-    result = checker.CheckExpiration(2);
-    EXPECT_TRUE(result);
+    auto drained = checker.DrainStashEvents();
+    ASSERT_EQ(drained.size(), 2u);
+    EXPECT_EQ(checker.GetEvent(1), nullptr);
+    EXPECT_EQ(checker.GetEvent(2), nullptr);
+    EXPECT_TRUE(checker.DrainStashEvents().empty());
 }
 
 /**
- * @tc.name: ExpirationCheckerTest_BoundaryConditions
- * @tc.desc: Test boundary conditions and error scenarios
+ * @tc.name: ExpirationCheckerTest_UpdateNullEvent001
+ * @tc.desc: UpdateInputEvent with nullptr event is ignored
  * @tc.type: FUNC
- * @tc.require:
  */
-HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_BoundaryConditions, TestSize.Level1)
+HWTEST_F(ExpirationCheckerTest, ExpirationCheckerTest_UpdateNullEvent001, TestSize.Level1)
 {
     ExpirationChecker checker;
-
-    EXPECT_FALSE(checker.CheckExpiration(0));
-    EXPECT_FALSE(checker.CheckExpiration(-1));
-    EXPECT_FALSE(checker.CheckExpiration(INT32_MAX));
-
-    EXPECT_FALSE(checker.CheckValid(nullptr));
-
-    auto keyEvent = KeyEvent::Create();
-    ASSERT_NE(keyEvent, nullptr);
-    keyEvent->SetId(1);
-    checker.UpdateInputEvent(keyEvent);
-    checker.UpdateInputEvent(keyEvent);
-    EXPECT_TRUE(checker.CheckValid(keyEvent));
-    EXPECT_TRUE(checker.CheckExpiration(1));
+    checker.UpdateInputEvent(nullptr);
+    EXPECT_TRUE(checker.TakeExpiredEvents().empty());
+    EXPECT_TRUE(checker.DrainStashEvents().empty());
 }
 }  // namespace MMI
 }  // namespace OHOS

@@ -188,6 +188,7 @@ private:
     int32_t UpdateCursorPositionOnButtonPress();
 #ifdef OHOS_BUILD_ENABLE_VKEYBOARD
     static bool IsEventFromVirtualSource(struct libinput_event* event);
+    static bool IsVirtualTouchpadDevice(struct libinput_device *device, const std::string &devName);
     static void GetVirtualTouchpadTapSwitch(bool &switchFlag);
     static void GetVirtualTouchpadRightClickType(int32_t &type);
     static int32_t GetVirtualTouchpadPrimaryButton();

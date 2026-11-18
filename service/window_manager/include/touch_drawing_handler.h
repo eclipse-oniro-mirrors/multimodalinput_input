@@ -67,6 +67,7 @@ public:
     DISALLOW_COPY_AND_MOVE(TouchDrawingHandler);
 
     void UpdateDisplayInfo(const OLD::DisplayInfo &displayInfo) override;
+    uint64_t GetDisplayRsId() const override;
     void TouchDrawHandler(std::shared_ptr<PointerEvent> pointerEvent) override;
     void UpdateLabels(bool isOn) override;
     void UpdateBubbleData(bool isOn) override;

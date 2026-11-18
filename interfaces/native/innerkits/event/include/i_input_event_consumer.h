@@ -17,6 +17,7 @@
 #define I_INPUT_EVENT_CONSUMER_H
 
 #include "axis_event.h"
+#include "input_handler_type.h"
 #include "key_event.h"
 #include "pointer_event.h"
 #include "switch_event.h"
@@ -31,6 +32,7 @@ public:
     virtual void OnInputEvent(std::shared_ptr<KeyEvent> keyEvent) const;
     virtual void OnInputEvent(std::shared_ptr<PointerEvent> pointerEvent) const;
     virtual void OnInputEvent(std::shared_ptr<AxisEvent> axisEvent) const;
+    virtual void OnHookDisabled(HookEventType hookEventType) const {}
 };
 } // namespace MMI
 } // namespace OHOS

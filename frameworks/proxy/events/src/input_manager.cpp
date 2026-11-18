@@ -71,6 +71,11 @@ int32_t InputManager::GetWindowPid(int32_t windowId)
     return InputMgrImpl.GetWindowPid(windowId);
 }
 
+int32_t InputManager::EnableTouchpadRawEvent(bool enable)
+{
+    return InputMgrImpl.EnableTouchpadRawEvent(enable);
+}
+
 int32_t InputManager::UpdateDisplayInfo(const UserScreenInfo &userScreenInfo)
 {
     return InputMgrImpl.UpdateDisplayInfo(userScreenInfo);
@@ -308,7 +313,7 @@ int32_t InputManager::SimulateInputEvent(std::shared_ptr<PointerEvent> pointerEv
     } else {
         MMI_HILOGD("isAutoToVirtualScreen=%{public}s", isAutoToVirtualScreen ? "true" : "false");
     }
-    return InputMgrImpl.SimulateInputEvent(pointerEvent, useCoordinate);
+    return InputMgrImpl.SimulateInputEvent(pointerEvent, false, useCoordinate);
     // LCOV_EXCL_STOP
 }
 
@@ -1072,9 +1077,9 @@ int32_t InputManager::RemoveInputEventHook(HookEventType hookEventType)
     return InputMgrImpl.RemoveInputEventHook(hookEventType);
 }
 
-int32_t InputManager::DispatchToNextHandler(int32_t eventId, HookEventType hookEventType)
+int32_t InputManager::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed)
 {
-    return InputMgrImpl.DispatchToNextHandler(eventId, hookEventType);
+    return InputMgrImpl.NotifyHookEventResult(eventId, hookEventType, isConsumed);
 }
 
 int32_t InputManager::SetKeyStatusRecord(bool enable, int32_t timeout)

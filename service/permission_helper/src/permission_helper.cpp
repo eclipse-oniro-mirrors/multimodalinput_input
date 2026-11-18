@@ -40,6 +40,7 @@ namespace {
     const std::string DEVICE_CONTROLLER_PERMISSION_CODE = "ohos.permission.INPUT_DEVICE_CONTROLLER";
     const std::string KEYBOARD_CONTROLLER_PERMISSION_CODE = "ohos.permission.INPUT_KEYBOARD_CONTROLLER";
     const std::string KEY_EVENT_HOOK_PERMISSION_CODE = "ohos.permission.HOOK_KEY_EVENT";
+    const std::string INPUT_EVENT_HOOK_PERMISSION_CODE = "ohos.permission.HOOK_INPUT_EVENT";
     const std::string MANAGE_EDM_POLICY_PERMISSION_CODE = "ohos.permission.MANAGE_EDM_POLICY";
     const std::string INPUT_DEVICE_PERMISSION_CODE = "ohos.permission.INPUT_DEVICE_CONFIGURATOR";
     const std::string INPUT_RECORDING_PERMISSION_CODE = "ohos.permission.INPUT_RECORDING";
@@ -142,6 +143,20 @@ bool PermissionHelper::CheckKeyEventHook()
     }
     MMI_HILOGI("CheckHapPermission %{public}s success", KEY_EVENT_HOOK_PERMISSION_CODE.c_str());
     AddPermissionUsedRecord(tokenId, KEY_EVENT_HOOK_PERMISSION_CODE, 1, 0);
+    return true;
+}
+
+bool PermissionHelper::CheckInputEventHook()
+{
+    CALL_DEBUG_ENTER;
+    auto tokenId = IPCSkeleton::GetCallingTokenID();
+    if (!CheckHapPermission(INPUT_EVENT_HOOK_PERMISSION_CODE)) {
+        MMI_HILOGE("CheckHapPermission %{public}s failed", INPUT_EVENT_HOOK_PERMISSION_CODE.c_str());
+        AddPermissionUsedRecord(tokenId, INPUT_EVENT_HOOK_PERMISSION_CODE, 0, 1);
+        return false;
+    }
+    MMI_HILOGI("CheckHapPermission %{public}s success", INPUT_EVENT_HOOK_PERMISSION_CODE.c_str());
+    AddPermissionUsedRecord(tokenId, INPUT_EVENT_HOOK_PERMISSION_CODE, 1, 0);
     return true;
 }
 

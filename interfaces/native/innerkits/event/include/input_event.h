@@ -285,6 +285,14 @@ public:
      */
     static constexpr int32_t SOURCE_TYPE_MSDP_HAND_OPTINON = 7;
 
+    /**
+     * Indicates that the input source generates a touchpad raw event, which carries the raw
+     * contact data of the touchpad before normalization.
+     *
+     * @since 26.1.0
+     */
+    static constexpr int32_t SOURCE_TYPE_TOUCHPAD_RAW = 8;
+
 public:
     /**
      * Copy constructor function for InputEvent

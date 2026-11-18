@@ -1112,6 +1112,49 @@ int32_t MultimodalInputConnectManager::SetCurrentUser(int32_t userId)
     return multimodalInputConnectService_->SetCurrentUser(userId);
 }
 
+int32_t MultimodalInputConnectManager::SetTouchpadRawEventSwitch(bool enable)
+{
+    sptr<IMultimodalInputConnect> multimodalInputConnectService = nullptr;
+    {
+        std::lock_guard<std::mutex> guard(lock_);
+        multimodalInputConnectService = multimodalInputConnectService_;
+    }
+    if (multimodalInputConnectService == nullptr) {
+        MMI_HILOGE("SetTouchpadRawEventSwitch failed, multimodalInputConnectService_ is nullptr");
+        return INVALID_HANDLER_ID;
+    }
+    int32_t ret = multimodalInputConnectService->SetTouchpadRawEventSwitch(enable);
+    if (ret == RET_OK) {
+        std::lock_guard<std::mutex> guard(lock_);
+        rawEventSwitchCache_ = enable;
+    }
+    return ret;
+}
+
+void MultimodalInputConnectManager::RestoreRawEventSwitch()
+{
+    // LCOV_EXCL_START
+    sptr<IMultimodalInputConnect> multimodalInputConnectService = nullptr;
+    {
+        std::lock_guard<std::mutex> guard(lock_);
+        if (!rawEventSwitchCache_) {
+            return;
+        }
+        multimodalInputConnectService = multimodalInputConnectService_;
+    }
+    if (multimodalInputConnectService == nullptr) {
+        MMI_HILOGE("RestoreRawEventSwitch failed, multimodalInputConnectService_ is nullptr");
+        return;
+    }
+    int32_t ret = multimodalInputConnectService->SetTouchpadRawEventSwitch(true);
+    if (ret != RET_OK) {
+        MMI_HILOGE("Failed to restore touchpad raw event switch, ret:%{public}d", ret);
+        return;
+    }
+    MMI_HILOGI("Touchpad raw event switch restoration completed");
+    // LCOV_EXCL_STOP
+}
+
 int32_t MultimodalInputConnectManager::SetTouchpadThreeFingersTapSwitch(bool switchFlag)
 {
     std::lock_guard<std::mutex> guard(lock_);
@@ -1415,6 +1458,14 @@ int32_t MultimodalInputConnectManager::DispatchToNextHandler(int32_t eventId)
     return multimodalInputConnectService_->DispatchToNextHandler(eventId);
 }
 
+int32_t MultimodalInputConnectManager::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType,
+    bool isConsumed)
+{
+    std::lock_guard<std::mutex> guard(lock_);
+    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
+    return multimodalInputConnectService_->NotifyHookEventResult(eventId, hookEventType, isConsumed);
+}
+
 int32_t MultimodalInputConnectManager::GetExternalObject(
     const std::string &pluginName, sptr<IRemoteObject> &pluginRemoteStub)
 {
@@ -1435,22 +1486,6 @@ int32_t MultimodalInputConnectManager::RemoveInputEventHook(HookEventType hookEv
     std::lock_guard<std::mutex> guard(lock_);
     CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
     return multimodalInputConnectService_->RemoveInputEventHook(hookEventType);
-}
-
-int32_t MultimodalInputConnectManager::DispatchToNextHandler(const std::shared_ptr<KeyEvent> keyEvent)
-{
-    std::lock_guard<std::mutex> guard(lock_);
-    CHKPR(keyEvent, ERR_INVALID_VALUE);
-    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->DispatchToNextHandler(*keyEvent);
-}
-
-int32_t MultimodalInputConnectManager::DispatchToNextHandler(const std::shared_ptr<PointerEvent> pointerEvent)
-{
-    std::lock_guard<std::mutex> guard(lock_);
-    CHKPR(pointerEvent, ERR_INVALID_VALUE);
-    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
-    return multimodalInputConnectService_->DispatchToNextHandler(*pointerEvent);
 }
 
 int32_t MultimodalInputConnectManager::SetKeyStatusRecord(bool enable, int32_t timeout)

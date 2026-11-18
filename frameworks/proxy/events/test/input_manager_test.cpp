@@ -6384,7 +6384,8 @@ public:
         }
         auto y = item.GetDisplayY();
         if (y >= height / 2) {
-            EXPECT_EQ(InputManager::GetInstance()->DispatchToNextHandler(eventId, hookEventType), ERROR_UNSUPPORT);
+            EXPECT_EQ(InputManager::GetInstance()->NotifyHookEventResult(eventId, hookEventType, false),
+                ERROR_UNSUPPORT);
             std::cout << "DispatchToNextHandler " << eventId << std::endl;
         }
     }
@@ -6412,7 +6413,8 @@ public:
         }
         auto y = item.GetDisplayY();
         if (y < height / 2) {
-            EXPECT_EQ(InputManager::GetInstance()->DispatchToNextHandler(eventId, hookEventType), ERROR_UNSUPPORT);
+            EXPECT_EQ(InputManager::GetInstance()->NotifyHookEventResult(eventId, hookEventType, false),
+                ERROR_UNSUPPORT);
             std::cout << "DispatchToNextHandler " << eventId << std::endl;
         }
     }
@@ -6492,7 +6494,7 @@ HWTEST_F(InputManagerTest, InputManagerTest_DispatchToNextHandler_001, TestSize.
 {
     CALL_TEST_DEBUG;
     int32_t eventId { 0 };
-    EXPECT_EQ(InputManager::GetInstance()->DispatchToNextHandler(eventId, HOOK_EVENT_TYPE_TOUCH),
+    EXPECT_EQ(InputManager::GetInstance()->NotifyHookEventResult(eventId, HOOK_EVENT_TYPE_TOUCH, false),
         ERROR_UNSUPPORT);
 }
 
@@ -6549,7 +6551,7 @@ HWTEST_F(InputManagerTest, InputManagerTest_DispatchToNextHandler, TestSize.Leve
 
     auto eventId = pointerEvent->GetId();
     HookEventType hookEventType = 2;
-    auto ret = InputManager::GetInstance()->DispatchToNextHandler(eventId, hookEventType);
+    auto ret = InputManager::GetInstance()->NotifyHookEventResult(eventId, hookEventType, false);
     EXPECT_EQ(ret, ERROR_UNSUPPORT);
 }
 /*

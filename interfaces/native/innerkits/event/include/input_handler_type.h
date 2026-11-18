@@ -105,6 +105,7 @@ inline constexpr HookEventType HOOK_EVENT_TYPE_NONE { 0x0 };
 inline constexpr HookEventType HOOK_EVENT_TYPE_KEY { 1u };
 inline constexpr HookEventType HOOK_EVENT_TYPE_TOUCH { 1u << 1 };
 inline constexpr HookEventType HOOK_EVENT_TYPE_MOUSE { 1u << 2 };
+inline constexpr HookEventType HOOK_EVENT_TYPE_AXIS { 1u << 3 };
 
 } // namespace MMI
 } // namespace OHOS

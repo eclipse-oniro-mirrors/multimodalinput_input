@@ -2792,5 +2792,43 @@ HWTEST_F(ScreenPointerTest, ScreenPointerTest_GetScale_006, TestSize.Level1)
     screenpointer->mode_ = mode_t::SCREEN_UNIQUE;
     EXPECT_FLOAT_EQ(screenpointer->GetScale(), 1.0f);
 }
+
+/**
+ * @tc.name: ScreenPointerTest_ConstructSourceMode_001
+ * @tc.desc: Test the DisplayInfo constructor's displaySourceMode mapping (screen_pointer.cpp
+ *           154-171): each MMI source mode maps to the same-named Rosen mode; SCREEN_EXPAND has
+ *           no same-named Rosen mode and out-of-range values, both fall back to SCREEN_MAIN via
+ *           the default label.
+ * @tc.type: Function
+ * @tc.require:
+ */
+HWTEST_F(ScreenPointerTest, ScreenPointerTest_ConstructSourceMode_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    hwcmgr_ptr_t hwcmgr = std::make_shared<HardwareCursorPointerManager>();
+    ASSERT_NE(hwcmgr, nullptr);
+    handler_ptr_t handler = nullptr;
+    struct SourceModeCase {
+        OHOS::MMI::DisplaySourceMode input;
+        mode_t expected;
+    };
+    const SourceModeCase cases[] = {
+        { OHOS::MMI::DisplaySourceMode::SCREEN_MIRROR, mode_t::SCREEN_MIRROR },
+        { OHOS::MMI::DisplaySourceMode::SCREEN_EXTEND, mode_t::SCREEN_EXTEND },
+        { OHOS::MMI::DisplaySourceMode::SCREEN_ALONE, mode_t::SCREEN_ALONE },
+        { OHOS::MMI::DisplaySourceMode::SCREEN_UNIQUE, mode_t::SCREEN_UNIQUE },
+        { OHOS::MMI::DisplaySourceMode::SCREEN_MAIN, mode_t::SCREEN_MAIN },
+        { OHOS::MMI::DisplaySourceMode::SCREEN_EXPAND, mode_t::SCREEN_MAIN },
+        { static_cast<OHOS::MMI::DisplaySourceMode>(99), mode_t::SCREEN_MAIN },
+    };
+    for (const auto &item : cases) {
+        OLD::DisplayInfo di;
+        di.displaySourceMode = item.input;
+        std::shared_ptr<ScreenPointer> screenpointer = std::make_shared<ScreenPointer>(hwcmgr, handler, di);
+        ASSERT_NE(screenpointer, nullptr);
+        EXPECT_EQ(screenpointer->GetMode(), static_cast<uint32_t>(item.expected))
+            << "input mode=" << static_cast<uint32_t>(item.input);
+    }
+}
 } // namespace MMI
 } // namespace OHOS

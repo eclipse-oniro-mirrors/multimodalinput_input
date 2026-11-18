@@ -116,6 +116,11 @@ group("multimodalinput_mmi_service") {
   if (input_feature_mouse) {
     deps += [ "${mmi_path}/service/mouse_event_normalize:mmi_mouse_event_normalizer" ]
   }
+
+  # 端到端验证用测试二进制，默认不参与门禁/整包编译（见 multimodalinput_mini.gni）
+  if (input_feature_input_event_hook_tool) {
+    deps += [ "tools/input_event_hook:input_event_hook" ]
+  }
 }
 
 group("input-third-mmi") {
@@ -215,7 +220,6 @@ group("mmi_tests") {
     "frameworks/proxy:ut-mmi-proxy-out",
     "frameworks/proxy/event_handler/test:InputActiveSubscribeManagerTest",
     "frameworks/proxy/event_handler/test:InputEventHookHandlerTest",
-    "frameworks/proxy/event_handler/test:InputEventStagerTest",
     "frameworks/proxy/events/test:FrameworkEventTests",
     "libudev:test",
     "service:AccountManagerTest",
@@ -298,8 +302,6 @@ group("mmi_tests") {
       "service:InputEventHookTest",
       "service:InputEventHookManagerTest",
       "service:KeyEventHookTest",
-      "service:KeyLoopClosureCheckerTest",
-      "service:PointerLoopClosureCheckerTest",
       "service:PointerEventHookTest",
     ]
   }

@@ -76,6 +76,8 @@ protected:
     int32_t OnHookKey(const UDSClient &client, NetPacket &pkt);
     int32_t OnHookTouch(const UDSClient &client, NetPacket &pkt);
     int32_t OnHookMouse(const UDSClient &client, NetPacket &pkt);
+    int32_t OnHookAxis(const UDSClient &client, NetPacket &pkt);
+    int32_t OnHookDisable(const UDSClient &client, NetPacket &pkt);
 private:
     static void OnDispatchEventProcessed(int32_t eventId, int64_t actionTime);
 
