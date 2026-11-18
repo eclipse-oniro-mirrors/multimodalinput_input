@@ -108,7 +108,7 @@ void InputEventStatistics::MarkMouseDispatchStart(int32_t deviceId)
     dispatchStartPending_ = true;
 }
 
-void InputEventStatistics::RecordMouseDispatchLatency(const PointerEvent *point)
+void InputEventStatistics::RecordMouseDispatchLatency(std::shared_ptr<PointerEvent> point)
 {
     if (!dispatchStartPending_ || point == nullptr) {
         return;

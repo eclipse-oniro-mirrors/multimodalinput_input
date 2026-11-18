@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 #include "pointer_event.h"
 
@@ -96,10 +97,8 @@ public:
     // dispatch latency once per marked event, for mouse/touchpad sourced move-action
     // events only (button/wheel events share the pipeline but are not counted).
     // Events that never reach a successful UDS send (intercepted/consumed/dropped)
-    // are not counted. A null pointer is ignored. Takes a const raw pointer on
-    // purpose: read-only hot path access, no ownership transfer and no shared_ptr
-    // refcount churn.
-    static void RecordMouseDispatchLatency(const PointerEvent *point);
+    // are not counted. An empty pointer is ignored.
+    static void RecordMouseDispatchLatency(std::shared_ptr<PointerEvent> point);
 
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     // Called when a touchpad right-click gesture is recognized (two-finger tap or

@@ -183,10 +183,10 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_RecordDispatchLatenc
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_MOVE);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(point.get());
+    InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 1u);
     // one mark only records once
-    InputEventStatistics::RecordMouseDispatchLatency(point.get());
+    InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 1u);
 }
 
@@ -201,7 +201,7 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_InterceptedEventNoSt
     CALL_TEST_DEBUG;
     auto point = CreatePointerEvent(PointerEvent::SOURCE_TYPE_MOUSE, TEST_DEVICE_ID);
     ASSERT_NE(point, nullptr);
-    InputEventStatistics::RecordMouseDispatchLatency(point.get());
+    InputEventStatistics::RecordMouseDispatchLatency(point);
     InputEventStatistics::RecordMouseDispatchLatency(nullptr);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
@@ -221,13 +221,13 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_SimulateNoDispatchSt
     // simulate flag (api injected)
     point->AddFlag(InputEvent::EVENT_FLAG_SIMULATE);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(point.get());
+    InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
     // touchscreen source is not mouse statistics scope
     auto touch = CreatePointerEvent(PointerEvent::SOURCE_TYPE_TOUCHSCREEN, TEST_DEVICE_ID);
     ASSERT_NE(touch, nullptr);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(touch.get());
+    InputEventStatistics::RecordMouseDispatchLatency(touch);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
 
@@ -244,7 +244,7 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_NonMoveNoDispatchSta
     ASSERT_NE(point, nullptr);
     point->SetPointerAction(PointerEvent::POINTER_ACTION_DOWN);
     InputEventStatistics::MarkMouseDispatchStart(TEST_DEVICE_ID);
-    InputEventStatistics::RecordMouseDispatchLatency(point.get());
+    InputEventStatistics::RecordMouseDispatchLatency(point);
     EXPECT_EQ(SumDispatchLatencyCounts(), 0u);
 }
 
