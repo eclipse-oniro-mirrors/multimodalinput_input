@@ -209,7 +209,7 @@ ORIGINAL_INPUT_EVENT_INTERVAL:
   __BASE: {type: STATISTIC, level: MINOR, desc: original input event interval statistics}
   MOUSE: {type: STRING, desc: bucket counts of mouse motion event interval in json format}
 
-ORIGINAL_EVENT_DISPATCH_LATENCY:
+INPUT_EVENT_DISPATCH_LATENCY:
   __BASE: {type: STATISTIC, level: MINOR, desc: original event dispatch latency statistics}
   MOUSE: {type: STRING, desc: bucket counts of mouse event dispatch latency in json format}
 

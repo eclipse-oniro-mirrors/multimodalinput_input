@@ -475,7 +475,7 @@ int32_t DfxHisysevent::ReportOriginalEventDispatchLatencyStat(uint32_t below2ms,
         ",\"ABOVE16MS\":" + std::to_string(above16ms) + "}";
     int32_t ret = HiSysEventWrite(
         OHOS::HiviewDFX::HiSysEvent::Domain::MULTI_MODAL_INPUT,
-        "ORIGINAL_EVENT_DISPATCH_LATENCY",
+        "INPUT_EVENT_DISPATCH_LATENCY",
         OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC,
         "MOUSE", latencyJson);
     if (ret != RET_OK) {
