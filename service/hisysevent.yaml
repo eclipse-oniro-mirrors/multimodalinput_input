@@ -210,8 +210,8 @@ ORIGINAL_INPUT_EVENT_INTERVAL:
   MOUSE: {type: STRING, desc: bucket counts of mouse motion event interval in json format}
 
 INPUT_EVENT_DISPATCH_LATENCY:
-  __BASE: {type: STATISTIC, level: MINOR, desc: original event dispatch latency statistics}
-  MOUSE: {type: STRING, desc: bucket counts of mouse event dispatch latency in json format}
+  __BASE: {type: STATISTIC, level: MINOR, desc: input event dispatch latency statistics}
+  MOUSE: {type: STRING, desc: bucket counts of input event dispatch latency in json format}
 
 INPUT_GESTURE:
   __BASE: {type: STATISTIC, level: MINOR, desc: input gesture usage count}
