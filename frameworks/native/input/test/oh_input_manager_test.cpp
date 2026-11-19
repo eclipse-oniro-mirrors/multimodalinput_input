@@ -6579,5 +6579,287 @@ HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_PointerEventToTouchEven
     EXPECT_EQ(pressure, OH_Input_GetTouchEventPressure(touchEvent));
 }
 
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectKeyEvent_WhenEventIsNull
+ * @tc.desc: InjectKeyEvent with nullptr returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectKeyEvent_WhenEventIsNull, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(OH_Input_InjectKeyEvent(nullptr), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectKeyEvent_DownUpDownSequence
+ * @tc.desc: InjectKeyEvent DOWN/UP/DOWN sequence covers previous-UP cleanup and both action branches
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectKeyEvent_DownUpDownSequence, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_KeyEvent keyEvent {};
+    keyEvent.keyCode = 2017;
+    keyEvent.actionTime = 100;
+    keyEvent.action = KEY_ACTION_DOWN;
+    EXPECT_EQ(OH_Input_InjectKeyEvent(&keyEvent), INPUT_SUCCESS);
+
+    keyEvent.actionTime = 200;
+    keyEvent.action = KEY_ACTION_UP;
+    EXPECT_EQ(OH_Input_InjectKeyEvent(&keyEvent), INPUT_SUCCESS);
+
+    keyEvent.actionTime = 300;
+    keyEvent.action = KEY_ACTION_DOWN;
+    EXPECT_EQ(OH_Input_InjectKeyEvent(&keyEvent), INPUT_SUCCESS);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEvent_WhenEventIsNull
+ * @tc.desc: InjectMouseEvent with nullptr returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_WhenEventIsNull, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(OH_Input_InjectMouseEvent(nullptr), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEvent_DisplayIdPositive
+ * @tc.desc: InjectMouseEvent with positive displayId sets target display and reaches simulate path
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_DisplayIdPositive, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_MouseEvent mouseEvent {};
+    mouseEvent.action = MOUSE_ACTION_MOVE;
+    mouseEvent.actionTime = 100;
+    mouseEvent.displayId = 2;
+    mouseEvent.displayX = 100;
+    mouseEvent.displayY = 100;
+    mouseEvent.button = MOUSE_BUTTON_NONE;
+    EXPECT_EQ(OH_Input_InjectMouseEvent(&mouseEvent), INPUT_PERMISSION_DENIED);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEvent_InvalidAction
+ * @tc.desc: InjectMouseEvent with invalid action returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_InvalidAction, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_MouseEvent mouseEvent {};
+    mouseEvent.action = static_cast<Input_MouseEventAction>(100);
+    mouseEvent.actionTime = 100;
+    mouseEvent.displayX = 100;
+    mouseEvent.displayY = 100;
+    mouseEvent.button = MOUSE_BUTTON_LEFT;
+    EXPECT_EQ(OH_Input_InjectMouseEvent(&mouseEvent), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEvent_InvalidButton
+ * @tc.desc: InjectMouseEvent with invalid button returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEvent_InvalidButton, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_MouseEvent mouseEvent {};
+    mouseEvent.action = MOUSE_ACTION_MOVE;
+    mouseEvent.actionTime = 100;
+    mouseEvent.displayX = 100;
+    mouseEvent.displayY = 100;
+    mouseEvent.button = static_cast<Input_MouseEventButton>(100);
+    EXPECT_EQ(OH_Input_InjectMouseEvent(&mouseEvent), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEventGlobal_WhenEventIsNull
+ * @tc.desc: InjectMouseEventGlobal with nullptr returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEventGlobal_WhenEventIsNull, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(OH_Input_InjectMouseEventGlobal(nullptr), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectMouseEventGlobal_InvalidAction
+ * @tc.desc: InjectMouseEventGlobal with invalid action returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectMouseEventGlobal_InvalidAction, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_MouseEvent mouseEvent {};
+    mouseEvent.action = static_cast<Input_MouseEventAction>(100);
+    mouseEvent.actionTime = 100;
+    mouseEvent.globalX = 100;
+    mouseEvent.globalY = 100;
+    mouseEvent.button = MOUSE_BUTTON_LEFT;
+    EXPECT_EQ(OH_Input_InjectMouseEventGlobal(&mouseEvent), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEvent_WhenEventIsNull
+ * @tc.desc: InjectTouchEvent with nullptr returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEvent_WhenEventIsNull, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(nullptr), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEvent_DownMoveUpSequence
+ * @tc.desc: InjectTouchEvent DOWN/MOVE/UP sequence covers move and final-finger reset branches
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEvent_DownMoveUpSequence, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_TouchEvent touchEvent {};
+    touchEvent.id = 0;
+    touchEvent.displayX = 100;
+    touchEvent.displayY = 100;
+    touchEvent.actionTime = 100;
+    touchEvent.action = TOUCH_ACTION_DOWN;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+
+    touchEvent.displayX = 120;
+    touchEvent.displayY = 120;
+    touchEvent.actionTime = 200;
+    touchEvent.action = TOUCH_ACTION_MOVE;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+
+    touchEvent.actionTime = 300;
+    touchEvent.action = TOUCH_ACTION_UP;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEvent_UpWithMultiplePointers
+ * @tc.desc: InjectTouchEvent UP with remaining fingers does not reset the pointer list
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEvent_UpWithMultiplePointers, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_TouchEvent touchEvent {};
+    touchEvent.id = 0;
+    touchEvent.displayX = 100;
+    touchEvent.displayY = 100;
+    touchEvent.actionTime = 100;
+    touchEvent.action = TOUCH_ACTION_DOWN;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+
+    touchEvent.displayX = 200;
+    touchEvent.displayY = 200;
+    touchEvent.id = 1;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+
+    touchEvent.actionTime = 200;
+    touchEvent.action = TOUCH_ACTION_UP;
+    touchEvent.id = 0;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEvent_CancelAfterDown
+ * @tc.desc: InjectTouchEvent CANCEL after DOWN finds pointer item and returns INPUT_SUCCESS
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEvent_CancelAfterDown, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_TouchEvent touchEvent {};
+    touchEvent.id = 0;
+    touchEvent.displayX = 100;
+    touchEvent.displayY = 100;
+    touchEvent.actionTime = 100;
+    touchEvent.action = TOUCH_ACTION_DOWN;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+
+    touchEvent.actionTime = 200;
+    touchEvent.action = TOUCH_ACTION_CANCEL;
+    EXPECT_EQ(OH_Input_InjectTouchEvent(&touchEvent), INPUT_SUCCESS);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEventGlobal_WhenEventIsNull
+ * @tc.desc: InjectTouchEventglobal with nullptr returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_WhenEventIsNull, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(nullptr), INPUT_PARAMETER_ERROR);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEventGlobal_DownMoveUpSequence
+ * @tc.desc: InjectTouchEventGlobal DOWN/MOVE/UP sequence covers gobal coordinate and reset branches
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_DownMoveUpSequence, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_TouchEvent touchEvent {};
+    touchEvent.id = 0;
+    touchEvent.displayX = 100;
+    touchEvent.displayY = 100;
+    touchEvent.globalX = 100;
+    touchEvent.globalY = 100;
+    touchEvent.actionTime = 100;
+    touchEvent.action = TOUCH_ACTION_DOWN;
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PERMISSION_DENIED);
+
+    touchEvent.globalX = 120;
+    touchEvent.globalY = 120;
+    touchEvent.actionTime = 200;
+    touchEvent.action = TOUCH_ACTION_MOVE;
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PERMISSION_DENIED);
+
+    touchEvent.actionTime = 300;
+    touchEvent.action = TOUCH_ACTION_UP;
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PERMISSION_DENIED);
+}
+
+/**
+ * @tc.name: OHInputManagerTest_OH_Input_InjectTouchEventGlobal_InvalidAction
+ * @tc.desc: InjectTouchEventGlobal with invalid action returns INPUT_PARAMETER_ERROR
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(OHInputManagerTest, OHInputManagerTest_OH_Input_InjectTouchEventGlobal_InvalidAction, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    Input_TouchEvent touchEvent {};
+    touchEvent.action = static_cast<Input_TouchEventAction>(100);
+    touchEvent.displayX = 100;
+    touchEvent.displayY = 100;
+    touchEvent.globalX = 100;
+    touchEvent.globalY = 100;
+    EXPECT_EQ(OH_Input_InjectTouchEventGlobal(&touchEvent), INPUT_PARAMETER_ERROR);
+}
 } // namespace MMI
 } // namespace OHOS

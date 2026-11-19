@@ -180,6 +180,9 @@ static constexpr int32_t MOUSE_INJECT_POINTER_ID { 0 };
 static std::shared_ptr<OHOS::MMI::KeyEvent> g_keyEvent = OHOS::MMI::KeyEvent::Create();
 static std::shared_ptr<OHOS::MMI::PointerEvent> g_mouseEvent = OHOS::MMI::PointerEvent::Create();
 static std::shared_ptr<OHOS::MMI::PointerEvent> g_touchEvent = OHOS::MMI::PointerEvent::Create();
+static std::mutex g_keyEventMutex;
+static std::mutex g_mouseEventMutex;
+static std::mutex g_touchEventMutex;
 static const std::set<int32_t> g_keyCodeValueSet = {
     KEYCODE_FN, KEYCODE_DPAD_UP, KEYCODE_DPAD_DOWN, KEYCODE_DPAD_LEFT, KEYCODE_DPAD_RIGHT, KEYCODE_ALT_LEFT,
     KEYCODE_ALT_RIGHT, KEYCODE_SHIFT_LEFT, KEYCODE_SHIFT_RIGHT, KEYCODE_TAB, KEYCODE_ENTER, KEYCODE_DEL, KEYCODE_MENU,
@@ -352,40 +355,45 @@ int32_t OH_Input_InjectKeyEvent(const struct Input_KeyEvent* keyEvent)
         MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectKeyEvent.Error", INPUT_PARAMETER_ERROR);
         return INPUT_PARAMETER_ERROR;
     }
-    CHKPR(g_keyEvent, INPUT_PARAMETER_ERROR);
-    g_keyEvent->ClearFlag();
-    if (g_keyEvent->GetAction() == OHOS::MMI::KeyEvent::KEY_ACTION_UP) {
-        std::optional<OHOS::MMI::KeyEvent::KeyItem> preUpKeyItem = g_keyEvent->GetKeyItem();
-        if (preUpKeyItem) {
-            g_keyEvent->RemoveReleasedKeyItems(*preUpKeyItem);
-        } else {
-            MMI_HILOGE("The preUpKeyItem is nullopt");
+    std::shared_ptr<OHOS::MMI::KeyEvent> event;
+    {
+        std::lock_guard<std::mutex> lock(g_keyEventMutex);
+        CHKPR(g_keyEvent, INPUT_PARAMETER_ERROR);
+        g_keyEvent->ClearFlag();
+        if (g_keyEvent->GetAction() == OHOS::MMI::KeyEvent::KEY_ACTION_UP) {
+            std::optional<OHOS::MMI::KeyEvent::KeyItem> preUpKeyItem = g_keyEvent->GetKeyItem();
+            if (preUpKeyItem) {
+                g_keyEvent->RemoveReleasedKeyItems(*preUpKeyItem);
+            } else {
+                MMI_HILOGE("The preUpKeyItem is nullopt");
+            }
         }
+        int64_t time = keyEvent->actionTime;
+        if (time < 0) {
+            time = OHOS::MMI::GetSysClockTime();
+        }
+        g_keyEvent->SetActionTime(time);
+        g_keyEvent->SetRepeat(true);
+        g_keyEvent->SetKeyCode(keyEvent->keyCode);
+        bool isKeyPressed = false;
+        if (keyEvent->action == KEY_ACTION_DOWN) {
+            g_keyEvent->SetAction(OHOS::MMI::KeyEvent::KEY_ACTION_DOWN);
+            g_keyEvent->SetKeyAction(OHOS::MMI::KeyEvent::KEY_ACTION_DOWN);
+            isKeyPressed = true;
+        } else if (keyEvent->action == KEY_ACTION_UP) {
+            g_keyEvent->SetAction(OHOS::MMI::KeyEvent::KEY_ACTION_UP);
+            g_keyEvent->SetKeyAction(OHOS::MMI::KeyEvent::KEY_ACTION_UP);
+            isKeyPressed = false;
+        }
+        OHOS::MMI::KeyEvent::KeyItem item;
+        item.SetDownTime(time);
+        item.SetKeyCode(keyEvent->keyCode);
+        item.SetPressed(isKeyPressed);
+        HandleKeyAction(keyEvent, item);
+        g_keyEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
+        event = std::make_shared<OHOS::MMI::KeyEvent>(*g_keyEvent);
     }
-    int64_t time = keyEvent->actionTime;
-    if (time < 0) {
-        time = OHOS::MMI::GetSysClockTime();
-    }
-    g_keyEvent->SetActionTime(time);
-    g_keyEvent->SetRepeat(true);
-    g_keyEvent->SetKeyCode(keyEvent->keyCode);
-    bool isKeyPressed = false;
-    if (keyEvent->action == KEY_ACTION_DOWN) {
-        g_keyEvent->SetAction(OHOS::MMI::KeyEvent::KEY_ACTION_DOWN);
-        g_keyEvent->SetKeyAction(OHOS::MMI::KeyEvent::KEY_ACTION_DOWN);
-        isKeyPressed = true;
-    } else if (keyEvent->action == KEY_ACTION_UP) {
-        g_keyEvent->SetAction(OHOS::MMI::KeyEvent::KEY_ACTION_UP);
-        g_keyEvent->SetKeyAction(OHOS::MMI::KeyEvent::KEY_ACTION_UP);
-        isKeyPressed = false;
-    }
-    OHOS::MMI::KeyEvent::KeyItem item;
-    item.SetDownTime(time);
-    item.SetKeyCode(keyEvent->keyCode);
-    item.SetPressed(isKeyPressed);
-    HandleKeyAction(keyEvent, item);
-    g_keyEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-    OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(g_keyEvent, true);
+    OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true);
     return INPUT_SUCCESS;
 }
 
@@ -580,33 +588,38 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent)
     MMI_HILOGI("Input_MouseEvent injectEvent");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectMouseEvent.Call", true);
     CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
-    CHKPR(g_mouseEvent, INPUT_PARAMETER_ERROR);
-    g_mouseEvent->ClearFlag();
-    g_mouseEvent->ClearAxisValue();
-    if (mouseEvent->displayId <= 0) {
-        g_mouseEvent->SetTargetDisplayId(0);
-    } else {
-        MMI_HILOGI("{%{public}d}", mouseEvent->displayId);
-        g_mouseEvent->SetTargetDisplayId(mouseEvent->displayId);
+    int32_t result = INPUT_SUCCESS;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
+    {
+        std::lock_guard<std::mutex> lock(g_mouseEventMutex);
+        CHKPR(g_mouseEvent, INPUT_PARAMETER_ERROR);
+        g_mouseEvent->ClearFlag();
+        g_mouseEvent->ClearAxisValue();
+        if (mouseEvent->displayId <= 0) {
+            g_mouseEvent->SetTargetDisplayId(0);
+        } else {
+            MMI_HILOGI("{%{public}d}", mouseEvent->displayId);
+            g_mouseEvent->SetTargetDisplayId(mouseEvent->displayId);
+        }
+        int64_t time = mouseEvent->actionTime;
+        if (time < 0) {
+            time = OHOS::MMI::GetSysClockTime();
+        }
+        g_mouseEvent->SetActionTime(time);
+        OHOS::MMI::PointerEvent::PointerItem item;
+        g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
+        item.SetDownTime(time);
+        result = HandleMouseAction(mouseEvent, item);
+        if (result != 0) {
+            return result;
+        }
+        result = HandleMouseProperty(mouseEvent, item);
+        if (result != 0) {
+            return result;
+        }
+        g_mouseEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_mouseEvent);
     }
-    int64_t time = mouseEvent->actionTime;
-    if (time < 0) {
-        time = OHOS::MMI::GetSysClockTime();
-    }
-    g_mouseEvent->SetActionTime(time);
-    OHOS::MMI::PointerEvent::PointerItem item;
-    g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
-    item.SetDownTime(time);
-    int32_t result = HandleMouseAction(mouseEvent, item);
-    if (result != 0) {
-        return result;
-    }
-    result = HandleMouseProperty(mouseEvent, item);
-    if (result != 0) {
-        return result;
-    }
-    g_mouseEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-    auto event = std::make_shared<PointerEvent>(*g_mouseEvent);
     result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event,
         true, PointerEvent::DISPLAY_COORDINATE);
     if ((result == INPUT_PERMISSION_DENIED) || (result == INPUT_OCCUPIED_BY_OTHER)) {
@@ -622,32 +635,37 @@ int32_t OH_Input_InjectMouseEventGlobal(const struct Input_MouseEvent* mouseEven
     MMI_HILOGD("Input_MouseEvent global");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectMouseEventGlobal.Call", true);
     CHKPR(mouseEvent, INPUT_PARAMETER_ERROR);
-    CHKPR(g_mouseEvent, INPUT_PARAMETER_ERROR);
-    g_mouseEvent->ClearFlag();
-    g_mouseEvent->ClearAxisValue();
-    g_mouseEvent->SetTargetDisplayId(0);
-    int64_t time = mouseEvent->actionTime;
-    if (time < 0) {
-        time = OHOS::MMI::GetSysClockTime();
+    int32_t result = INPUT_SUCCESS;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
+    {
+        std::lock_guard<std::mutex> lock(g_mouseEventMutex);
+        CHKPR(g_mouseEvent, INPUT_PARAMETER_ERROR);
+        g_mouseEvent->ClearFlag();
+        g_mouseEvent->ClearAxisValue();
+        g_mouseEvent->SetTargetDisplayId(0);
+        int64_t time = mouseEvent->actionTime;
+        if (time < 0) {
+            time = OHOS::MMI::GetSysClockTime();
+        }
+        g_mouseEvent->SetActionTime(time);
+        OHOS::MMI::PointerEvent::PointerItem item;
+        g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
+        item.SetDownTime(time);
+        result = HandleMouseAction(mouseEvent, item);
+        if (result != 0) {
+            return result;
+        }
+        result = HandleMouseProperty(mouseEvent, item);
+        if (result != 0) {
+            return result;
+        }
+        if (!item.IsValidGlobalXY()) {
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectMouseEventGlobal.Error", INPUT_PARAMETER_ERROR);
+            return INPUT_PARAMETER_ERROR;
+        }
+        g_mouseEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_mouseEvent);
     }
-    g_mouseEvent->SetActionTime(time);
-    OHOS::MMI::PointerEvent::PointerItem item;
-    g_mouseEvent->GetPointerItem(MOUSE_INJECT_POINTER_ID, item);
-    item.SetDownTime(time);
-    int32_t result = HandleMouseAction(mouseEvent, item);
-    if (result != 0) {
-        return result;
-    }
-    result = HandleMouseProperty(mouseEvent, item);
-    if (result != 0) {
-        return result;
-    }
-    if (!item.IsValidGlobalXY()) {
-        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectMouseEventGlobal.Error", INPUT_PARAMETER_ERROR);
-        return INPUT_PARAMETER_ERROR;
-    }
-    g_mouseEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-    auto event = std::make_shared<PointerEvent>(*g_mouseEvent);
     result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event,
         true, PointerEvent::GLOBAL_COORDINATE);
     if ((result == INPUT_PERMISSION_DENIED) || (result == INPUT_OCCUPIED_BY_OTHER)) {
@@ -941,31 +959,35 @@ int32_t OH_Input_InjectTouchEvent(const struct Input_TouchEvent* touchEvent)
     MMI_HILOGI("Input_TouchEvent injectTouchEvent");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectTouchEvent.Call", true);
     CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
-    CHKPR(g_touchEvent, INPUT_PARAMETER_ERROR);
-    g_touchEvent->ClearFlag();
-    OHOS::MMI::PointerEvent::PointerItem item;
-    int32_t result = HandleTouchAction(touchEvent, item);
-    if (result != 0) {
-        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEvent.Error", INPUT_PARAMETER_ERROR);
-        return INPUT_PARAMETER_ERROR;
-    }
-    result = HandleTouchProperty(touchEvent, item, PointerEvent::DISPLAY_COORDINATE);
-    if (result != 0) {
-        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEvent.Error", INPUT_PARAMETER_ERROR);
-        return INPUT_PARAMETER_ERROR;
-    }
-    g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-    auto event = std::make_shared<PointerEvent>(*g_touchEvent);
-    OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
-        PointerEvent::DISPLAY_COORDINATE);
-    if (touchEvent->action == TOUCH_ACTION_UP) {
-        g_touchEvent->RemovePointerItem(g_touchEvent->GetPointerId());
-        MMI_HILOGD("This touch event is up remove this finger");
-        if (g_touchEvent->GetPointerIds().empty()) {
-            MMI_HILOGD("This touch event is final finger up remove this finger");
-            g_touchEvent->Reset();
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
+    {
+        std::lock_guard<std::mutex> lock(g_touchEventMutex);
+        CHKPR(g_touchEvent, INPUT_PARAMETER_ERROR);
+        g_touchEvent->ClearFlag();
+        OHOS::MMI::PointerEvent::PointerItem item;
+        int32_t result = HandleTouchAction(touchEvent, item);
+        if (result != 0) {
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEvent.Error", INPUT_PARAMETER_ERROR);
+            return INPUT_PARAMETER_ERROR;
+        }
+        result = HandleTouchProperty(touchEvent, item, PointerEvent::DISPLAY_COORDINATE);
+        if (result != 0) {
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEvent.Error", INPUT_PARAMETER_ERROR);
+            return INPUT_PARAMETER_ERROR;
+        }
+        g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_touchEvent);
+        if (touchEvent->action == TOUCH_ACTION_UP) {
+            g_touchEvent->RemovePointerItem(g_touchEvent->GetPointerId());
+            MMI_HILOGD("This touch event is up remove this finger");
+            if (g_touchEvent->GetPointerIds().empty()) {
+                MMI_HILOGD("This touch event is final finger up remove this finger");
+                g_touchEvent->Reset();
+            }
         }
     }
+    OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
+        PointerEvent::DISPLAY_COORDINATE);
     return INPUT_SUCCESS;
 }
 
@@ -974,35 +996,40 @@ int32_t OH_Input_InjectTouchEventGlobal(const struct Input_TouchEvent* touchEven
     MMI_HILOGD("injectTouchEvent global");
     MMI_HISTOGRAM_BOOLEAN("InputKit.OH_Input_InjectTouchEventGlobal.Call", true);
     CHKPR(touchEvent, INPUT_PARAMETER_ERROR);
-    CHKPR(g_touchEvent, INPUT_PARAMETER_ERROR);
-    g_touchEvent->ClearFlag();
-    OHOS::MMI::PointerEvent::PointerItem item;
-    int32_t result = HandleTouchAction(touchEvent, item);
-    if (result != 0) {
-        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PARAMETER_ERROR);
-        return INPUT_PARAMETER_ERROR;
-    }
-    result = HandleTouchProperty(touchEvent, item, PointerEvent::GLOBAL_COORDINATE);
-    if (result != 0) {
-        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PARAMETER_ERROR);
-        return INPUT_PARAMETER_ERROR;
-    }
-    if (!item.IsValidGlobalXY()) {
-        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PARAMETER_ERROR);
-        return INPUT_PARAMETER_ERROR;
-    }
-    g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
-    auto event = std::make_shared<PointerEvent>(*g_touchEvent);
-    result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
-        PointerEvent::GLOBAL_COORDINATE);
-    if (touchEvent->action == TOUCH_ACTION_UP) {
-        g_touchEvent->RemovePointerItem(g_touchEvent->GetPointerId());
-        MMI_HILOGD("This touch event is up remove this finger");
-        if (g_touchEvent->GetPointerIds().empty()) {
-            MMI_HILOGD("This touch event is final finger up remove this finger");
-            g_touchEvent->Reset();
+    int32_t result = INPUT_SUCCESS;
+    std::shared_ptr<OHOS::MMI::PointerEvent> event;
+    {
+        std::lock_guard<std::mutex> lock(g_touchEventMutex);
+        CHKPR(g_touchEvent, INPUT_PARAMETER_ERROR);
+        g_touchEvent->ClearFlag();
+        OHOS::MMI::PointerEvent::PointerItem item;
+        result = HandleTouchAction(touchEvent, item);
+        if (result != 0) {
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PARAMETER_ERROR);
+            return INPUT_PARAMETER_ERROR;
+        }
+        result = HandleTouchProperty(touchEvent, item, PointerEvent::GLOBAL_COORDINATE);
+        if (result != 0) {
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PARAMETER_ERROR);
+            return INPUT_PARAMETER_ERROR;
+        }
+        if (!item.IsValidGlobalXY()) {
+            MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PARAMETER_ERROR);
+            return INPUT_PARAMETER_ERROR;
+        }
+        g_touchEvent->AddFlag(OHOS::MMI::InputEvent::EVENT_FLAG_SIMULATE);
+        event = std::make_shared<OHOS::MMI::PointerEvent>(*g_touchEvent);
+        if (touchEvent->action == TOUCH_ACTION_UP) {
+            g_touchEvent->RemovePointerItem(g_touchEvent->GetPointerId());
+            MMI_HILOGD("This touch event is up remove this finger");
+            if (g_touchEvent->GetPointerIds().empty()) {
+                MMI_HILOGD("This touch event is final finger up remove this finger");
+                g_touchEvent->Reset();
+            }
         }
     }
+    result = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().SimulateInputEvent(event, true,
+        PointerEvent::GLOBAL_COORDINATE);
     if ((result == INPUT_PERMISSION_DENIED) || (result == INPUT_OCCUPIED_BY_OTHER)) {
         MMI_HILOGE("Permission denied or occupied by other");
         MMI_HISTOGRAM_ERROR("InputKit.OH_Input_InjectTouchEventGlobal.Error", INPUT_PERMISSION_DENIED);
