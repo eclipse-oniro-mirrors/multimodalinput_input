@@ -43,12 +43,14 @@
 #undef MMI_LOG_TAG
 #define MMI_LOG_TAG "OHInputManager"
 
+constexpr OH_Input_EventType INVALID_EVENT_TYPE { static_cast<OH_Input_EventType>(-1) };
+
 // Unified event base, modeled after the libinput_event polymorphism (libinput-private.h struct
 // libinput_event): it only carries a type tag; event structs such as Input_KeyEvent embed base as
 // their first member so they can be upcast for the callback, and OH_Input_Event_As* validates the
 // type tag before downcasting back.
 struct OH_Input_Event {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { INVALID_EVENT_TYPE };
 };
 
 struct Input_KeyState {

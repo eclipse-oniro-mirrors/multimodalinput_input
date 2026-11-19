@@ -33,6 +33,8 @@ constexpr OH_Input_EventTypeMask POINTER_MASK { OH_INPUT_EVENT_TYPE_MASK_MOUSE |
 constexpr OH_Input_EventTypeMask ALL_MASK { OH_INPUT_EVENT_TYPE_MASK_KEY | OH_INPUT_EVENT_TYPE_MASK_MOUSE |
     OH_INPUT_EVENT_TYPE_MASK_TOUCH | OH_INPUT_EVENT_TYPE_MASK_AXIS };
 
+constexpr OH_Input_EventType UNSET_EVENT_TYPE { static_cast<OH_Input_EventType>(-1) };
+
 // The callback returns non-NULL (the original event) to pass the event through; this test binary covers
 // only pure local paths and the callback is never actually invoked.
 const OH_Input_Event* PassThroughOnEvent(OH_Input_EventHandler*, const OH_Input_Event* event)
@@ -373,7 +375,7 @@ HWTEST_F(InputNativeEventHandlerTest, InputNativeEventHandlerTest_Destroy_002, T
  */
 HWTEST_F(InputNativeEventHandlerTest, InputNativeEventHandlerTest_GetType_001, TestSize.Level1)
 {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { UNSET_EVENT_TYPE };
     Input_Result ret = OH_Input_Event_GetType(nullptr, &type);
     EXPECT_EQ(ret, INPUT_PARAMETER_ERROR);
 }
