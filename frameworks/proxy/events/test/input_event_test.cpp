@@ -325,6 +325,7 @@ HWTEST_F(InputEventTest, InputEventTest_ReadFromParcel_002, TestSize.Level1)
     in.WriteUint32(0);
     in.WriteBool(true);
     in.WriteUint32(0);
+    in.WriteBool(false);
     bool ret = inputEvent->ReadFromParcel(in);
     EXPECT_TRUE(ret);
 }

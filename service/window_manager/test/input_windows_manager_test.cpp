@@ -14502,9 +14502,12 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AbandonRedispatch_001,
     axisItem.SetPointerId(0);
     axisItem.SetToolType(PointerEvent::TOOL_TYPE_TOUCHPAD);
     pointerEvent->AddPointerItem(axisItem);
+    // MouseRedispatchStore::Abandon resolves the tool type through the event's pointer id;
+    // without it the lookup misses and the item's TOUCHPAD type is never seen.
+    pointerEvent->SetPointerId(0);
     auto result = inputWindowsManager->mouseRedispatchStore_.Abandon(pointerEvent);
     EXPECT_TRUE(result);
-    inputWindowsManager->mouseRedispatchStore_.SetWindowActive(targetWindowId);
+    inputWindowsManager->mouseRedispatchStore_.SetWindowActive(MouseSessionType::AXIS, targetWindowId);
     result = inputWindowsManager->mouseRedispatchStore_.Abandon(pointerEvent);
     EXPECT_FALSE(result);
     pointerEvent->SetPointerAction(PointerEvent::POINTER_ACTION_AXIS_END);
@@ -17986,14 +17989,15 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_ApplyBoundDisplayId_Ke
     EXPECT_EQ(keyEvent->GetTargetDisplayId(), 1);
     EXPECT_EQ(WIN_MGR->activeSequenceCount_[devId], 1);
 
-    // Simulated key events must not touch the sequence counter.
+    // Simulated key events skip both the bound-display retarget and the sequence counter:
+    // injected events must not be silently re-routed to the bound display.
     auto simulated = KeyEvent::Create();
     ASSERT_NE(simulated, nullptr);
     simulated->SetDeviceId(devId);
     simulated->SetTargetDisplayId(-1);
     simulated->AddFlag(InputEvent::EVENT_FLAG_SIMULATE);
     WIN_MGR->ApplyBoundDisplayId(simulated);
-    EXPECT_EQ(simulated->GetTargetDisplayId(), 1); // bound display still applied
+    EXPECT_EQ(simulated->GetTargetDisplayId(), -1); // bound display not applied to simulated event
     EXPECT_EQ(WIN_MGR->activeSequenceCount_[devId], 1); // counter unchanged by simulated event
 }
 

@@ -102,6 +102,12 @@ public:
 HWTEST_F(E2eUdevTest, TestUdevPropsDefault, TestSize.Level1)
 {
     ASSERT_NO_FATAL_FAILURE(testDevice_.Init());
+    // Restore the original (2023) form: wait for the async add notification before querying.
+    // The 2026-05-21 "fix ut" pair dropped the wait and inverted the expectation to match a
+    // late-notification race (GetDevice(-1) -> 401), which only passes on a cold pipeline.
+    ASSERT_TRUE(WaitAdded());
+    EXPECT_GE(listener_->deviceId_, 0);
+
     auto res = inputManager_->GetDevice(listener_->deviceId_, [](std::shared_ptr<OHOS::MMI::InputDevice> dev) {
         EXPECT_EQ(dev->GetName(), TestDevice::TEST_NAME);
         EXPECT_EQ(dev->GetBus(), TestDevice::TEST_BUS);
@@ -109,13 +115,14 @@ HWTEST_F(E2eUdevTest, TestUdevPropsDefault, TestSize.Level1)
         EXPECT_EQ(dev->GetProduct(), TestDevice::TEST_PRODUCT);
         EXPECT_EQ(dev->GetCapabilities(), 1ULL << OHOS::MMI::INPUT_DEV_CAP_POINTER);
     });
-    EXPECT_NE(res, 0);
+    EXPECT_EQ(res, 0);
 }
 
 HWTEST_F(E2eUdevTest, TestUdevPropsKey, TestSize.Level1)
 {
     testDevice_.KeyboardSetup();
     ASSERT_NO_FATAL_FAILURE(testDevice_.Init(false));
+    ASSERT_TRUE(WaitAdded());
     EXPECT_GE(listener_->deviceId_, 0);
 
     auto res = inputManager_->GetDevice(listener_->deviceId_, [](std::shared_ptr<OHOS::MMI::InputDevice> dev) {

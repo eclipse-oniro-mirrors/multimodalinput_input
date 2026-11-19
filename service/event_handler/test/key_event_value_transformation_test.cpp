@@ -902,7 +902,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 768;
+    int32_t keyValue = 641;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_CLICK);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -920,7 +920,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 769;
+    int32_t keyValue = 642;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_FOCUS_LEFT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -938,7 +938,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 770;
+    int32_t keyValue = 643;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_FOCUS_RIGHT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -956,7 +956,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 771;
+    int32_t keyValue = 644;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_EXPOSURE_LEFT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -974,7 +974,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 772;
+    int32_t keyValue = 645;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_EXPOSURE_RIGHT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -992,7 +992,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 773;
+    int32_t keyValue = 646;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_SHUTTER_LEFT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -1010,7 +1010,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 774;
+    int32_t keyValue = 647;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_SHUTTER_RIGHT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -1028,7 +1028,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 775;
+    int32_t keyValue = 648;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_APERTURE_LEFT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -1046,7 +1046,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_Transf
     CALL_DEBUG_ENTER;
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
-    int32_t keyValue = 776;
+    int32_t keyValue = 649;
     KeyEventValueTransformation result = TransferKeyValue(keyValue);
     EXPECT_EQ(result.sysKeyValue, KeyEvent::KEYCODE_PTZ_APERTURE_RIGHT);
     EXPECT_EQ(result.nativeKeyValue, keyValue);
@@ -1082,7 +1082,7 @@ HWTEST_F(KeyEventValueTransformationTest, KeyEventValueTransformationTest_InputT
     auto KeyEvent = KeyEvent::Create();
     ASSERT_NE(KeyEvent, nullptr);
     constexpr int32_t ptzKeySize { 9 };
-    constexpr int32_t firstLinuxCode { 768 };
+    constexpr int32_t firstLinuxCode { 641 };
     constexpr int32_t firstOhosCode { 3235 };
     for (int32_t i = 0; i < ptzKeySize; ++i) {
         int32_t result = InputTransformationKeyValue(firstOhosCode + i);
