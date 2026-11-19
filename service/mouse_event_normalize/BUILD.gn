@@ -38,6 +38,7 @@ include_dirs = [
     "${mmi_path}/service/product_property_config/include",
     "${mmi_path}/service/dfx/include",
     "${mmi_path}/service/event_dispatch/include",
+    "${mmi_path}/service/input_event_statistics/include",
     "${mmi_path}/util/json_parser/include",
     "${mmi_path}/service/common/timer_manager/include",
 ]

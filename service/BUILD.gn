@@ -61,6 +61,7 @@ config("libmmi_server_config") {
     "key_event_normalize/include",
     "event_handler/include",
     "event_dump/include",
+    "input_event_statistics/include",
     "monitor/include",
     "interceptor/include",
     "dfx/include",
@@ -4434,6 +4435,39 @@ ohos_unittest("DfxHisysEventTest") {
     "init:libbegetutil",
     "libinput:libinput-third-mmi",
     "samgr:samgr_proxy",
+  ]
+}
+
+ohos_unittest("InputEventStatisticsTest") {
+  module_out_path = module_output_path
+
+  include_dirs = [ "${mmi_path}/test/unittest/common/include" ]
+
+  configs = [
+    "${mmi_path}:coverage_flags",
+    ":libmmi_server_config",
+  ]
+
+  cflags = [
+    "-Dprivate=public",
+    "-Dprotected=public",
+  ]
+
+  sources = [
+    "input_event_statistics/test/input_event_statistics_test.cpp",
+  ]
+
+  deps = [
+    "${mmi_path}/service:libmmi-server",
+    "${mmi_path}/util:libmmi-util",
+  ]
+
+  external_deps = [
+    "c_utils:utilsbase",
+    "googletest:gtest_main",
+    "hilog:libhilog",
+    "hisysevent:libhisysevent",
+    "libinput:libinput-third-mmi",
   ]
 }
 

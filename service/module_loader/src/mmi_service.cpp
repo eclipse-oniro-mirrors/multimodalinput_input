@@ -51,6 +51,7 @@
 #include "event_dump.h"
 #include "event_statistic.h"
 #include "event_log_helper.h"
+#include "input_event_statistics.h"
 #include "ffrt.h"
 #ifdef OHOS_BUILD_KNUCKLE
 #include "knuckle_handler_component.h"
@@ -562,6 +563,9 @@ void MMIService::OnStart()
         MMI_HILOGI("Set thread status flag to true");
         threadStatusFlag_ = true;
     }, "MMIService-OnStart");
+#ifdef OHOS_BUILD_ENABLE_POINTER
+    InputEventStatistics::StartReportTimer();
+#endif // OHOS_BUILD_ENABLE_POINTER
     [[ maybe_unused ]] auto taskFunc = [this]() {
         if (threadStatusFlag_) {
             MMI_HILOGI("Set thread status flag to false");

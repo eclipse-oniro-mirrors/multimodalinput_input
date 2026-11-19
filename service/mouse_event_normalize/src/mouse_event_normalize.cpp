@@ -17,6 +17,7 @@
 #include "mouse_device_state.h"
 
 #include "input_device_manager.h"
+#include "input_event_statistics.h"
 
 #undef MMI_LOG_DOMAIN
 #define MMI_LOG_DOMAIN MMI_LOG_DISPATCH
@@ -58,6 +59,7 @@ void MouseEventNormalize::OnDeviceAdded(int32_t deviceId)
 void MouseEventNormalize::OnDeviceRemoved(int32_t deviceId)
 {
     CALL_DEBUG_ENTER;
+    InputEventStatistics::OnDeviceRemoved(deviceId);
     auto iter = std::find_if(processors_.cbegin(), processors_.cend(),
         [deviceId](const auto &item) {
             return ((item.first == deviceId));
@@ -164,6 +166,13 @@ int32_t MouseEventNormalize::OnEvent(struct libinput_event *event)
         return RET_ERR;
     }
     SetCurrentDeviceId(deviceId);
+    // Touchpad cursor motion arrives as POINTER_MOTION_TOUCHPAD (instead of the
+    // POINTER_MOTION type used by mice), both types belong to the statistics scope.
+    if (libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION ||
+        libinput_event_get_type(event) == LIBINPUT_EVENT_POINTER_MOTION_TOUCHPAD) {
+        InputEventStatistics::MarkMouseDispatchStart(deviceId);
+        InputEventStatistics::OnPointerMotionEvent(deviceId);
+    }
     std::shared_ptr<MouseTransformProcessor> processor { nullptr };
     if (auto it = processors_.find(deviceId); it != processors_.end()) {
         processor = it->second;
@@ -223,6 +232,7 @@ void MouseEventNormalize::NormalizeMoveToCenter()
 
 void MouseEventNormalize::Dump(int32_t fd, const std::vector<std::string> &args)
 {
+    InputEventStatistics::Dump(fd);
     auto processor = GetCurrentProcessor();
     CHKPV(processor);
     processor->Dump(fd, args);

@@ -22,6 +22,7 @@
 #include "event_log_helper.h"
 #include "input_event_data_transformation.h"
 #include "input_event_handler.h"
+#include "input_event_statistics.h"
 #ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 #include "input_event_hook_manager.h"
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
@@ -623,6 +624,7 @@ void EventDispatchHandler::DispatchPointerEventInner(std::shared_ptr<PointerEven
         MMI_HILOGE("Sending structure of EventTouch failed! errCode:%{public}d", MSG_SEND_FAIL);
         return;
     }
+    InputEventStatistics::RecordMouseDispatchLatency(pointerEvent);
     if (sess->GetPid() != AppDebugListener::GetInstance()->GetAppDebugPid() && pointerEvent->IsMarkEnabled()) {
         MMI_HILOGD("Session pid:%{public}d", sess->GetPid());
         ANRMgr->AddTimer(ANR_DISPATCH, point->GetId(), currentTime, sess);
