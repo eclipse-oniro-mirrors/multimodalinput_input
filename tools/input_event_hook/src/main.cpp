@@ -32,6 +32,7 @@ std::thread g_flusher;
 constexpr int32_t FLUSH_INTERVAL_MS { 200 };
 // stdout 全缓冲大小（字节）
 constexpr int FLUSH_BUFFER_SIZE { 1 << 16 };
+constexpr OH_Input_EventType UNSET_EVENT_TYPE { static_cast<OH_Input_EventType>(-1) };
 
 
 // 后台刷写线程：stdout 为全缓冲（回调线程只写内存缓冲，避免终端 I/O 拖慢回调
@@ -185,7 +186,7 @@ void PrintAxisEvent(const Input_AxisEvent* axis)
 // With --consume enabled, NULL is returned.
 const OH_Input_Event* OnEvent(OH_Input_EventHandler*, const OH_Input_Event* event)
 {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { UNSET_EVENT_TYPE };
     if (OH_Input_Event_GetType(event, &type) != INPUT_SUCCESS) {
         printf("[hook] OH_Input_Event_GetType failed\n");
         return event;
