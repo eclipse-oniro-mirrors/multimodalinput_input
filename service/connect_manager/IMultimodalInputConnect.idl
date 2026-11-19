@@ -213,4 +213,5 @@ interface OHOS.MMI.IMultimodalInputConnect {
     void DeliverNonce([in] String nonce);
     void RedispatchInputEvent([in] PointerEvent pointerEvent);
     void UpdateUIExtensionInfo([in] UIExtensionInfo[] uiExtensionInfos);
+    void CheckHookPermission();
 }

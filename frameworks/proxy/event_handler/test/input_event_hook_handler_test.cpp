@@ -233,7 +233,7 @@ HWTEST_F(InputEventHookHandlerTest, InputEventHookHandlerTest_AddInputEventHook_
         consumer->OnInputEvent(event);
     };
     auto ret = INPUT_EVENT_HOOK_HANDLER.AddInputEventHook(consumer, hookEventType);
-    EXPECT_EQ(ret, ERROR_REPEAT_INTERCEPTOR);
+    EXPECT_EQ(ret, ERROR_REPEAT_HANDLER);
     ClearData();
 }
 
@@ -308,7 +308,7 @@ HWTEST_F(InputEventHookHandlerTest, InputEventHookHandlerTest_AddInputEventHook_
         consumer->OnInputEvent(event);
     };
     auto ret = INPUT_EVENT_HOOK_HANDLER.AddInputEventHook(consumer, hookEventType);
-    EXPECT_EQ(ret, ERROR_REPEAT_INTERCEPTOR);
+    EXPECT_EQ(ret, ERROR_REPEAT_HANDLER);
     ClearData();
 }
 

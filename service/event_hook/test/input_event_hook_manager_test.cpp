@@ -231,7 +231,7 @@ HWTEST_F(InputEventHookManagerTest, InputEventHookManagerTest_AddInputEventHook0
     };
     hookMgr.hooks_[HOOK_EVENT_TYPE_KEY].push_back(
         std::make_shared<KeyEventHook>(sess, nextHookGetter));
-    EXPECT_EQ(hookMgr.AddInputEventHook(UDS_PID, HOOK_EVENT_TYPE_MOUSE), ERROR_REPEAT_INTERCEPTOR);
+    EXPECT_EQ(hookMgr.AddInputEventHook(UDS_PID, HOOK_EVENT_TYPE_MOUSE), ERROR_REPEAT_HANDLER);
 }
 
 /**

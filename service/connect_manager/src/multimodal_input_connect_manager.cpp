@@ -1488,6 +1488,13 @@ int32_t MultimodalInputConnectManager::RemoveInputEventHook(HookEventType hookEv
     return multimodalInputConnectService_->RemoveInputEventHook(hookEventType);
 }
 
+int32_t MultimodalInputConnectManager::CheckHookPermission()
+{
+    std::lock_guard<std::mutex> guard(lock_);
+    CHKPR(multimodalInputConnectService_, INVALID_HANDLER_ID);
+    return multimodalInputConnectService_->CheckHookPermission();
+}
+
 int32_t MultimodalInputConnectManager::SetKeyStatusRecord(bool enable, int32_t timeout)
 {
     CALL_DEBUG_ENTER;

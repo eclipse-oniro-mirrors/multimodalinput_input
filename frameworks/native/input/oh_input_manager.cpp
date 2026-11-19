@@ -3853,8 +3853,14 @@ Input_Result OH_Input_EventHandler_Create(OH_Input_EventTypeMask mask,
         MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Create.Error", INPUT_PARAMETER_ERROR);
         return INPUT_PARAMETER_ERROR;
     }
-    // Permission and product-form checks are handled by the server/permission side; the client does
-    // no permission check
+    // Feature and permission checks run on the server; the client maps the result only
+    int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().CheckHookPermission();
+    if (ret != RET_OK) {
+        Input_Result errCode = NormalizeHookResult(ret);
+        MMI_HILOGE("CheckHookPermission failed, errCode:%{public}d", errCode);
+        MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Create.Error", errCode);
+        return errCode;
+    }
     auto handlerPtr = std::make_shared<OH_Input_EventHandler>();
     handlerPtr->mask = mask;
     handlerPtr->onEventFunc = onEventFunc;
@@ -3931,7 +3937,14 @@ Input_Result OH_Input_EventHandler_Enable(OH_Input_EventHandler* handler, bool e
         int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().AddInputEventHook(g_hookEventConsumer,
             hookEventType);
         if (ret != RET_OK) {
-            auto errCode = NormalizeHookResult(ret);
+            // ERROR_REPEAT_HANDLER (3800002) is already a final Input_Result value reported by the
+            // hook-add path when this process holds a hook; pass it through without normalizing.
+            auto errCode = (ret == OHOS::MMI::ERROR_REPEAT_HANDLER) ?
+                INPUT_REPEAT_HANDLER : NormalizeHookResult(ret);
+            if (errCode == INPUT_DEVICE_NOT_SUPPORTED) {
+                // 801 is not declared for Enable; converge to the declared service exception
+                errCode = INPUT_SERVICE_EXCEPTION;
+            }
             MMI_HILOGE("AddInputEventHook failed, hookEventType:%{public}u, errCode:%{public}d",
                 hookEventType, errCode);
             MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Enable.Error", errCode);
@@ -3951,6 +3964,10 @@ Input_Result OH_Input_EventHandler_Enable(OH_Input_EventHandler* handler, bool e
     int32_t ret = OHOS::Singleton<OHOS::MMI::InputManagerImpl>::GetInstance().RemoveInputEventHook(hookEventType);
     if (ret != RET_OK) {
         auto errCode = NormalizeHookResult(ret);
+        if (errCode == INPUT_DEVICE_NOT_SUPPORTED) {
+            // 801 is not declared for Enable; converge to the declared service exception
+            errCode = INPUT_SERVICE_EXCEPTION;
+        }
         MMI_HILOGE("RemoveInputEventHook failed, hookEventType:%{public}u, errCode:%{public}d",
             hookEventType, errCode);
         MMI_HISTOGRAM_ERROR("InputKit.OH_Input_EventHandler_Enable.Error", errCode);
