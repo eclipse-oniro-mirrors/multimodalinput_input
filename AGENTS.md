@@ -68,6 +68,7 @@ prebuilts/build-tools/linux-x86/bin/ninja -C out/rk3568 InputWindowsManagerTest
 | 场景 | 修改目录 | 先读文档 |
 | --- | --- | --- |
 | 事件归一化、目标选择、命中测试、坐标转换、分发、合成事件、高频移动/绘制路径 | `service/event_dispatch/`, `service/window_manager/` | `docs/knowledge/input-event-pipeline.md` |
+| 触控板原始报点：使能门控、旁路采集、直投分发、手势接管取消 | `service/event_handler/`, `service/event_dispatch/` | `docs/knowledge/touchpad-raw-event.md` |
 | 显示组、焦点隔离、捕获、axis-end、重分发、默认组回退 | `service/window_manager/`, `service/display_state_manager/` | `docs/knowledge/display-group-model.md` |
 | 设备/显示绑定、热插拔、虚拟/远端设备、摇杆、手写板、手写笔、触控板、生命周期清理 | `service/device_manager/`, `service/device_state_manager/` | `docs/knowledge/input-device-scope.md` |
 | 鼠标/光标缓存、捕获状态、指针序列、键盘焦点重发、UDS 分发状态、懒分配 | `service/window_manager/` | `docs/knowledge/input-context-state.md` |
