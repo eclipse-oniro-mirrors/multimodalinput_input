@@ -323,6 +323,12 @@ void InputWindowsManager::ReissueCancelTouchEvent(std::shared_ptr<PointerEvent> 
         }
         tPointerEvent->SetActionTime(GetSysClockTime());
         tPointerEvent->SetTargetWindowId(item.GetTargetWindowId());
+        int32_t agentWindowId = item.GetTargetWindowId();
+        auto windowInfo = GetWindowAndDisplayInfo(agentWindowId, tPointerEvent->GetTargetDisplayId());
+        if (windowInfo) {
+            agentWindowId = windowInfo->agentWindowId;
+        }
+        tPointerEvent->SetAgentWindowId(agentWindowId);
         tPointerEvent->UpdateId();
         auto inputEventNormalizeHandler = InputHandler->GetEventNormalizeHandler();
         CHKPV(inputEventNormalizeHandler);
