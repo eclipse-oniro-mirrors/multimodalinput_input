@@ -36,12 +36,15 @@ WindowUtilsTest::~WindowUtilsTest()
     ClearTestWindow();
 }
 
-std::shared_ptr<WindowUtilsTest> WindowUtilsTest::GetInstance()
+WindowUtilsTest* WindowUtilsTest::GetInstance()
 {
-    if (windowUtils_ == nullptr) {
-        windowUtils_ = std::make_shared<WindowUtilsTest>();
-    }
-    return windowUtils_;
+    // Intentionally leaked. A static shared_ptr member destroyed this singleton during
+    // __funcs_on_exit, and the destructor's testWindow_->Destroy() then ran after libwm's
+    // WindowInspector internals were already torn down, crashing with a NULL dereference
+    // (UnregisterGetWMSWindowListCallback, fault addr 0x0). The test window is reclaimed by
+    // WMS when this client process exits, so never deleting the singleton is safe here.
+    static WindowUtilsTest* instance = new WindowUtilsTest();
+    return instance;
 }
 
 void WindowUtilsTest::ClearTestWindow()

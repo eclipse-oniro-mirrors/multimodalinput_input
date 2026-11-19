@@ -27,7 +27,7 @@ public:
     WindowUtilsTest() = default;
     virtual ~WindowUtilsTest();
     DISALLOW_COPY_AND_MOVE(WindowUtilsTest);
-    static std::shared_ptr<WindowUtilsTest> GetInstance();
+    static WindowUtilsTest* GetInstance();
 public:
     bool DrawTestWindow();
     void ClearTestWindow();
@@ -50,7 +50,6 @@ private:
     sptr<Rosen::Window> CreateWindow(const TestWindowInfo& info);
 private:
     sptr<Rosen::Window> testWindow_ { nullptr };
-    static inline std::shared_ptr<WindowUtilsTest> windowUtils_ { nullptr };
 };
 } // namespace MMI
 } // namespace OHOS

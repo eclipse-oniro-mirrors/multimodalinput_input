@@ -32,7 +32,10 @@ struct Input_CursorInfo {
     uint32_t color { 0 };
 };
 
+// Keep layout-identical with the product struct (leading OH_Input_Event type tag); see the
+// note in oh_input_manager_test.cpp.
 struct Input_MouseEvent {
+    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
     int32_t action;
     int32_t displayX;
     int32_t displayY;
