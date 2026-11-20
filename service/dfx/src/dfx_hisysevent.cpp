@@ -485,14 +485,16 @@ int32_t DfxHisysevent::ReportOriginalEventDispatchLatencyStat(uint32_t below2ms,
 }
 
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-int32_t DfxHisysevent::ReportInputGestureStat(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount)
+int32_t DfxHisysevent::ReportInputGestureStat(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount,
+    uint32_t doubleTapAndDragCount)
 {
     int32_t ret = HiSysEventWrite(
         OHOS::HiviewDFX::HiSysEvent::Domain::MULTI_MODAL_INPUT,
         "INPUT_GESTURE",
         OHOS::HiviewDFX::HiSysEvent::EventType::STATISTIC,
         "TOUCH_PAD_2FINGER_TAP", twoFingerTapCount,
-        "TOUCH_PAD_PRESS_RIGHT_CLICK_AREA", pressRightClickAreaCount);
+        "TOUCH_PAD_PRESS_RIGHT_CLICK_AREA", pressRightClickAreaCount,
+        "TOUCH_PAD_DOUBLE_TAP_AND_DRAG", doubleTapAndDragCount);
     if (ret != RET_OK) {
         MMI_HILOGE("HiviewDFX Write failed, ret:%{public}d", ret);
     }

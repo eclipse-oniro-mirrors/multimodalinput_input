@@ -19,6 +19,8 @@
 #include <cstring>
 
 #include "dfx_hisysevent.h"
+#include "input_device_manager.h"
+#include "libinput.h"
 #include "timer_manager.h"
 #include "util.h"
 #include "util_ex.h"
@@ -203,6 +205,32 @@ uint64_t InputEventStatistics::GetTouchpadPressRightClickAreaCount()
 {
     return touchpadPressRightClickAreaCount_.load(std::memory_order_relaxed);
 }
+
+uint64_t InputEventStatistics::GetTouchpadDoubleTapAndDragCount()
+{
+    // The counter is maintained by libinput per touchpad device; the reported value
+    // is the sum over all touchpads. Empty (no touchpad) returns 0.
+    uint64_t totalCount = 0;
+    auto originDevices = INPUT_DEV_MGR->GetTouchPadDeviceOrigins();
+    for (const auto &originDevice : originDevices) {
+        if (originDevice == nullptr) {
+            continue;
+        }
+        totalCount += libinput_device_config_tap_get_drag_count(originDevice);
+    }
+    return totalCount;
+}
+
+void InputEventStatistics::ResetTouchpadDoubleTapAndDragCount()
+{
+    auto originDevices = INPUT_DEV_MGR->GetTouchPadDeviceOrigins();
+    for (const auto &originDevice : originDevices) {
+        if (originDevice == nullptr) {
+            continue;
+        }
+        libinput_device_config_tap_reset_drag_count(originDevice);
+    }
+}
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 void InputEventStatistics::StartReportTimer()
@@ -231,7 +259,7 @@ void InputEventStatistics::StartReportTimer()
 void InputEventStatistics::LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
     const uint32_t (&latencyCounts)[BUCKET_COUNT]
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-    , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount
+    , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount, uint32_t doubleTapAndDragCount
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
     )
 {
@@ -239,14 +267,15 @@ void InputEventStatistics::LogReportSummary(const uint32_t (&moveCounts)[BUCKET_
     MMI_HILOGI("Input event statistics: moveInterval[0-8ms:%{public}u, 8-16ms:%{public}u, 16-33ms:%{public}u,"
         " 33-50ms:%{public}u, 50ms+:%{public}u], dispatchLatency[0-2ms:%{public}u, 2-4ms:%{public}u,"
         " 4-8ms:%{public}u, 8-16ms:%{public}u, 16ms+:%{public}u],"
-        " touchpadRightClick[twoFingerTap:%{public}u, pressRightClickArea:%{public}u]",
+        " touchpadRightClick[twoFingerTap:%{public}u, pressRightClickArea:%{public}u],"
+        " touchpadDoubleTapAndDrag:%{public}u",
         moveCounts[MOVE_INTERVAL_BELOW_8MS], moveCounts[MOVE_INTERVAL_FROM_8_TO_16MS],
         moveCounts[MOVE_INTERVAL_FROM_16_TO_33MS], moveCounts[MOVE_INTERVAL_FROM_33_TO_50MS],
         moveCounts[MOVE_INTERVAL_ABOVE_50MS],
         latencyCounts[DISPATCH_LATENCY_BELOW_2MS], latencyCounts[DISPATCH_LATENCY_FROM_2_TO_4MS],
         latencyCounts[DISPATCH_LATENCY_FROM_4_TO_8MS], latencyCounts[DISPATCH_LATENCY_FROM_8_TO_16MS],
         latencyCounts[DISPATCH_LATENCY_ABOVE_16MS],
-        twoFingerTapCount, pressRightClickAreaCount);
+        twoFingerTapCount, pressRightClickAreaCount, doubleTapAndDragCount);
 #else
     MMI_HILOGI("Input event statistics: moveInterval[0-8ms:%{public}u, 8-16ms:%{public}u, 16-33ms:%{public}u,"
         " 33-50ms:%{public}u, 50ms+:%{public}u], dispatchLatency[0-2ms:%{public}u, 2-4ms:%{public}u,"
@@ -282,7 +311,10 @@ void InputEventStatistics::TryReport()
         static_cast<uint32_t>(touchpadTwoFingerTapCount_.load(std::memory_order_relaxed));
     uint32_t pressRightClickAreaCount =
         static_cast<uint32_t>(touchpadPressRightClickAreaCount_.load(std::memory_order_relaxed));
-    uint64_t gestureTotal = static_cast<uint64_t>(twoFingerTapCount) + pressRightClickAreaCount;
+    // Pull the tap-and-drag count accumulated inside libinput for this window.
+    uint32_t doubleTapAndDragCount = static_cast<uint32_t>(GetTouchpadDoubleTapAndDragCount());
+    uint64_t gestureTotal = static_cast<uint64_t>(twoFingerTapCount) + pressRightClickAreaCount +
+        doubleTapAndDragCount;
     if (moveTotal == 0 && latencyTotal == 0 && gestureTotal == 0) {
         return;
     }
@@ -293,7 +325,7 @@ void InputEventStatistics::TryReport()
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
     LogReportSummary(moveCounts, latencyCounts
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-        , twoFingerTapCount, pressRightClickAreaCount
+        , twoFingerTapCount, pressRightClickAreaCount, doubleTapAndDragCount
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
     );
     if (moveTotal > 0) {
@@ -315,10 +347,16 @@ void InputEventStatistics::TryReport()
     }
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     if (gestureTotal > 0) {
-        int32_t ret = DfxHisysevent::ReportInputGestureStat(twoFingerTapCount, pressRightClickAreaCount);
+        int32_t ret = DfxHisysevent::ReportInputGestureStat(twoFingerTapCount, pressRightClickAreaCount,
+            doubleTapAndDragCount);
         if (ret != RET_OK) {
             MMI_HILOGE("Report input gesture stat failed, ret:%{public}d", ret);
         }
+    }
+    if (doubleTapAndDragCount > 0) {
+        // The libinput counters were consumed by this report window; start the next
+        // window from zero (consistent with resetting local counters after a report).
+        ResetTouchpadDoubleTapAndDragCount();
     }
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
     Reset();
@@ -366,6 +404,8 @@ void InputEventStatistics::DumpTouchpadGesture(int32_t fd)
         static_cast<unsigned long long>(GetTouchpadTwoFingerTapCount()));
     mprintf(fd, "  Right Click Count (Press Right Click Area): %llu\n",
         static_cast<unsigned long long>(GetTouchpadPressRightClickAreaCount()));
+    mprintf(fd, "  Double Tap And Drag Count: %llu\n",
+        static_cast<unsigned long long>(GetTouchpadDoubleTapAndDragCount()));
 }
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
 } // namespace MMI
