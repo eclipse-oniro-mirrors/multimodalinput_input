@@ -78,7 +78,7 @@ int32_t InputEventHookHandler::AddInputEventHook(std::shared_ptr<IInputEventCons
     }
     if (currentHookStats_.load(std::memory_order_relaxed) != 0) {
         MMI_HILOGE("Hook already existed, hookEventType:%{public}u", hookEventType);
-        return ERROR_REPEAT_INTERCEPTOR;
+        return ERROR_REPEAT_HANDLER;
     }
     if (int32_t ret = AddInputEventHookToServer(hookEventType); ret != RET_OK) {
         MMI_HILOGE("AddInputEventHook failed hookEventType:%{public}u", hookEventType);

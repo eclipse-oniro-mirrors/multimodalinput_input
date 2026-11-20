@@ -3549,6 +3549,12 @@ int32_t InputManagerImpl::RemoveInputEventHook(HookEventType hookEventType)
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }
 
+int32_t InputManagerImpl::CheckHookPermission()
+{
+    CALL_DEBUG_ENTER;
+    return MULTIMODAL_INPUT_CONNECT_MGR->CheckHookPermission();
+}
+
 int32_t InputManagerImpl::NotifyHookEventResult(int32_t eventId, HookEventType hookEventType, bool isConsumed)
 {
 #ifdef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK

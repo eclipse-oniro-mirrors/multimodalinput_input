@@ -66,7 +66,7 @@ int32_t InputEventHookManager::AddInputEventHook(int32_t pid, HookEventType hook
     Init();
     if (IsHookExistedByPid(pid)) {
         MMI_HILOGE("Hook already existed for pid:%{public}d", pid);
-        return ERROR_REPEAT_INTERCEPTOR;
+        return ERROR_REPEAT_HANDLER;
     }
     auto udsServerPtr = InputHandler->GetUDSServer();
     CHKPR(udsServerPtr, RET_ERR);

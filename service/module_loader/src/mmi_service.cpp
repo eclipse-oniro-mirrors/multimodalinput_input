@@ -6393,6 +6393,10 @@ ErrCode MMIService::GetExternalObject(const std::string &pluginName, sptr<IRemot
 ErrCode MMIService::AddInputEventHook(HookEventType hookEventType)
 {
     CALL_DEBUG_ENTER;
+    if (!IsRunning()) {
+        MMI_HILOGE("Service is not running. go switch default");
+        return MMISERVICE_NOT_RUNNING;
+    }
 #ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
     MMI_HILOGE("AddInputEventHook is disabled - feature not enabled");
     return ERROR_UNSUPPORT;
@@ -6422,6 +6426,10 @@ ErrCode MMIService::AddInputEventHook(HookEventType hookEventType)
 ErrCode MMIService::RemoveInputEventHook(HookEventType hookEventType)
 {
     CALL_DEBUG_ENTER;
+    if (!IsRunning()) {
+        MMI_HILOGE("Service is not running. go switch default");
+        return MMISERVICE_NOT_RUNNING;
+    }
 #ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
     MMI_HILOGE("RemoveInputEventHook is disabled - feature not enabled");
     return ERROR_UNSUPPORT;
@@ -6440,6 +6448,26 @@ ErrCode MMIService::RemoveInputEventHook(HookEventType hookEventType)
         return ret;
     }
     MMI_HILOGI("RemoveInputEventHook success hookEventType:%{public}u", hookEventType);
+    return RET_OK;
+#endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+}
+
+ErrCode MMIService::CheckHookPermission()
+{
+    CALL_DEBUG_ENTER;
+    if (!IsRunning()) {
+        MMI_HILOGE("Service is not running. go switch default");
+        return MMISERVICE_NOT_RUNNING;
+    }
+#ifndef OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
+    MMI_HILOGE("CheckHookPermission is disabled - feature not enabled");
+    return ERROR_UNSUPPORT;
+#else
+    if (!PER_HELPER->CheckInputEventHook()) {
+        MMI_HILOGE("CheckInputEventHook failed");
+        return ERROR_NO_PERMISSION;
+    }
+    MMI_HILOGI("CheckHookPermission success");
     return RET_OK;
 #endif // OHOS_BUILD_ENABLE_INPUT_EVENT_HOOK
 }

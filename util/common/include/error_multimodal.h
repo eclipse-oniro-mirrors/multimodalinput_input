@@ -37,6 +37,9 @@ inline constexpr int32_t ERR_SERVICE_EXCEPTION { -3800001 };
 inline constexpr int32_t ERROR_OPERATION_FREQUENT { -1001 };
 inline constexpr int32_t ERROR_DEVICE_NOT_SUPPORTED { -1002 };
 inline constexpr int32_t ERROR_REPEAT_INTERCEPTOR { -1003 };
+// Value aligns with Input_Result::INPUT_REPEAT_HANDLER (3800002): raised by the AddInputEventHook
+// chain when the process already holds a hook, the client passes it through to the C API unchanged.
+inline constexpr int32_t ERROR_REPEAT_HANDLER { 3800002 };
 inline constexpr int32_t ERROR_INVALID_PARAMETER { -1004 };
 inline constexpr int32_t ERROR_PIXELMAP_MANAGED { -1005 };
 inline constexpr int32_t ERROR_APP_NOT_FOCUSED { 3900009 };
