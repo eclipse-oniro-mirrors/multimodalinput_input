@@ -45,7 +45,7 @@ struct Input_KeyState {
 };
 
 struct Input_KeyEvent {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t id { -1 };
     int32_t action { -1 };
     int32_t keyCode { -1 };
@@ -62,7 +62,7 @@ struct Input_CursorInfo {
 };
 
 struct Input_MouseEvent {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t action;
     int32_t displayX;
     int32_t displayY;
@@ -78,7 +78,7 @@ struct Input_MouseEvent {
 };
 
 struct Input_TouchEvent {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t action;
     int32_t id;
     int32_t displayX;
@@ -96,7 +96,7 @@ struct Input_TouchEvent {
 };
 
 struct Input_AxisEvent {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t axisAction;
     float displayX;
     float displayY;

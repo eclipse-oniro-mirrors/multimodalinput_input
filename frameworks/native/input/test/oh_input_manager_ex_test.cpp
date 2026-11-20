@@ -35,7 +35,7 @@ struct Input_CursorInfo {
 // Keep layout-identical with the product struct (leading OH_Input_Event type tag); see the
 // note in oh_input_manager_test.cpp.
 struct Input_MouseEvent {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t action;
     int32_t displayX;
     int32_t displayY;

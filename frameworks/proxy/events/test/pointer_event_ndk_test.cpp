@@ -27,7 +27,7 @@
 // Keep layout-identical with the product struct: leading OH_Input_Event type tag plus the
 // globalX/globalY fields (see frameworks/native/input/oh_input_manager.cpp).
 struct Input_TouchEvent {
-    OH_Input_EventType type { OH_INPUT_EVENT_NONE };
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t action;
     int32_t id;
     int32_t displayX;
