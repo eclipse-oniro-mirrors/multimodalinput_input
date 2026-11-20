@@ -4435,8 +4435,6 @@ HWTEST_F(PointerDrawingManagerTest, CreatePointerWindowForScreenPointer_006, Tes
     pointerDrawingManager->isHardCursorSurfaceNodeInited_.store(false);
 }
 
-
-
 /**
  * @tc.name: PointerDrawingManagerTest_RsFlushImplicitTransaction_001
  * @tc.desc: Test RsFlushImplicitTransaction with null rsUIDirector_

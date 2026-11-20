@@ -117,11 +117,12 @@ uint64_t libinput_event_touchpad_get_time_usec(struct libinput_event_touch *even
 
 // Stub the gesture accessors for the same reason (SendRawTouchpadCancel on a fake event).
 // No test feeds gesture data, so the converter reports "not a gesture" and the cancel path
-// bails out early, exactly as the tests expect.
-struct libinput_event_gesture* g_gesture_event = nullptr;
+// bails out early, exactly as the tests expect. The snake_case names are intentional: they
+// must match the libinput declarations exactly to interpose them.
+struct libinput_event_gesture* g_gestureEvent = nullptr;
 struct libinput_event_gesture* libinput_event_get_gesture_event(struct libinput_event *event)
 {
-    return (event != nullptr ? g_gesture_event : nullptr);
+    return (event != nullptr ? g_gestureEvent : nullptr);
 }
 
 int libinput_event_gesture_get_finger_count(struct libinput_event_gesture *event)
