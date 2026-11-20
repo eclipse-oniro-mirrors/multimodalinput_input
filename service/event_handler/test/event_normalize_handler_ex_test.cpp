@@ -108,9 +108,11 @@ struct libinput_event_touch* libinput_event_get_touchpad_event(struct libinput_e
 
 // Stub the timestamp API as well: without it the call on the fake touch event escapes to the
 // CFI-instrumented system libinput and aborts (cross-DSO check on a non-libinput object).
+// The local minimal libinput_event has no time member, so report a constant zero timestamp.
 uint64_t libinput_event_touchpad_get_time_usec(struct libinput_event_touch *event)
 {
-    return (event != nullptr ? event->base.time : 0);
+    (void)event;
+    return 0;
 }
 
 double g_touchpad_pressure = 0.0;
