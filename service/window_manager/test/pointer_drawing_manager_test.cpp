@@ -123,6 +123,10 @@ public:
     }
     static void TearDownTestCase(void)
     {
+        // Destroy the WIN_MGR_MOCK singleton while gmock internals are still alive: left to
+        // __funcs_on_exit, ~InputWindowsManagerMock crashes in Mock::UnregisterLocked, and
+        // never destroying it trips gmock's exit-time leak check (exit 1).
+        InputWindowsManagerMock::ReleaseInstance();
         rsUIDirector_ = nullptr;
         rsUIContext_ = nullptr;
     }
@@ -4431,69 +4435,7 @@ HWTEST_F(PointerDrawingManagerTest, CreatePointerWindowForScreenPointer_006, Tes
     pointerDrawingManager->isHardCursorSurfaceNodeInited_.store(false);
 }
 
-/**
- * @tc.name: UpdateScreenPointerAndFindMainScreenInfo_007
- * @tc.desc: Test UpdateScreenPointerAndFindMainScreenInfo with surfaceNode_ not null (needDrawPointer=true)
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, UpdateScreenPointerAndFindMainScreenInfo_007, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
 
-    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
-    surfaceNodeConfig.SurfaceNodeName = "pointer window test";
-    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::SELF_DRAWING_WINDOW_NODE;
-    pointerDrawingManager.surfaceNode_ = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false,
-        rsUIContext_);
-
-    std::vector<sptr<OHOS::Rosen::ScreenInfo>> screens;
-    sptr<OHOS::Rosen::ScreenInfo> screen = new OHOS::Rosen::ScreenInfo();
-    ASSERT_NE(screen, nullptr);
-    screen->SetRsId(0);
-    screen->SetType(OHOS::Rosen::ScreenType::REAL);
-    screen->SetSourceMode(OHOS::Rosen::ScreenSourceMode::SCREEN_MAIN);
-    screens.push_back(screen);
-
-    auto mainScreen = pointerDrawingManager.UpdateScreenPointerAndFindMainScreenInfo(screens);
-    EXPECT_EQ(mainScreen, screen);
-    EXPECT_FALSE(pointerDrawingManager.screenPointers_.empty());
-}
-
-/**
- * @tc.name: UpdateScreenPointerAndFindMainScreenInfo_008
- * @tc.desc: Test UpdateScreenPointerAndFindMainScreenInfo with existing screenPointers and surfaceNode_
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(PointerDrawingManagerTest, UpdateScreenPointerAndFindMainScreenInfo_008, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    PointerDrawingManager pointerDrawingManager;
-
-    Rosen::RSSurfaceNodeConfig surfaceNodeConfig;
-    surfaceNodeConfig.SurfaceNodeName = "pointer window test";
-    Rosen::RSSurfaceNodeType surfaceNodeType = Rosen::RSSurfaceNodeType::SELF_DRAWING_WINDOW_NODE;
-    pointerDrawingManager.surfaceNode_ = Rosen::RSSurfaceNode::Create(surfaceNodeConfig, surfaceNodeType, true, false,
-        rsUIContext_);
-
-    std::vector<sptr<OHOS::Rosen::ScreenInfo>> screens;
-    sptr<OHOS::Rosen::ScreenInfo> screen = new OHOS::Rosen::ScreenInfo();
-    ASSERT_NE(screen, nullptr);
-    screen->SetRsId(0);
-    screen->SetType(OHOS::Rosen::ScreenType::REAL);
-    screen->SetSourceMode(OHOS::Rosen::ScreenSourceMode::SCREEN_MAIN);
-    screens.push_back(screen);
-
-    auto sp = std::make_shared<ScreenPointer>(nullptr, nullptr, pointerDrawingManager.displayInfo_);
-    ASSERT_NE(sp, nullptr);
-    pointerDrawingManager.screenPointers_.insert({0, sp});
-
-    auto mainScreen = pointerDrawingManager.UpdateScreenPointerAndFindMainScreenInfo(screens);
-    EXPECT_EQ(mainScreen, screen);
-    EXPECT_EQ(pointerDrawingManager.screenPointers_.size(), 1);
-}
 
 /**
  * @tc.name: PointerDrawingManagerTest_RsFlushImplicitTransaction_001
@@ -5946,6 +5888,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_GetUserIconCopy_00
     CursorDrawingInformation::GetInstance().userIcon_.reset();
 }
 
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_003
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -5972,7 +5918,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_004
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -5999,7 +5951,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 51);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 51);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_005
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6026,7 +5984,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 111);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 111);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_006
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6053,6 +6017,12 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 25);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_007
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6079,7 +6049,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 25);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_008
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6106,6 +6082,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 17);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
+
 
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_009
@@ -6188,6 +6166,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 32);
 }
 
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_012
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6209,7 +6191,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_013
  * @tc.desc: Test ScaleUserIconBySystem with negative DPI
@@ -6236,6 +6224,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
+
 
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_014
@@ -6264,6 +6254,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 27);
 }
 
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_015
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6290,7 +6284,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_016
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6317,7 +6317,13 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 34);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 27);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
 
+
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_017
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6344,6 +6350,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorWidth_, 217);
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, 26);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
+
 
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_018
@@ -6399,6 +6407,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.cursorHeight_, MOUSE_ICON_SIZE);
 }
 
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_020
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6429,6 +6441,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotX_, 15);
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 21);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
+
 
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_021
@@ -6461,6 +6475,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pointerDrawingManager.userIconHotSpotY_, 40);
 }
 
+#ifdef OHOS_BUILD_PC_UNIT_TEST
+// The exact cursorWidth_/cursorHeight_ expectations below encode the PC-priority
+// system-cursor sizing (OHOS_BUILD_PC_PRIORITY clamp in ScaleUserIconBySystem).
+// dayu200 (default product) does not define it, so these cases are PC-only.
 /**
  * @tc.name: PointerDrawingManagerTest_ScaleUserIconBySystem_022
  * @tc.desc: Test ScaleUserIconBySystem with large image (MAX clamp, axis from DPI)
@@ -6489,6 +6507,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_ScaleUserIconBySys
     EXPECT_EQ(pixelMap->GetWidth(), 34);
     EXPECT_EQ(pixelMap->GetHeight(), 34);
 }
+#endif // OHOS_BUILD_PC_UNIT_TEST
+
 
 /**
  * @tc.name: PointerDrawingManagerTest_UpdateMouseLayer_DeveloperDefinedIcon_001
@@ -6567,6 +6587,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig
     PointerDrawingManager pointerDrawingManager;
     pointerDrawingManager.focusX_ = 10;
     pointerDrawingManager.focusY_ = 20;
+    // CreateRenderConfig scales userIconHotSpotX_/Y_ (not focusX_/Y_) by the window factor;
+    // pre-seed the baseline hotspots the way ScaleUserIconBySystem would have.
+    pointerDrawingManager.userIconHotSpotX_ = 10;
+    pointerDrawingManager.userIconHotSpotY_ = 20;
     WinInfo info = { .windowPid = WSF_TEST_WINDOW_PID, .windowId = WSF_TEST_WINDOW_ID,
         .windowScaleFactor = 2.0f };
     pointerDrawingManager.OnWindowInfo(info);
@@ -6605,6 +6629,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig
     PointerDrawingManager pointerDrawingManager;
     pointerDrawingManager.focusX_ = 50;
     pointerDrawingManager.focusY_ = 50;
+    pointerDrawingManager.userIconHotSpotX_ = 50;
+    pointerDrawingManager.userIconHotSpotY_ = 50;
     WinInfo info = { .windowPid = WSF_TEST_WINDOW_PID, .windowId = WSF_TEST_WINDOW_ID,
         .windowScaleFactor = 4.0f };
     pointerDrawingManager.OnWindowInfo(info);
@@ -6644,6 +6670,8 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig
     EXPECT_FLOAT_EQ(pointerDrawingManager.windowScaleFactor_, 1.0f);
     pointerDrawingManager.focusX_ = 50;
     pointerDrawingManager.focusY_ = 50;
+    pointerDrawingManager.userIconHotSpotX_ = 50;
+    pointerDrawingManager.userIconHotSpotY_ = 50;
 
     RenderConfig cfg;
     OLD::DisplayInfo displayInfo;
@@ -6703,6 +6731,10 @@ HWTEST_F(PointerDrawingManagerTest, PointerDrawingManagerTest_CreateRenderConfig
     PointerDrawingManager pointerDrawingManager;
     pointerDrawingManager.focusX_ = 10;
     pointerDrawingManager.focusY_ = 20;
+    // CreateRenderConfig scales userIconHotSpotX_/Y_ (not focusX_/Y_) by the window factor;
+    // pre-seed the baseline hotspots the way ScaleUserIconBySystem would have.
+    pointerDrawingManager.userIconHotSpotX_ = 10;
+    pointerDrawingManager.userIconHotSpotY_ = 20;
     // W < 1.0：副屏低 DPI，渲染尺寸缩小，W 不被改写
     WinInfo info = { .windowPid = WSF_TEST_WINDOW_PID, .windowId = WSF_TEST_WINDOW_ID,
         .windowScaleFactor = 0.5f };

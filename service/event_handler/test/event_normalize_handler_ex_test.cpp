@@ -115,6 +115,26 @@ uint64_t libinput_event_touchpad_get_time_usec(struct libinput_event_touch *even
     return 0;
 }
 
+// Stub the gesture accessors for the same reason (SendRawTouchpadCancel on a fake event).
+// No test feeds gesture data, so the converter reports "not a gesture" and the cancel path
+// bails out early, exactly as the tests expect.
+struct libinput_event_gesture* g_gesture_event = nullptr;
+struct libinput_event_gesture* libinput_event_get_gesture_event(struct libinput_event *event)
+{
+    return (event != nullptr ? g_gesture_event : nullptr);
+}
+
+int libinput_event_gesture_get_finger_count(struct libinput_event_gesture *event)
+{
+    return (event != nullptr ? 0 : 0);
+}
+
+uint32_t libinput_event_gesture_get_time(struct libinput_event_gesture *event)
+{
+    (void)event;
+    return 0;
+}
+
 double g_touchpad_pressure = 0.0;
 double libinput_event_touchpad_get_pressure(struct libinput_event_touch *event)
 {
