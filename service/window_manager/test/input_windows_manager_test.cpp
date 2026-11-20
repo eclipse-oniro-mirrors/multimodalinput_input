@@ -434,6 +434,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_009, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
+    auto displayGroupInfo = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
     std::string msg = "There is in InputWindowsManagerTest_GetDisplayIdNames_009";
     ASSERT_EQ(WIN_MGR->SetDisplayBind(-1, 1, msg), -1);
 }
@@ -492,10 +494,12 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_012, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
+    auto displayGroupInfo = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
     constexpr int32_t deviceId = 2;
     constexpr int32_t displayId = 1;
     std::string msg;
-    // Display 1 exists (registered by SetUp), so the call reaches bindInfo_.BindToDisplay.
+    // Display 1 is registered explicitly, so the call reaches bindInfo_.SetDisplayBind.
     // Device 2 was never registered, so binding is rejected with ERR_BIND_DEVICE_NOT_EXIST.
     EXPECT_EQ(WIN_MGR->SetDisplayBind(deviceId, displayId, msg), ERR_BIND_DEVICE_NOT_EXIST);
     EXPECT_EQ(msg, "The specified input device does not exist.");
@@ -513,13 +517,15 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_013, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
+    auto displayGroupInfo = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
     constexpr int32_t devId { 8811 };
-    // Register the device into bindInfo_ so BindToDisplay can resolve it by id.
+    // Register the device into bindInfo_ so SetDisplayBind can resolve it by id.
     WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
     constexpr int32_t displayId = 1;
     std::string msg;
-    // Display 1 exists physically but carries no bind entry, which the legacy config-driven path
-    // rejected; the new path must accept it.
+    // Display 1 is registered explicitly. Registering the device may consume the free-display
+    // entry, so the first bind either establishes the relation or is an idempotent success.
     EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, displayId, msg), RET_OK);
     EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), displayId);
 }
@@ -536,6 +542,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_014, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
+    auto displayGroupInfo = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
     constexpr int32_t devId { 8812 };
     WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
     constexpr int32_t displayId = 1;
@@ -559,6 +567,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_015, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
+    auto displayGroupInfo = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
     constexpr int32_t devIdA { 8813 };
     constexpr int32_t devIdX { 8814 };
     WIN_MGR->DeviceStatusChanged(devIdA, "mouse_setdisplaybind_a", "sysUid_setdisplaybind_a", "add");
@@ -573,29 +583,6 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_015, Te
 }
 
 /**
- * @tc.name: InputWindowsManagerTest_SetDisplayBind_016
- * @tc.desc: Rebinding a device to another display drops its previous binding
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_016, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    UDSServer udsServer;
-    WIN_MGR->Init(udsServer);
-    // Display 888 is unique to this case, so it cannot disturb cases that rely on the absence
-    // of displays like 2 or 3.
-    auto displayGroupInfo = CreateDisplayGroupInfo(888, 888);
-    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
-    constexpr int32_t devId { 8815 };
-    WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
-    std::string msg;
-    ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, 1, msg), RET_OK);
-    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, 888, msg), RET_OK);
-    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 888);
-}
-
-/**
  * @tc.name: InputWindowsManagerTest_SetDisplayBind_017
  * @tc.desc: Bindings established via SetDisplayBind are not surfaced to applications: the
  *           bindToDisplay-only accessor keeps returning -1 for them
@@ -607,6 +594,8 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_017, Te
     CALL_TEST_DEBUG;
     UDSServer udsServer;
     WIN_MGR->Init(udsServer);
+    auto displayGroupInfo = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(displayGroupInfo);
     constexpr int32_t devId { 8816 };
     WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
     constexpr int32_t displayId = 1;
@@ -873,6 +862,32 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_GetDisplayBindInfo_001
     EXPECT_EQ(ret, ERR_DISPLAY_NOT_EXIST);
     ret = WIN_MGR->GetDisplayBindInfo(infos);
     EXPECT_EQ(ret, 0);
+}
+
+/**
+ * @tc.name: InputWindowsManagerTest_SetDisplayBind_016
+ * @tc.desc: Rebinding a device to another display drops its previous binding
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_SetDisplayBind_016, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    UDSServer udsServer;
+    WIN_MGR->Init(udsServer);
+    auto group1 = CreateDisplayGroupInfo(1, 1);
+    WIN_MGR->UpdateDisplayInfo(group1);
+    constexpr int32_t devId { 8815 };
+    WIN_MGR->DeviceStatusChanged(devId, "mouse_setdisplaybind", "sysUid_setdisplaybind", "add");
+    std::string msg;
+    ASSERT_EQ(WIN_MGR->SetDisplayBind(devId, 1, msg), RET_OK);
+    // Display 2 is registered only here: the earlier cases that count all registered displays
+    // (GetAllUsersDisplays_001) or rely on display 2 being absent (GetDisplayBindInfo_001)
+    // have already run, and the later ones register display 2 themselves.
+    auto group2 = CreateDisplayGroupInfo(2, 2);
+    WIN_MGR->UpdateDisplayInfo(group2);
+    EXPECT_EQ(WIN_MGR->SetDisplayBind(devId, 2, msg), RET_OK);
+    EXPECT_EQ(WIN_MGR->GetBindDisplayIdByInputDevice(devId), 2);
 }
 
 /**
