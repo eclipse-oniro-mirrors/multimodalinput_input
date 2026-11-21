@@ -33,6 +33,11 @@
 void SetCursorInfo(OHOS::MMI::PointerEvent::PointerItem& item, Input_MouseEvent* mouseEvent);
 Input_TouchEvent  *OH_Input_PointerEventToTouchEvent(const OHOS::MMI::PointerEvent &event);
 
+// The internal event structs embed an OH_Input_Event base (a 4-byte type tag) as their first
+// member (see frameworks/native/input/oh_input_manager.cpp). The local copies below must stay
+// layout-identical with the product definitions: without the leading tag the C API reads and
+// writes through shifted offsets, corrupting neighbouring fields and smashing the caller's
+// stack canary (SIGILL at TouchEventPressure_002 after d9379cb5e added the base).
 struct Input_KeyState {
     int32_t keyCode;
     int32_t keyState;
@@ -40,6 +45,7 @@ struct Input_KeyState {
 };
 
 struct Input_KeyEvent {
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t id { -1 };
     int32_t action { -1 };
     int32_t keyCode { -1 };
@@ -56,6 +62,7 @@ struct Input_CursorInfo {
 };
 
 struct Input_MouseEvent {
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t action;
     int32_t displayX;
     int32_t displayY;
@@ -71,6 +78,7 @@ struct Input_MouseEvent {
 };
 
 struct Input_TouchEvent {
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t action;
     int32_t id;
     int32_t displayX;
@@ -88,6 +96,7 @@ struct Input_TouchEvent {
 };
 
 struct Input_AxisEvent {
+    OH_Input_EventType type { static_cast<OH_Input_EventType>(-1) };
     int32_t axisAction;
     float displayX;
     float displayY;

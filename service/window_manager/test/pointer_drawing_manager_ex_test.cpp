@@ -85,6 +85,10 @@ public:
     }
     static void TearDownTestCase(void)
     {
+        // Destroy the WIN_MGR_MOCK singleton while gmock internals are still alive: left to
+        // __funcs_on_exit, ~InputWindowsManagerMock crashes in Mock::UnregisterLocked, and
+        // never destroying it trips gmock's exit-time leak check (exit 1).
+        InputWindowsManagerMock::ReleaseInstance();
         rsUIContext_ = nullptr;
     }
     static std::shared_ptr<Media::PixelMap> CreatePixelMap(int32_t width, int32_t height);

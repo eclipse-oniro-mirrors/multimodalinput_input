@@ -204,7 +204,15 @@ public:
 #ifdef OHOS_BUILD_ENABLE_ANCO_GAME_EVENT_MAPPING
     MOCK_METHOD(int32_t, ControlMouseEventToAnco, (int32_t, bool, const std::string &));
 #endif // OHOS_BUILD_ENABLE_ANCO_GAME_EVENT_MAPPING
-    MOCK_METHOD(OLD::DisplayGroupInfo&, GetDefaultDisplayGroupInfo, ());
+    // Plain override, not a MOCK_METHOD: this is the only reference-returning method here, and
+    // an uninteresting reference-returning mock call has no default action to fall back to, so
+    // gmock aborts the process from PerformDefaultAction (SIGABRT seen when system
+    // libcursor_drawing_adapter calls it before a test sets an expectation). No test sets
+    // expectations on it, so returning a stable default instance is safe.
+    OLD::DisplayGroupInfo& GetDefaultDisplayGroupInfo() override
+    {
+        return defaultDisplayGroupInfo_;
+    }
     MOCK_METHOD(std::vector<PluginDisplayGroupInfo>, GetDisplayGroupInfos, ());
     MOCK_METHOD(int32_t, GetDisplayId, (std::shared_ptr<InputEvent>), (const));
     MOCK_METHOD(int32_t, FindDisplayGroupId, (int32_t), (const));
@@ -216,6 +224,7 @@ public:
     static void ReleaseInstance();
 
 private:
+    OLD::DisplayGroupInfo defaultDisplayGroupInfo_ {};
     MouseRedispatchStore mouseStore_;
     TouchRedispatchStore touchStore_;
     static std::mutex mutex_;

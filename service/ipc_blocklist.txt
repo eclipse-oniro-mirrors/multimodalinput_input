@@ -34,3 +34,4 @@ src:*foundation/multimodalinput/input/service/window_manager/src/input_windows_m
 src:*foundation/multimodalinput/input/service/window_manager/src/mouse_redispatch_store.cpp
 src:*foundation/multimodalinput/input/service/window_manager/src/pointer_dispatch_event_cache.cpp
 src:*foundation/multimodalinput/input/service/window_manager/src/touch_redispatch_store.cpp
+src:*foundation/multimodalinput/input/service/subscriber/src/input_active_subscriber_handler.cpp

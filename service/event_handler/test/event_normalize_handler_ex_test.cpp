@@ -106,6 +106,36 @@ struct libinput_event_touch* libinput_event_get_touchpad_event(struct libinput_e
     return (event != nullptr ? g_touchpad_event : nullptr);
 }
 
+// Stub the timestamp API as well: without it the call on the fake touch event escapes to the
+// CFI-instrumented system libinput and aborts (cross-DSO check on a non-libinput object).
+// The local minimal libinput_event has no time member, so report a constant zero timestamp.
+uint64_t libinput_event_touchpad_get_time_usec(struct libinput_event_touch *event)
+{
+    (void)event;
+    return 0;
+}
+
+// Stub the gesture accessors for the same reason (SendRawTouchpadCancel on a fake event).
+// No test feeds gesture data, so the converter reports "not a gesture" and the cancel path
+// bails out early, exactly as the tests expect. The snake_case names are intentional: they
+// must match the libinput declarations exactly to interpose them.
+struct libinput_event_gesture* g_gestureEvent = nullptr;
+struct libinput_event_gesture* libinput_event_get_gesture_event(struct libinput_event *event)
+{
+    return (event != nullptr ? g_gestureEvent : nullptr);
+}
+
+int libinput_event_gesture_get_finger_count(struct libinput_event_gesture *event)
+{
+    return (event != nullptr ? 0 : 0);
+}
+
+uint32_t libinput_event_gesture_get_time(struct libinput_event_gesture *event)
+{
+    (void)event;
+    return 0;
+}
+
 double g_touchpad_pressure = 0.0;
 double libinput_event_touchpad_get_pressure(struct libinput_event_touch *event)
 {
