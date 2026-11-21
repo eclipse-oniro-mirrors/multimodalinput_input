@@ -257,26 +257,8 @@ void InputEventStatistics::StartReportTimer()
 }
 
 void InputEventStatistics::LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
-    const uint32_t (&latencyCounts)[BUCKET_COUNT]
-#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-    , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount, uint32_t doubleTapAndDragCount
-#endif // OHOS_BUILD_ENABLE_TOUCHPAD
-    )
+    const uint32_t (&latencyCounts)[BUCKET_COUNT])
 {
-#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-    MMI_HILOGI("Input event statistics: moveInterval[0-8ms:%{public}u, 8-16ms:%{public}u, 16-33ms:%{public}u,"
-        " 33-50ms:%{public}u, 50ms+:%{public}u], dispatchLatency[0-2ms:%{public}u, 2-4ms:%{public}u,"
-        " 4-8ms:%{public}u, 8-16ms:%{public}u, 16ms+:%{public}u],"
-        " touchpadRightClick[twoFingerTap:%{public}u, pressRightClickArea:%{public}u],"
-        " touchpadDoubleTapAndDrag:%{public}u",
-        moveCounts[MOVE_INTERVAL_BELOW_8MS], moveCounts[MOVE_INTERVAL_FROM_8_TO_16MS],
-        moveCounts[MOVE_INTERVAL_FROM_16_TO_33MS], moveCounts[MOVE_INTERVAL_FROM_33_TO_50MS],
-        moveCounts[MOVE_INTERVAL_ABOVE_50MS],
-        latencyCounts[DISPATCH_LATENCY_BELOW_2MS], latencyCounts[DISPATCH_LATENCY_FROM_2_TO_4MS],
-        latencyCounts[DISPATCH_LATENCY_FROM_4_TO_8MS], latencyCounts[DISPATCH_LATENCY_FROM_8_TO_16MS],
-        latencyCounts[DISPATCH_LATENCY_ABOVE_16MS],
-        twoFingerTapCount, pressRightClickAreaCount, doubleTapAndDragCount);
-#else
     MMI_HILOGI("Input event statistics: moveInterval[0-8ms:%{public}u, 8-16ms:%{public}u, 16-33ms:%{public}u,"
         " 33-50ms:%{public}u, 50ms+:%{public}u], dispatchLatency[0-2ms:%{public}u, 2-4ms:%{public}u,"
         " 4-8ms:%{public}u, 8-16ms:%{public}u, 16ms+:%{public}u]",
@@ -286,8 +268,17 @@ void InputEventStatistics::LogReportSummary(const uint32_t (&moveCounts)[BUCKET_
         latencyCounts[DISPATCH_LATENCY_BELOW_2MS], latencyCounts[DISPATCH_LATENCY_FROM_2_TO_4MS],
         latencyCounts[DISPATCH_LATENCY_FROM_4_TO_8MS], latencyCounts[DISPATCH_LATENCY_FROM_8_TO_16MS],
         latencyCounts[DISPATCH_LATENCY_ABOVE_16MS]);
-#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
+
+#ifdef OHOS_BUILD_ENABLE_TOUCHPAD
+void InputEventStatistics::LogTouchpadGestureSummary(uint32_t twoFingerTapCount,
+    uint32_t pressRightClickAreaCount, uint32_t doubleTapAndDragCount)
+{
+    MMI_HILOGI("Input event statistics: touchpadRightClick[twoFingerTap:%{public}u,"
+        " pressRightClickArea:%{public}u], touchpadDoubleTapAndDrag:%{public}u",
+        twoFingerTapCount, pressRightClickAreaCount, doubleTapAndDragCount);
+}
+#endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
 void InputEventStatistics::TryReport()
 {
@@ -323,11 +314,10 @@ void InputEventStatistics::TryReport()
         return;
     }
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
-    LogReportSummary(moveCounts, latencyCounts
+    LogReportSummary(moveCounts, latencyCounts);
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-        , twoFingerTapCount, pressRightClickAreaCount, doubleTapAndDragCount
+    LogTouchpadGestureSummary(twoFingerTapCount, pressRightClickAreaCount, doubleTapAndDragCount);
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
-    );
     if (moveTotal > 0) {
         int32_t ret = DfxHisysevent::ReportOriginalInputEventIntervalStat(moveCounts[MOVE_INTERVAL_BELOW_8MS],
             moveCounts[MOVE_INTERVAL_FROM_8_TO_16MS], moveCounts[MOVE_INTERVAL_FROM_16_TO_33MS],

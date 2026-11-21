@@ -171,14 +171,15 @@ public:
     static void RecordDispatchLatency(int64_t latencyUs);
 
 private:
-    // Prints the one-line summary log of a report window (hourly low frequency path).
-    // The touchpad gesture segment is part of the line only in touchpad builds.
+    // Prints the summary logs of a report window (hourly low frequency path):
+    // mouse interval/latency buckets, plus the touchpad gesture counts in
+    // touchpad builds (LogTouchpadGestureSummary, one log line each).
     static void LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
-        const uint32_t (&latencyCounts)[BUCKET_COUNT]
+        const uint32_t (&latencyCounts)[BUCKET_COUNT]);
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-        , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount
+    static void LogTouchpadGestureSummary(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount,
+        uint32_t doubleTapAndDragCount);
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
-    );
 
     static std::atomic<uint64_t> moveIntervalCounts_[BUCKET_COUNT];
     static std::atomic<uint64_t> dispatchLatencyCounts_[BUCKET_COUNT];
