@@ -20,8 +20,6 @@
 #include <memory>
 #include <mutex>
 
-#include "pointer_event.h"
-
 namespace OHOS {
 namespace MMI {
 
@@ -39,7 +37,7 @@ public:
     
     private:
         PendingEventCounter *counter_;
-    }
+    };
 
     PendingEventCounter() = delete;
     ~PendingEventCounter() = delete;

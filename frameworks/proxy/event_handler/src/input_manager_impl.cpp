@@ -430,14 +430,14 @@ int32_t InputManagerImpl::SetWindowInputEventConsumer(std::shared_ptr<IInputEven
     return RET_OK;
 }
 
-int32_t InputManagerImpl::HasPendingInputEvent()
+bool InputManagerImpl::HasPendingInputEvent()
 {
     BytraceAdapter::MMIClientTraceStart(BytraceAdapter::MMI_THREAD_LOOP_DEPTH_THREE, msg);
     MMIClientPtr client = MMIEventHdl.GetMMIClient();
     if (client == nullptr) {
         MMI_HILOGE("client is nullptr");
         BytraceAdapter::MMIClientTraceStop();
-        return RET_ERR;
+        return false;
     }
     if (client->IsEventHandlerChanged()) {
         MMI_HILOG_DISPATCHI("The event handler has changed");

@@ -376,7 +376,7 @@ private:
 #endif // OHOS_BUILD_ENABLE_ANCO
     uint32_t permissionType_ = 0;
     bool permissionEnable_ = false;
-    PendingEventCounter pendingEventCounter_
+    PendingEventCounter pendingEventCounter_;
 };
 
 #define InputMgrImpl ::OHOS::Singleton<InputManagerImpl>::GetInstance()

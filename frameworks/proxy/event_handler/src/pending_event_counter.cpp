@@ -55,7 +55,7 @@ bool PendingEventCounter::HasPendingEvent()
 
 std::shared_ptr<PendingEventCounter::Guard> PendingEventCounter::CreateGuard()
 {
-    return std:make_shared<Guard>(*this);
+    return std::make_shared<Guard>(*this);
 }
 
 void PendingEventCounter::Record()
