@@ -217,6 +217,7 @@ INPUT_GESTURE:
   __BASE: {type: STATISTIC, level: MINOR, desc: input gesture usage count}
   TOUCH_PAD_2FINGER_TAP: {type: UINT32, desc: touchpad two finger tap right click count}
   TOUCH_PAD_PRESS_RIGHT_CLICK_AREA: {type: UINT32, desc: touchpad press right click area count}
+  TOUCH_PAD_DOUBLE_TAP_AND_DRAG: {type: UINT32, desc: count of tap-and-drag on touchpad}
 
 COMBO_START_TIME:
   __BASE: {type: STATISTIC, level: MINOR, desc: combo start time}

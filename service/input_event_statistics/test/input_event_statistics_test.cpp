@@ -366,8 +366,24 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpTouchpadGestureT
     EXPECT_NE(dumpStr.find("Touchpad Gesture Statistics"), std::string::npos);
     EXPECT_NE(dumpStr.find("Right Click Count (Two Finger Tap): 1"), std::string::npos);
     EXPECT_NE(dumpStr.find("Right Click Count (Press Right Click Area): 1"), std::string::npos);
+    // No touchpad device in the test environment, the libinput-sourced counter dumps 0.
+    EXPECT_NE(dumpStr.find("Double Tap And Drag Count: 0"), std::string::npos);
     EXPECT_EQ(dumpStr.find("Mouse Move Interval"), std::string::npos);
     EXPECT_EQ(dumpStr.find("Mouse Dispatch Latency"), std::string::npos);
+}
+
+/**
+ * @tc.name: InputEventStatisticsTest_TouchpadTapDragQueryTest_001
+ * @tc.desc: tap-and-drag count query/reset without touchpad devices returns 0 and does not crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_TouchpadTapDragQueryTest_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(InputEventStatistics::GetTouchpadDoubleTapAndDragCount(), 0u);
+    InputEventStatistics::ResetTouchpadDoubleTapAndDragCount();
+    EXPECT_EQ(InputEventStatistics::GetTouchpadDoubleTapAndDragCount(), 0u);
 }
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
@@ -389,6 +405,7 @@ HWTEST_F(InputEventStatisticsTest, InputEventStatisticsTest_DumpNoDataTest_001, 
     EXPECT_NE(gestureStr.find("Touchpad Gesture Statistics"), std::string::npos);
     EXPECT_NE(gestureStr.find("Right Click Count (Two Finger Tap): 0"), std::string::npos);
     EXPECT_NE(gestureStr.find("Right Click Count (Press Right Click Area): 0"), std::string::npos);
+    EXPECT_NE(gestureStr.find("Double Tap And Drag Count: 0"), std::string::npos);
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
 }
 

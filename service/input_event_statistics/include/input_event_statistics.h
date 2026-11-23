@@ -32,8 +32,9 @@ namespace MMI {
  *  - mouse pointer-move event dispatch latency (libinput arrival at
  *    MouseEventNormalize::OnEvent, before normalize/gesture interpretation ->
  *    UDS send done, move-action events only);
- *  - touchpad right-click gesture count, split by gesture source (two-finger
- *    tap / press in the right-click area).
+ *  - touchpad gesture usage counts: right-click split by gesture source
+ *    (two-finger tap / press in the right-click area), and tap-and-drag
+ *    (counted inside libinput, pulled and reset at report time).
  *
  * Device scope: every device reported by libinput (kernel /dev/input node,
  * including uinput created ones) is counted as a physical device; only UDS
@@ -42,8 +43,11 @@ namespace MMI {
  * Threading: all notification entries (OnPointerMotionEvent/MarkMouseDispatchStart/
  * RecordMouseDispatchLatency/RecordTouchpadRightClick/OnDeviceRemoved) are invoked on the
  * server epoll thread; TryReport is invoked by the report timer on the same thread;
- * Dump is posted as a sync task on the server thread as well. Bucket counters are
- * atomics so that any incidental cross-thread read is still safe.
+ * Dump is posted as a sync task on the server thread as well. The tap-and-drag count
+ * is queried/reset inside libinput from the report timer thread, the same calling
+ * context TouchPadTransformProcessor::NotifyLibinputDragState already uses for
+ * libinput device interfaces. Bucket counters are atomics so that any incidental
+ * cross-thread read is still safe.
  *
  * Performance: notification entries only do integer compare/increment on the hot path
  * (no allocation, no string formatting, no logging), see docs constraint <=50us.
@@ -105,6 +109,16 @@ public:
     // right button zone press). Counted per gesture source: isTwoFingerTap=true counts
     // as a two-finger tap gesture, otherwise as a press in the right-click area.
     static void RecordTouchpadRightClick(bool isTwoFingerTap);
+
+    // Live query of the tap-and-drag gesture count accumulated inside libinput
+    // (incremented by libinput once per tap-and-drag gesture, i.e. when a tap
+    // followed by a finger down turns into a drag), summed over all touchpad
+    // devices. Read-only, does not reset the libinput counters.
+    static uint64_t GetTouchpadDoubleTapAndDragCount();
+
+    // Resets the tap-and-drag counters of all touchpad devices inside libinput.
+    // Called after a successful hourly report window consumed the counts.
+    static void ResetTouchpadDoubleTapAndDragCount();
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
     // ---------------- lifecycle ----------------
@@ -134,6 +148,8 @@ public:
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
     // Dumps touchpad gesture statistics to fd, one line per gesture with its
     // trigger sources distinguished (zero values when no data, never fails).
+    // The tap-and-drag line is a live query of the libinput counters accumulated
+    // since the last hourly report.
     static void DumpTouchpadGesture(int32_t fd);
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
 
@@ -155,14 +171,15 @@ public:
     static void RecordDispatchLatency(int64_t latencyUs);
 
 private:
-    // Prints the one-line summary log of a report window (hourly low frequency path).
-    // The touchpad gesture segment is part of the line only in touchpad builds.
+    // Prints the summary logs of a report window (hourly low frequency path):
+    // mouse interval/latency buckets, plus the touchpad gesture counts in
+    // touchpad builds (LogTouchpadGestureSummary, one log line each).
     static void LogReportSummary(const uint32_t (&moveCounts)[BUCKET_COUNT],
-        const uint32_t (&latencyCounts)[BUCKET_COUNT]
+        const uint32_t (&latencyCounts)[BUCKET_COUNT]);
 #ifdef OHOS_BUILD_ENABLE_TOUCHPAD
-        , uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount
+    static void LogTouchpadGestureSummary(uint32_t twoFingerTapCount, uint32_t pressRightClickAreaCount,
+        uint32_t doubleTapAndDragCount);
 #endif // OHOS_BUILD_ENABLE_TOUCHPAD
-    );
 
     static std::atomic<uint64_t> moveIntervalCounts_[BUCKET_COUNT];
     static std::atomic<uint64_t> dispatchLatencyCounts_[BUCKET_COUNT];
