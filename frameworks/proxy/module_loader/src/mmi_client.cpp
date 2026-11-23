@@ -331,7 +331,7 @@ bool MMIClient::HasPendingInputData()
     int32_t bytes = 0;
     if (ioctl(fd, FIONREAD, &bytes) < 0) {
         int32_t savedErrno = errno;
-        MMI_HILOGD("ioctl FIONREAD failed, fd:%{public}d, errno:%{public}d, connected:%{public}d",
+        MMI_HILOGE("ioctl FIONREAD failed, fd:%{public}d, errno:%{public}d, connected:%{public}d",
             fd, savedErrno, GetConnectedStatus());
         return false;
     }

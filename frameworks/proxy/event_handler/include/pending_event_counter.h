@@ -27,7 +27,7 @@ class PendingEventCounter final {
 public:
     class Guard final {
     public:
-        Guard(PendingEventCounter &counter);
+        explicit Guard(PendingEventCounter &counter);
         ~Guard();
 
         void Release();
