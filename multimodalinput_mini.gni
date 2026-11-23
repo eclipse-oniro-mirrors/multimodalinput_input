@@ -132,6 +132,7 @@ declare_args() {
     "events/src/input_manager.cpp",
     "module_loader/src/mmi_client.cpp",
     "module_loader/src/mmi_fd_listener.cpp",
+    "event_handler/src/pending_event_counter.cpp",
   ]
 
   libmmi_service_sources = [

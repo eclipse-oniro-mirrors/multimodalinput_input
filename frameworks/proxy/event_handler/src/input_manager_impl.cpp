@@ -430,6 +430,25 @@ int32_t InputManagerImpl::SetWindowInputEventConsumer(std::shared_ptr<IInputEven
     return RET_OK;
 }
 
+int32_t InputManagerImpl::HasPendingInputEvent()
+{
+    BytraceAdapter::MMIClientTraceStart(BytraceAdapter::MMI_THREAD_LOOP_DEPTH_THREE, msg);
+    MMIClientPtr client = MMIEventHdl.GetMMIClient();
+    if (client == nullptr) {
+        MMI_HILOGE("client is nullptr");
+        BytraceAdapter::MMIClientTraceStop();
+        return RET_ERR;
+    }
+    if (client->IsEventHandlerChanged()) {
+        MMI_HILOG_DISPATCHI("The event handler has changed");
+        BytraceAdapter::MMIClientTraceStop();
+        return pendingEventCounter_.HasPendingInputEvent();
+    }
+    MMI_HILOG_DISPATCHD("The event handler hasn't changed");
+    BytraceAdapter::MMIClientTraceStop();
+    return client->HasPendingInputData();
+}
+
 int32_t InputManagerImpl::SubscribeKeyEvent(std::shared_ptr<KeyOption> keyOption,
     std::function<void(std::shared_ptr<KeyEvent>)> callback)
 {
@@ -661,10 +680,12 @@ void InputManagerImpl::OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent)
     MMIClientPtr client = MMIEventHdl.GetMMIClient();
     CHKPV(client);
     MarkLastDispatched(keyEvent->GetId());
+    auto pendingGuard = pendingEventCounter_.CreateGuard();
     if (client->IsEventHandlerChanged()) {
         BytraceAdapter::StartPostTaskEvent(keyEvent);
-        if (!eventHandler->PostTask([this, inputConsumer, keyEvent] {
+        if (!eventHandler->PostTask([this, inputConsumer, keyEvent, pendingGuard] {
                 this->OnKeyEventTask(inputConsumer, keyEvent);
+                pendingGuard->Release();
                 MarkLastProcessed(keyEvent->GetId());
                 return;
             },
@@ -678,6 +699,7 @@ void InputManagerImpl::OnKeyEvent(std::shared_ptr<KeyEvent> keyEvent)
         MarkLastDispatched(keyEvent->GetId());
         BytraceAdapter::StartConsumer(keyEvent);
         inputConsumer->OnInputEvent(keyEvent);
+        pendingGuard->Release();
         BytraceAdapter::StopConsumer();
         MarkLastProcessed(keyEvent->GetId());
     }
@@ -732,10 +754,12 @@ void InputManagerImpl::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent
         }
     }
     MarkLastDispatched(pointerEvent->GetId());
+    auto pendingGuard = pendingEventCounter_.CreateGuard();
     if (client->IsEventHandlerChanged()) {
         BytraceAdapter::StartPostTaskEvent(pointerEvent);
-        if (!eventHandler->PostTask([this, inputConsumer, pointerEvent] {
+        if (!eventHandler->PostTask([this, inputConsumer, pointerEvent, pendingGuard] {
                 this->OnPointerEventTask(inputConsumer, pointerEvent);
+                pendingGuard->Release();
                 MarkLastProcessed(pointerEvent->GetId());
             },
             std::string("MMI::OnPointerEvent"), 0, AppExecFwk::EventHandler::Priority::VIP)) {
@@ -748,6 +772,7 @@ void InputManagerImpl::OnPointerEvent(std::shared_ptr<PointerEvent> pointerEvent
         MarkLastDispatched(pointerEvent->GetId());
         BytraceAdapter::StartConsumer(pointerEvent);
         inputConsumer->OnInputEvent(pointerEvent);
+        pendingGuard->Release();
         BytraceAdapter::StopConsumer();
         MarkLastProcessed(pointerEvent->GetId());
     }

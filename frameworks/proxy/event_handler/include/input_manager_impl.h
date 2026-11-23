@@ -36,6 +36,7 @@
 #include "key_option.h"
 #include "long_press_event.h"
 #include "mmi_event_observer.h"
+#include "pending_event_counter.h"
 #include "pointer_style.h"
 #include "pointer_event_recorder.h"
 #include "touchpad_control_display_gain.h"
@@ -84,6 +85,7 @@ public:
     void NotifyBundleName(int32_t pid, int32_t uid, const std::string &bundleName, int32_t syncStatus);
     int32_t SetWindowInputEventConsumer(std::shared_ptr<IInputEventConsumer> inputEventConsumer,
         std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
+    bool HasPendingInputEvent();
     int32_t EnableTouchpadRawEvent(bool enable);
     void ClearWindowPointerStyle(int32_t pid, int32_t windowId);
     int32_t SetNapStatus(int32_t pid, int32_t uid, const std::string &bundleName, int32_t napStatus);
@@ -374,6 +376,7 @@ private:
 #endif // OHOS_BUILD_ENABLE_ANCO
     uint32_t permissionType_ = 0;
     bool permissionEnable_ = false;
+    PendingEventCounter pendingEventCounter_
 };
 
 #define InputMgrImpl ::OHOS::Singleton<InputManagerImpl>::GetInstance()

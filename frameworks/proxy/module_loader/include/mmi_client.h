@@ -46,6 +46,7 @@ public:
         return isEventHandlerChanged_;
     }
     EventHandlerPtr GetEventHandler() const override;
+    bool HasPendingInputData() override;
 
 private:
     bool StartEventRunner();

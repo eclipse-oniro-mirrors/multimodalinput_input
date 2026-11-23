@@ -15,6 +15,9 @@
 
 #include "mmi_client.h"
 
+#include <cerrno>
+#include <sys/ioctl.h>
+
 #include "anr_handler.h"
 #include "mmi_fd_listener.h"
 #include "multimodal_input_connect_manager.h"
@@ -316,6 +319,22 @@ void MMIClient::Stop()
             MMI_HILOGI("Remove all file descriptor listeners success");
         }
     }
+}
+
+bool MMIClient::HasPendingInputData()
+{
+    int32_t fd = GetFd();
+    if (fd < 0 || !GetConnectedStatus()) {
+        return false;
+    }
+
+    int32_t bytes = 0;
+    if (ioctl(fd, FIONREAD, &bytes) < 0) {
+        MMI_HILOGD("ioctl FIONREAD failed, fd:%{public}d, errno:%{public}d", fd, errno);
+        return false;
+    }
+    MMI_HILOGD("This process has %{public}d bytes", bytes);
+    return bytes > 0;
 }
 
 const std::string& MMIClient::GetErrorStr(ErrCode code) const

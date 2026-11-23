@@ -123,6 +123,11 @@ int32_t InputManager::SetWindowInputEventConsumer(std::shared_ptr<IInputEventCon
     // LCOV_EXCL_STOP
 }
 
+bool InputManager::HasPendingInputEvent()
+{
+    return InputMgrImpl.HasPendingInputEvent();
+}
+
 int32_t InputManager::SubscribeKeyEvent(std::shared_ptr<KeyOption> keyOption,
     std::function<void(std::shared_ptr<KeyEvent>)> callback)
 {

@@ -440,6 +440,7 @@ ohos_unittest("InputMonitorManagerTest") {
     "event_handler/src/pointer_event_recorder.cpp",
     "event_handler/test/input_monitor_manager_test.cpp",
     "event_handler/test/tablet_event_input_subscribe_manager_test.cpp",
+    "event_handler/src/pending_event_counter.cpp",
   ]
 
   if (input_feature_switch) {
@@ -515,6 +516,7 @@ ohos_unittest("InputManagerImplTest") {
     "event_handler/src/pointer_event_recorder.cpp",
     "event_handler/test/input_manager_impl_test.cpp",
     "event_handler/test/pre_monitor_manager_test.cpp",
+    "event_handler/src/pending_event_counter.cpp",
   ]
 
   configs = [
@@ -657,6 +659,7 @@ ohos_unittest("PointerEventRecordTest") {
     "event_handler/src/tablet_event_input_subscribe_manager.cpp",
     "event_handler/src/pointer_event_recorder.cpp",
     "event_handler/test/pointer_event_record_test.cpp",
+    "event_handler/src/pending_event_counter.cpp",
   ]
 
   configs = [
@@ -924,6 +927,7 @@ ohos_unittest("KeyEventHookHandlerTest") {
     "event_handler/test/input_monitor_manager_test.cpp",
     "event_handler/test/key_event_hook_handler_test.cpp",
     "event_handler/test/tablet_event_input_subscribe_manager_test.cpp",
+    "event_handler/src/pending_event_counter.cpp",
   ]
 
   if (input_feature_switch) {
