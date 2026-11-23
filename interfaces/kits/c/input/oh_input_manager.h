@@ -3079,8 +3079,6 @@ typedef void (*OH_Input_EventHandler_OnDisabledFunc)(OH_Input_EventHandler* hand
  *             onEventFunc is NULL, onDisabledFunc is NULL, handler is NULL,
  *             or mask contains unsupported bits.
  *         <br>{@link INPUT_DEVICE_NOT_SUPPORTED} Capability not supported.
- *         <br>{@link INPUT_OCCUPIED_BY_SYSTEM} Handler occupied by the system.
- *         <br>{@link INPUT_OCCUPIED_BY_OTHER} Handler occupied by another process.
  *         <br>{@link INPUT_SERVICE_EXCEPTION} Input service exception, please try again.
  * @release OH_Input_EventHandler_Destroy {handler}
  * @since 26.1.0
