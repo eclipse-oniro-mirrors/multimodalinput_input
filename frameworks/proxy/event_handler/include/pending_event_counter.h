@@ -50,8 +50,7 @@ private:
     void Record();
     void Remove();
 
-    std::mutex pendingCountMutex_;
-    uint32_t pendingCount_ { 0 };
+    std::atomic<uint32_t> pendingCount_ { 0 };
 };
 
 } // namespace MMI
