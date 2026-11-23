@@ -66,9 +66,7 @@ void PendingEventCounter::Record()
 
 void PendingEventCounter::Remove()
 {
-    if (pendingCount_.load() > 0) {
-        pendingCount_.fetch_sub(1);
-    }
+    pendingCount_.fetch_sub(1);
     MMI_HILOGD("Remove pending count, pid:%{public}d, count:%{public}u",
         getpid(), pendingCount_.load());
 }
