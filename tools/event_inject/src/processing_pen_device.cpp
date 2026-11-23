@@ -53,7 +53,7 @@ void ProcessingPenDevice::TransformPenEventToInputEvent(const std::vector<PenEve
     for (const auto &item : penEvents) {
         SetPenSlidePadEvent(item, inputEventArray);
     }
-    SetPenLeavePadEvent(penEvents[penEvents.back()], inputEventArray);
+    SetPenLeavePadEvent(penEvents.back(), inputEventArray);
 }
 
 void ProcessingPenDevice::SetPenApproachPadEvent(const PenEvent& penEvent, InputEventArray& inputEventArray)
