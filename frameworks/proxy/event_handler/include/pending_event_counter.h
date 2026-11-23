@@ -16,9 +16,9 @@
 #ifndef PENDING_EVENT_COUNTER_H
 #define PENDING_EVENT_COUNTER_H
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 
 namespace OHOS {
 namespace MMI {

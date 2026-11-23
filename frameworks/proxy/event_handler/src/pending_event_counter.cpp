@@ -49,8 +49,8 @@ bool PendingEventCounter::HasPendingEvent()
 {
     std::lock_guard<std::mutex> guard(pendingCountMutex_);
     MMI_HILOGD("pid:%{public}d, haspending:%{public}d, count:%{public}u",
-        getpid(), pendingCount_ != 0, pendingCount_);
-    return pendingCount_ != 0;
+        getpid(), pendingCount_.load() != 0, pendingCount_.load());
+    return pendingCount_load() != 0;
 }
 
 std::shared_ptr<PendingEventCounter::Guard> PendingEventCounter::CreateGuard()
@@ -61,19 +61,19 @@ std::shared_ptr<PendingEventCounter::Guard> PendingEventCounter::CreateGuard()
 void PendingEventCounter::Record()
 {
     std::lock_guard<std::mutex> guard(pendingCountMutex_);
-    ++pendingCount_;
+    pendingCount_fetch_add(1);
     MMI_HILOGD("Record pending count, pid:%{public}d, count:%{public}u",
-        getpid(), pendingCount_);
+        getpid(), pendingCount_load());
 }
 
 void PendingEventCounter::Remove()
 {
     std::lock_guard<std::mutex> guard(pendingCountMutex_);
-    if (pendingCount_ > 0) {
-        --pendingCount_;
+    if (pendingCount_load() > 0) {
+        pendingCount_fetch_sub(1);
     }
     MMI_HILOGD("Remove pending count, pid:%{public}d, count:%{public}u",
-        getpid(), pendingCount_);
+        getpid(), pendingCount_load());
 }
 
 } // namespace MMI
