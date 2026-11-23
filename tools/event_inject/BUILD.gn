@@ -35,7 +35,6 @@ config("event_injection_public_config") {
     "${mmi_path}/service/product_type_config/include",
     "${mmi_path}/util/common/include",
     "${mmi_path}/util/json_parser/include",
-    "//third_party/FreeBSD/sys/dev/evdev",
   ]
 }
 
@@ -62,6 +61,7 @@ ohos_source_set("event-injection") {
   external_deps = [
     "cJSON:cjson",
     "c_utils:utils",
+    "hilog:libhilog",
     "ipc:ipc_single",
     "libinput:libinput-third-mmi",
   ]
@@ -162,6 +162,7 @@ ohos_executable("mmi-event-injection") {
   external_deps = [
     "cJSON:cjson",
     "c_utils:utils",
+    "hilog:libhilog",
     "libinput:libinput-third-mmi",
   ]
   install_enable = true
