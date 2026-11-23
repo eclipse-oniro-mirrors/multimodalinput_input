@@ -36,7 +36,7 @@ public:
         Guard &operator = (const Guard &) = delete;
     
     private:
-        PendingEventCounter *counter_;
+        std::atomic<PendingEventCounter*> counter_;
     };
 
     PendingEventCounter() = default;

@@ -330,7 +330,8 @@ bool MMIClient::HasPendingInputData()
 
     int32_t bytes = 0;
     if (ioctl(fd, FIONREAD, &bytes) < 0) {
-        MMI_HILOGD("ioctl FIONREAD failed, fd:%{public}d, errno:%{public}d", fd, errno);
+        MMI_HILOGD("ioctl FIONREAD failed, fd:%{public}d, errno:%{public}d, connected:%{public}d",
+            fd, errno, GetConnectedStatus());
         return false;
     }
     MMI_HILOGD("This process has %{public}d bytes", bytes);

@@ -39,9 +39,9 @@ PendingEventCounter::Guard::~Guard()
 
 void PendingEventCounter::Guard::Release()
 {
+    PendingEventCounter* counter = counter_.exchange(nullptr);
     if (counter_ != nullptr) {
         counter_->Remove();
-        counter_ = nullptr;
     }
 }
 
