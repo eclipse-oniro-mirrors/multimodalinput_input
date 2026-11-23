@@ -76,6 +76,5 @@ void PendingEventCounter::Remove()
         getpid(), pendingCount_);
 }
 
-
 } // namespace MMI
 } // namespace OHOS

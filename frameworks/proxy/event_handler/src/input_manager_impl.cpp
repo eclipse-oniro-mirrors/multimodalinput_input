@@ -432,6 +432,7 @@ int32_t InputManagerImpl::SetWindowInputEventConsumer(std::shared_ptr<IInputEven
 
 bool InputManagerImpl::HasPendingInputEvent()
 {
+    std::string msg = "HasPendingInputEvent";
     BytraceAdapter::MMIClientTraceStart(BytraceAdapter::MMI_THREAD_LOOP_DEPTH_THREE, msg);
     MMIClientPtr client = MMIEventHdl.GetMMIClient();
     if (client == nullptr) {
@@ -442,7 +443,7 @@ bool InputManagerImpl::HasPendingInputEvent()
     if (client->IsEventHandlerChanged()) {
         MMI_HILOG_DISPATCHI("The event handler has changed");
         BytraceAdapter::MMIClientTraceStop();
-        return pendingEventCounter_.HasPendingInputEvent();
+        return pendingEventCounter_.HasPendingEvent();
     }
     MMI_HILOG_DISPATCHD("The event handler hasn't changed");
     BytraceAdapter::MMIClientTraceStop();

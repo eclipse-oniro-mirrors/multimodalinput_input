@@ -133,8 +133,8 @@ public:
 
     /**
      * @brief Determine whether the process has pending input events.
-     * @return If the process has input events that have been receiveed but notprocessed,
-     * return ture;otherwise, return false.
+     * @return If the process has input events that have been received but not processed,
+     * return true; otherwise, return false.
      * @since 26
      */
     bool HasPendingInputEvent();

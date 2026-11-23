@@ -39,8 +39,8 @@ public:
         PendingEventCounter *counter_;
     };
 
-    PendingEventCounter() = delete;
-    ~PendingEventCounter() = delete;
+    PendingEventCounter() = default;
+    ~PendingEventCounter() = default;
 
     bool HasPendingEvent();
     
