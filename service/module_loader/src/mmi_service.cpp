@@ -168,6 +168,7 @@ constexpr int32_t TOUCHPAD_SCROLL_ROWS { 3 };
 constexpr int32_t UID_TRANSFORM_DIVISOR { 200000 };
 const std::string PRODUCT_DEVICE_TYPE = system::GetParameter("const.product.devicetype", "unknown");
 const std::string PRODUCT_TYPE_PC = "2in1";
+const std::string PRODUCT_TYPE_TABLET = "tablet";
 const int32_t ERROR_WINDOW_ID_PERMISSION_DENIED = 26500001;
 const std::string SCENEBOARD_NAME { "com.ohos.sceneboard" };
 const std::string FOUNDATION_NAME { "foundation" };
@@ -3899,14 +3900,19 @@ int32_t MMIService::UpdateCombineKeyState(bool enable)
 ErrCode MMIService::CheckControllerPermission()
 {
     CALL_DEBUG_ENTER;
-    // Controller permission model: CONTROL_DEVICE permission + PC device
+    // Controller permission model: CONTROL_DEVICE / ENTERPRISE_CONTROL_DEVICE permission + PC and tablet devices
     int32_t pid = GetCallingPid();
 
-    // 1. Check PC device
-    if (PRODUCT_DEVICE_TYPE != PRODUCT_TYPE_PC) {
+    // 1. Check PC and tablet device
+    if (PRODUCT_DEVICE_TYPE != PRODUCT_TYPE_PC && PRODUCT_DEVICE_TYPE != PRODUCT_TYPE_TABLET) {
         MMI_HILOGE("Controller not supported on non-PC device, pid:%{public}d, "
             "deviceType:%{public}s", pid, PRODUCT_DEVICE_TYPE.c_str());
         return CAPABILITY_NOT_SUPPORTED;
+    }
+
+    if (PER_HELPER->CheckEnterpriseControlDevice()) {
+        MMI_HILOGD("Controller permission check passed by ENTERPRISE_CONTROL_DEVICE, pid:%{public}d", pid);
+        return RET_OK;
     }
 
     // 2. Check CONTROL_DEVICE permission

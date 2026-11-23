@@ -65,6 +65,7 @@ constexpr int32_t SEND_NOTICE_OVERTIME { 5 };
 [[ maybe_unused ]] constexpr int32_t CAST_POINTER_ID { 5000 };
 const std::string PRODUCT_TYPE = system::GetParameter("const.product.devicetype", "unknown");
 const std::string PRODUCT_TYPE_PC = "2in1";
+const std::string PRODUCT_TYPE_TABLET = "tablet";
 [[ maybe_unused ]] constexpr int32_t WINDOW_ROTATE { 0 };
 constexpr int32_t COMMON_PERMISSION_CHECK_ERROR { 201 };
 constexpr int32_t CAST_INPUT_DEVICEID { 0xAAAAAAFF };
@@ -162,7 +163,8 @@ int32_t ServerMsgHandler::OnInjectKeyEvent(const std::shared_ptr<KeyEvent> keyEv
     LogTracer lt(keyEvent->GetId(), keyEvent->GetEventType(), keyEvent->GetKeyAction());
     keyEvent->ClearFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
     if (isNativeInject) {
-        int32_t checkReturn = NativeInjectCheck(pid);
+        int32_t checkReturn = NativeInjectCheck(pid,
+            keyEvent->HasInjectorInfo() ? keyEvent->GetInjectorInfo()->tokenId : 0);
         if (checkReturn != RET_OK) {
             return checkReturn;
         }
@@ -280,7 +282,8 @@ int32_t ServerMsgHandler::OnInjectPointerEvent(int32_t userId, const std::shared
     LogTracer lt(pointerEvent->GetId(), pointerEvent->GetEventType(), pointerEvent->GetPointerAction());
     pointerEvent->ClearFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
     if (isNativeInject) {
-        int32_t checkReturn = NativeInjectCheck(pid);
+        int32_t checkReturn = NativeInjectCheck(pid,
+            pointerEvent->HasInjectorInfo() ? pointerEvent->GetInjectorInfo()->tokenId : 0);
         if (checkReturn != RET_OK) {
             return checkReturn;
         }
@@ -306,7 +309,8 @@ int32_t ServerMsgHandler::OnInjectTouchPadEvent(int32_t userId, const std::share
     LogTracer lt(pointerEvent->GetId(), pointerEvent->GetEventType(), pointerEvent->GetPointerAction());
     pointerEvent->ClearFlag(InputEvent::EVENT_FLAG_INJECT_UNDER_LOCK);
     if (isNativeInject) {
-        int32_t checkReturn = NativeInjectCheck(pid);
+        int32_t checkReturn = NativeInjectCheck(pid,
+            pointerEvent->HasInjectorInfo() ? pointerEvent->GetInjectorInfo()->tokenId : 0);
         if (checkReturn != RET_OK) {
             return checkReturn;
         }
@@ -1909,16 +1913,20 @@ int32_t ServerMsgHandler::OnTransferBinderClientSrv(const sptr<IRemoteObject> &b
     return ERR_OK;
 }
 
-int32_t ServerMsgHandler::NativeInjectCheck(int32_t pid)
+int32_t ServerMsgHandler::NativeInjectCheck(int32_t pid, uint32_t tokenID)
 {
     CALL_DEBUG_ENTER;
-    if (PRODUCT_TYPE != PRODUCT_TYPE_PC) {
+    if (PRODUCT_TYPE != PRODUCT_TYPE_PC && PRODUCT_TYPE != PRODUCT_TYPE_TABLET) {
         MMI_HILOGW("Current device has no permission");
         return COMMON_PERMISSION_CHECK_ERROR;
     }
     if (pid <= 0) {
         MMI_HILOGW("Invalid process id pid:%{public}d", pid);
         return COMMON_PERMISSION_CHECK_ERROR;
+    }
+    if (tokenID != 0 && PER_HELPER->CheckEnterpriseControlDevice(tokenID)) {
+        MMI_HILOGI("Native inject permitted by ENTERPRISE_CONTROL_DEVICE permission, pid:%{public}d", pid);
+        return RET_OK;
     }
     if (PER_HELPER->CheckControlDevicePermission()) {
         MMI_HILOGI("Native inject permitted by CONTROL_DEVICE permission, pid:%{public}d", pid);

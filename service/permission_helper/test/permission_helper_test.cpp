@@ -434,6 +434,20 @@ HWTEST_F(PermissionHelperTest, PermissionHelperTest_CheckControlDevicePermission
 }
 
 /**
+ * @tc.name: PermissionHelperTest_CheckEnterpriseControlDevice001
+ * @tc.desc: Test CheckEnterpriseControlDevice
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PermissionHelperTest, PermissionHelperTest_CheckEnterpriseControlDevice001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // The host test process token is not a HAP token, so the HAP-only check must reject it.
+    bool result = PER_HELPER->CheckEnterpriseControlDevice();
+    EXPECT_FALSE(result);
+}
+
+/**
  * @tc.name: PermissionHelperTest_RequestFromShell001
  * @tc.desc: Test RequestFromShell
  * @tc.type: FUNC

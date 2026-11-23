@@ -194,7 +194,7 @@ private:
     int32_t OnUiExtentionWindowInfo(NetPacket &pkt, WindowInfo& info);
     bool CloseInjectNotice(int32_t pid);
     bool IsNavigationWindowInjectEvent(std::shared_ptr<PointerEvent> pointerEvent);
-    int32_t NativeInjectCheck(int32_t pid);
+    int32_t NativeInjectCheck(int32_t pid, uint32_t tokenID = 0);
     int32_t ReadScreensInfo(NetPacket &pkt, UserScreenInfo &userScreenInfo);
     int32_t ReadDisplayGroupsInfo(NetPacket &pkt, UserScreenInfo &userScreenInfo);
     int32_t ReadDisplaysInfo(NetPacket &pkt, DisplayGroupInfo &displayGroupInfo);

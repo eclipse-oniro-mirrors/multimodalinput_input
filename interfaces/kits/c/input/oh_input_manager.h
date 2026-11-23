@@ -719,8 +719,8 @@ int32_t OH_Input_GetKeySwitch(const struct Input_KeyState* keyState);
 
 /**
  * @brief Injects a key event.
- * <br>This API does not take effect if the user has not granted authorization and the caller does not have the ohos.
- * permission.CONTROL_DEVICE permission.
+ * <br>This API does not take effect if the user has not granted authorization and the caller does not have
+ * ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE permission.
  * <br>Since API version 20, you are advised to use {@link OH_Input_RequestInjection()} to request the required
  * permission before calling this API. If the status returned by {@link OH_Input_QueryAuthorizedStatus()} is
  * {@link AUTHORIZED}, then you can call this API.
@@ -731,8 +731,11 @@ int32_t OH_Input_GetKeySwitch(const struct Input_KeyState* keyState);
  * the key being pressed for a long time.
  * <br>Since API version 26.0.0, callers that have the ohos.permission.CONTROL_DEVICE permission can use this API
  * directly.
+ * <br>Since API version 26.1.0, callers that have ohos.permission.CONTROL_DEVICE or
+ * ohos.permission.ENTERPRISE_CONTROL_DEVICE permission can use this API.
  *
- * @permission ohos.permission.CONTROL_DEVICE
+ * @permission ohos.permission.CONTROL_DEVICE [since 26.0.0 - 26.0.1]
+ * @permission ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE [since 26.1.0]
  * @param keyEvent **KeyEvent** object, which can be created through {@link OH_Input_CreateKeyEvent()}. You can call
  *     {@link OH_Input_SetKeyEventKeyCode()} and {@link OH_Input_SetKeyEventAction()} to set the key value and key
  *     event type of the key event object.
@@ -949,15 +952,18 @@ Input_Result OH_Input_DispatchToNextHandler(int32_t eventId);
 /**
  * @brief Injects a mouse event by using coordinates in the relative coordinate system with the upper-left corner of
  * the specified screen as the origin.
- * <br>This API does not take effect if the user has not granted authorization and the caller does not have the ohos.
- * permission.CONTROL_DEVICE permission.
+ * <br>This API does not take effect if the user has not granted authorization and the caller does not have
+ * ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE permission.
  * <br>Since API version 20, you are advised to use {@link OH_Input_RequestInjection()} to request the required
  * permission before calling this API. If the status returned by {@link OH_Input_QueryAuthorizedStatus()} is
  * {@link AUTHORIZED}, then you can call this API.
  * <br>Since API version 26.0.0, callers that have the ohos.permission.CONTROL_DEVICE permission can use this API
  * directly.
+ * <br>Since API version 26.1.0, callers that have ohos.permission.CONTROL_DEVICE or
+ * ohos.permission.ENTERPRISE_CONTROL_DEVICE permission can use this API.
  *
- * @permission ohos.permission.CONTROL_DEVICE
+ * @permission ohos.permission.CONTROL_DEVICE [since 26.0.0 - 26.0.1]
+ * @permission ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE [since 26.1.0]
  * @param mouseEvent Mouse event object. You can call {@link OH_Input_CreateMouseEvent()} to create a mouse event
  *     object.
  *     <br>If the mouse event object is no longer needed, destroy it by calling {@link OH_Input_DestroyMouseEvent()}.
@@ -972,15 +978,18 @@ int32_t OH_Input_InjectMouseEvent(const struct Input_MouseEvent* mouseEvent);
 /**
  * @brief Injects a mouse event by using coordinates in the global coordinate system with the upper-left corner of the
  * primary screen as the origin.
- * <br>This API does not take effect if the user has not granted authorization and the caller does not have the ohos.
- * permission.CONTROL_DEVICE permission.
+ * <br>This API does not take effect if the user has not granted authorization and the caller does not have
+ * ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE permission.
  * <br>Since API version 20, you are advised to use {@link OH_Input_RequestInjection()} to request the required
  * permission before calling this API. If the status returned by {@link OH_Input_QueryAuthorizedStatus()} is
  * {@link AUTHORIZED}, then you can call this API.
  * <br>Since API version 26.0.0, callers that have the ohos.permission.CONTROL_DEVICE permission can use this API
  * directly.
+ * <br>Since API version 26.1.0, callers that have ohos.permission.CONTROL_DEVICE or
+ * ohos.permission.ENTERPRISE_CONTROL_DEVICE permission can use this API.
  *
- * @permission ohos.permission.CONTROL_DEVICE
+ * @permission ohos.permission.CONTROL_DEVICE [since 26.0.0 - 26.0.1]
+ * @permission ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE [since 26.1.0]
  * @param mouseEvent Mouse event object. You can call {@link OH_Input_CreateMouseEvent()} to create a mouse event
  *     object.
  *     <br>If the mouse event object is no longer needed, destroy it by calling {@link OH_Input_DestroyMouseEvent()}.
@@ -1294,15 +1303,18 @@ int32_t OH_Input_GetMouseEventGlobalY(const struct Input_MouseEvent* mouseEvent)
 /**
  * @brief Injects a touch event by using coordinates in the relative coordinate system with the upper-left corner of
  * the specified screen as the origin.
- * <br>This API does not take effect if the user has not granted authorization and the caller does not have the ohos.
- * permission.CONTROL_DEVICE permission.
+ * <br>This API does not take effect if the user has not granted authorization and the caller does not have
+ * ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE permission.
  * <br>Since API version 20, you are advised to use {@link OH_Input_RequestInjection()} to request the required
  * permission before calling this API. If the status returned by {@link OH_Input_QueryAuthorizedStatus()} is
  * {@link AUTHORIZED}, then you can call this API.
  * <br>Since API version 26.0.0, callers that have the ohos.permission.CONTROL_DEVICE permission can use this API
  * directly.
+ * <br>Since API version 26.1.0, callers that have ohos.permission.CONTROL_DEVICE or
+ * ohos.permission.ENTERPRISE_CONTROL_DEVICE permission can use this API.
  *
- * @permission ohos.permission.CONTROL_DEVICE
+ * @permission ohos.permission.CONTROL_DEVICE [since 26.0.0 - 26.0.1]
+ * @permission ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE [since 26.1.0]
  * @param touchEvent **TouchEvent** object, which can be created through {@link OH_Input_CreateTouchEvent()}.
  *     <br>If the **TouchEvent** object is no longer needed, destroy it by calling {@link OH_Input_DestroyTouchEvent()}.
  * @return Return value of the OH_Input_InjectTouchEvent function.
@@ -1316,14 +1328,17 @@ int32_t OH_Input_InjectTouchEvent(const struct Input_TouchEvent* touchEvent);
  * @brief Injects a touch event by using coordinates in the global coordinate system with the upper-left corner of the
  * primary screen as the origin.
  * <br>This API does not take effect if the event injection authorization is not granted and the caller does not have
- * the ohos.permission.CONTROL_DEVICE permission.
+ * ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE permission.
  * <br>Since API version 20, you are advised to use {@link OH_Input_RequestInjection()} to request the required
  * permission before calling this API. If the status returned by {@link OH_Input_QueryAuthorizedStatus()} is
  * {@link AUTHORIZED}, then you can call this API.
  * <br>Since API version 26.0.0, callers that have the ohos.permission.CONTROL_DEVICE permission can use this API
  * directly.
+ * <br>Since API version 26.1.0, callers that have ohos.permission.CONTROL_DEVICE or
+ * ohos.permission.ENTERPRISE_CONTROL_DEVICE permission can use this API.
  *
- * @permission ohos.permission.CONTROL_DEVICE
+ * @permission ohos.permission.CONTROL_DEVICE [since 26.0.0 - 26.0.1]
+ * @permission ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE [since 26.1.0]
  * @param touchEvent **TouchEvent** object, which can be created through {@link OH_Input_CreateTouchEvent()}.
  *     <br>If the **TouchEvent** object is no longer needed, destroy it by calling {@link OH_Input_DestroyTouchEvent()}.
  * @return Return value of the **OH_Input_InjectTouchEventGlobal** function.
@@ -2618,6 +2633,9 @@ Input_Result OH_Input_QueryMaxTouchPoints(int32_t *count);
  * <br>Since API version 26.0.0, if the ohos.permission.CONTROL_DEVICE permission has been granted, you do not need to
  * request the injection permission. The behavior of this API is independent of the ohos.permission.CONTROL_DEVICE
  * permission.
+ * <br>Since API version 26.1.0, if ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE
+ * permission has been granted, you do not need to request the injection permission. The behavior of this API is
+ * independent of ohos.permission.CONTROL_DEVICE or ohos.permission.ENTERPRISE_CONTROL_DEVICE permission.
  *
  * @param callback Callback used to return the permission authorization status. For details, see
  *     {@link Input_InjectAuthorizeCallback}.
@@ -2640,6 +2658,9 @@ Input_Result OH_Input_RequestInjection(Input_InjectAuthorizeCallback callback);
  * @brief Queries the injection permission authorization status of the current application.
  * <br>Since API version 26.0.0, this API returns only the dialog authorization status. It does not indicate whether
  * the caller has injection capability due to holding the ohos.permission.CONTROL_DEVICE permission.
+ * <br>Since API version 26.1.0, this API returns only the dialog authorization status. It does not indicate whether
+ * the caller has injection capability due to holding the ohos.permission.CONTROL_DEVICE permission or
+ * ohos.permission.ENTERPRISE_CONTROL_DEVICE.
  *
  * @param status Injection permission authorization status of the current application. See
  *     {@link Input_InjectionStatus}.
