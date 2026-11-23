@@ -29,7 +29,7 @@ namespace MMI {
 
 PendingEventCounter::Guard::Guard(PendingEventCounter &counter) : counter_(&counter)
 {
-    counter->Record();
+    counter.Record();
 }
 
 PendingEventCounter::Guard::~Guard()
@@ -40,7 +40,7 @@ PendingEventCounter::Guard::~Guard()
 void PendingEventCounter::Guard::Release()
 {
     PendingEventCounter* counter = counter_.exchange(nullptr);
-    if (counter_ != nullptr) {
+    if (counter != nullptr) {
         counter_->Remove();
     }
 }
