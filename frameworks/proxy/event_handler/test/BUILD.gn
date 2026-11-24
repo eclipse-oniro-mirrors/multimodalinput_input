@@ -80,6 +80,7 @@ ohos_unittest("MultimodalEventHandlerTest") {
     "${mmi_path}/frameworks/proxy/event_handler/src/switch_event_input_subscribe_manager.cpp",
     "${mmi_path}/frameworks/proxy/event_handler/src/tablet_event_input_subscribe_manager.cpp",
     "${mmi_path}/frameworks/proxy/events/src/input_manager.cpp",
+    "${mmi_path}/frameworks/proxy/events/src/pending_event_counter.cpp",
   ]
 
   sanitize = {

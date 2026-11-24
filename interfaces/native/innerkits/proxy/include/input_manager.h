@@ -132,6 +132,14 @@ public:
         std::shared_ptr<AppExecFwk::EventHandler> eventHandler);
 
     /**
+     * @brief Determine whether the process has pending input events.
+     * @return If the process has input events that have been received but not processed,
+     * return true; otherwise, return false.
+     * @since 26
+     */
+    bool HasPendingInputEvent();
+
+    /**
      * @brief Enables or disables the raw touchpad event reporting of the current process. Once enabled,
      * the raw touchpad events are reported as PointerEvents with the source type SOURCE_TYPE_TOUCHPAD_RAW,
      * carrying the touchpad raw extension and dispatched to the process through the standard event
