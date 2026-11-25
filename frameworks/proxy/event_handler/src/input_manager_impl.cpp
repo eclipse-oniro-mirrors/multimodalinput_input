@@ -138,7 +138,7 @@ int32_t InputManagerImpl::SetDisplayBind(int32_t deviceId, int32_t displayId, st
     int32_t ret = MULTIMODAL_INPUT_CONNECT_MGR->SetDisplayBind(deviceId, displayId, msg);
     if (ret != RET_OK) {
         MMI_HILOGE("SetDisplayBind failed, ret:%{public}d", ret);
-        return RET_ERR;
+        return ret;
     }
     return RET_OK;
 }
