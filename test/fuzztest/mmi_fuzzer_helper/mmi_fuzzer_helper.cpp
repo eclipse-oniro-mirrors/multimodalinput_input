@@ -21,9 +21,9 @@ namespace OHOS {
 namespace MMI {
 static void CleanupAccountManager()
 {
-    auto accountMgr = ACCOUNT_MGR;
+    auto accountMgr = AccountManager::GetInstanceIfCreated();
     if (accountMgr != nullptr) {
-        accountMgr->AccountManagerUnregister();
+        accountMgr->DetachAtExit();
     }
 }
 

@@ -92,6 +92,8 @@ public:
     int32_t RegisterCommonEventCallback(const std::function<void(const EventFwk::CommonEventData &)> &callback);
     bool UnRegisterCommonEventCallback(int32_t callbackId);
     void InitEdmCommonEventSubscriber();
+    static std::shared_ptr<AccountManager> GetInstanceIfCreated();
+    void DetachAtExit();
 
     AccountManager();
     ~AccountManager();

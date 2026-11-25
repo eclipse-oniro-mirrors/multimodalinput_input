@@ -84,6 +84,24 @@ std::shared_ptr<AccountManager> AccountManager::GetInstance()
     return instance_;
 }
 
+void AccountManager::DetachAtExit()
+{
+    subscriber_ = nullptr;
+    edmSubscriber_ = nullptr;
+    std::lock_guard<std::mutex> guard { lock_ };
+    if (timerId_ >= 0) {
+        TimerMgr->RemoveTimer(timerId_);
+        timerId_ = -1;
+    }
+    accounts_.clear();
+    observerCallbacks_.clear();
+}
+
+std::shared_ptr<AccountManager> AccountManager::GetInstanceIfCreated()
+{
+    return instance_;
+}
+
 void AccountManager::CommonEventSubscriber::OnReceiveEvent(const EventFwk::CommonEventData &data)
 {
     AccountManager::GetInstance()->OnCommonEvent(data);
