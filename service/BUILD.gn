@@ -151,6 +151,7 @@ config("libmmi_server_config") {
 ohos_rust_shared_ffi("mmi_rust") {
   sources = [ "rust/src/lib.rs" ]
   external_deps = [ "hilog:hilog_rust" ]
+  version_script = "libmmi_rust-map"
   subsystem_name = "multimodalinput"
   part_name = "input"
 }
