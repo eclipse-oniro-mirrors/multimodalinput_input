@@ -86,15 +86,12 @@ std::shared_ptr<AccountManager> AccountManager::GetInstance()
 
 void AccountManager::DetachAtExit()
 {
+    std::lock_guard<std::mutex> guard { lock_ };
     subscriber_ = nullptr;
     edmSubscriber_ = nullptr;
-    std::lock_guard<std::mutex> guard { lock_ };
-    if (timerId_ >= 0) {
-        TimerMgr->RemoveTimer(timerId_);
-        timerId_ = -1;
-    }
     accounts_.clear();
     observerCallbacks_.clear();
+    timerId_ = -1;
 }
 
 std::shared_ptr<AccountManager> AccountManager::GetInstanceIfCreated()
