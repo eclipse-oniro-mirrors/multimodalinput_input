@@ -3430,5 +3430,98 @@ HWTEST_F(PointerEventTest, PointerEventTest_RedispatchCountParcel_001, TestSize.
     delete restored;
 }
 
+/**
+ * @tc.name: PointerEventTest_GetTouchpadRawExtDefault_001
+ * @tc.desc: Touchpad getters return default values when no raw extension is set
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_GetTouchpadRawExtDefault_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    EXPECT_EQ(pointerEvent->HasTouchpadRawExt(), false);
+    EXPECT_EQ(pointerEvent->GetTouchpadDeviceWidth(), 0.0);
+    EXPECT_EQ(pointerEvent->GetTouchpadDeviceHeight(), 0.0);
+    EXPECT_EQ(pointerEvent->GetTouchpadSeatSlot(), -1);
+    EXPECT_TRUE(pointerEvent->GetTouchpadRawPoints().empty());
+}
+
+/**
+ * @tc.name: PointerEventTest_GetTouchpadRawExt_001
+ * @tc.desc: GetTouchpadDeviceWidth/GetTouchpadDeviceHeight return the set device size
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_GetTouchpadRawExt_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    PointerEvent::TouchpadRawExt touchpadRawExt;
+    touchpadRawExt.SetDeviceWidth(1000.5);
+    touchpadRawExt.SetDeviceHeight(600.25);
+    pointerEvent->SetTouchpadRawExt(touchpadRawExt);
+
+    EXPECT_EQ(pointerEvent->HasTouchpadRawExt(), true);
+    EXPECT_EQ(pointerEvent->GetTouchpadDeviceWidth(), 1000.5);
+    EXPECT_EQ(pointerEvent->GetTouchpadDeviceHeight(), 600.25);
+}
+
+/**
+ * @tc.name: PointerEventTest_GetTouchpadRawExt_002
+ * @tc.desc: GetTouchpadSeatSlot returns the set seat slot
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_GetTouchpadRawExt_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    PointerEvent::TouchpadRawExt touchpadRawExt;
+    touchpadRawExt.SetSeatSlot(3);
+    pointerEvent->SetTouchpadRawExt(touchpadRawExt);
+    EXPECT_EQ(pointerEvent->GetTouchpadSeatSlot(), 3);
+
+    PointerEvent::TouchpadRawExt noFingerExt;
+    pointerEvent->SetTouchpadRawExt(noFingerExt);
+    EXPECT_EQ(pointerEvent->GetTouchpadSeatSlot(), -1);
+}
+
+/**
+ * @tc.name: PointerEventTest_GetTouchpadRawExt_003
+ * @tc.desc: GetTouchpadRawPoints returns the set raw contact points
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(PointerEventTest, PointerEventTest_GetTouchpadRawExt_003, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    PointerEvent::TouchpadRawPoint firstPoint;
+    firstPoint.SetSeatSlot(1);
+    firstPoint.SetX(101.0);
+    firstPoint.SetY(202.0);
+    PointerEvent::TouchpadRawPoint secondPoint;
+    secondPoint.SetSeatSlot(2);
+    secondPoint.SetX(303.0);
+    secondPoint.SetY(404.0);
+    PointerEvent::TouchpadRawExt touchpadRawExt;
+    touchpadRawExt.SetRawPoints({ firstPoint, secondPoint });
+    pointerEvent->SetTouchpadRawExt(touchpadRawExt);
+
+    const auto &rawPoints = pointerEvent->GetTouchpadRawPoints();
+    ASSERT_EQ(rawPoints.size(), 2u);
+    EXPECT_EQ(rawPoints[0].GetSeatSlot(), 1);
+    EXPECT_EQ(rawPoints[0].GetX(), 101.0);
+    EXPECT_EQ(rawPoints[0].GetY(), 202.0);
+    EXPECT_EQ(rawPoints[1].GetSeatSlot(), 2);
+    EXPECT_EQ(rawPoints[1].GetX(), 303.0);
+    EXPECT_EQ(rawPoints[1].GetY(), 404.0);
+}
+
 } // namespace MMI
 } // namespace OHOS

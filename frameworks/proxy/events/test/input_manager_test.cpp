@@ -6744,5 +6744,32 @@ HWTEST_F(InputManagerTest, InputManagerTest_GetPointerEventRecord_001, TestSize.
     EXPECT_TRUE(records.empty());
     EXPECT_EQ(InputManager::GetInstance()->DisablePointerEventRecord(), RET_OK);
 }
+
+/**
+ * @tc.name: InputManagerTest_RegisterWindowStateErrorCallback_001
+ * @tc.desc: RegisterWindowStateErrorCallback fails in a non-sceneboard process
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerTest, InputManagerTest_RegisterWindowStateErrorCallback_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto callback = [](int32_t windowId, int32_t errCode) {
+        MMI_HILOGD("Window state error, windowId:%{public}d, errCode:%{public}d", windowId, errCode);
+    };
+    EXPECT_EQ(InputManager::GetInstance()->RegisterWindowStateErrorCallback(callback), RET_ERR);
+}
+
+/**
+ * @tc.name: InputManagerTest_RegisterWindowStateErrorCallback_002
+ * @tc.desc: RegisterWindowStateErrorCallback with a null callback fails
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerTest, InputManagerTest_RegisterWindowStateErrorCallback_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    EXPECT_EQ(InputManager::GetInstance()->RegisterWindowStateErrorCallback(nullptr), RET_ERR);
+}
 } // namespace MMI
 } // namespace OHOS
