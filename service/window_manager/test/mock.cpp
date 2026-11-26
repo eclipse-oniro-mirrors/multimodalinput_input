@@ -36,7 +36,8 @@ int32_t InputDisplayBindHelper::GetDisplayBindInfo(DisplayBindInfos &infos)
     return 0;
 }
 
-int32_t InputDisplayBindHelper::SetDisplayBind(int32_t deviceId, int32_t displayId, std::string &msg)
+int32_t InputDisplayBindHelper::SetDisplayBind(int32_t deviceId, int32_t displayId, uint64_t rsId,
+    const std::string &displayName, std::string &msg)
 {
     return 0;
 }
