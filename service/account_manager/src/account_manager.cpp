@@ -96,6 +96,7 @@ void AccountManager::DetachAtExit()
 
 std::shared_ptr<AccountManager> AccountManager::GetInstanceIfCreated()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     return instance_;
 }
 
