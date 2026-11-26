@@ -45,12 +45,10 @@ public:
     void SetAxisBeginWindow(const std::optional<WindowInfo>& window);
     std::optional<WindowInfo> GetAxisBeginWindow() const;
     void EraseAxisBeginWindow(float zOrder);
-    const std::map<float, std::optional<WindowInfo>>& GetAxisBeginWindowMap() const;
 
     void SetButtonDownWindow(float zOrder, const WindowInfo& window);
     std::optional<WindowInfo> GetButtonDownWindow(float zOrder) const;
     void EraseButtonDownWindow(float zOrder);
-    float FindButtonSessionZOrder(int32_t windowId) const;
 
     void SetWindowActive(int32_t windowId);
     void SetWindowActive(MouseSessionType sessionType, int32_t windowId);
