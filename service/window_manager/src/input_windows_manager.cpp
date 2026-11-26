@@ -3224,104 +3224,6 @@ void InputWindowsManager::DispatchPointer(int32_t pointerAction, int32_t windowI
 #endif // OHOS_BUILD_ENABLE_POINTER
 }
 
-void InputWindowsManager::DispatchPointerRedispatch(int32_t pointerAction, const WindowInfo& windowInfo, float zOrder)
-{
-    CALL_DEBUG_ENTER;
-    auto lastPointerEvent = mouseRedispatchStore_.GetLastEvent(zOrder);
-    if (lastPointerEvent == nullptr) {
-        return;
-    }
-    auto pointerEvent = PointerEvent::Create();
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("pointerEvent is null");
-        return;
-    }
-    pointerEvent->UpdateId();
-    LogTracer lt(pointerEvent->GetId(), pointerEvent->GetEventType(), pointerAction);
-    PointerEvent::PointerItem lastPointerItem;
-    int32_t lastPointerId = lastPointerEvent->GetPointerId();
-    if (!lastPointerEvent->GetPointerItem(lastPointerId, lastPointerItem)) {
-        MMI_HILOGE("GetPointerItem:%{public}d fail", lastPointerId);
-        return;
-    }
-    pointerEvent->SetTargetWindowId(windowInfo.id);
-    pointerEvent->SetAgentWindowId(windowInfo.agentWindowId);
-    pointerEvent->SetTargetDisplayId(windowInfo.displayId);
-    pointerEvent->SetDeviceId(lastPointerEvent->GetDeviceId());
-    pointerEvent->SetPointerId(lastPointerId);
-    pointerEvent->AddPointerItem(lastPointerItem);
-    pointerEvent->SetPointerAction(pointerAction);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_MOUSE);
-    pointerEvent->SetButtonId(lastPointerEvent->GetButtonId());
-    int64_t time = GetSysClockTime();
-    pointerEvent->SetActionTime(time);
-    pointerEvent->SetActionStartTime(time);
-    pointerEvent->ClearButtonPressed();
-    std::set<int32_t> pressedButtons = lastPointerEvent->GetPressedButtons();
-    for (const auto &buttonId : pressedButtons) {
-        pointerEvent->SetButtonPressed(buttonId);
-    }
-    int32_t axisEventType = lastPointerEvent->GetAxisEventType();
-    pointerEvent->SetAxisEventType(axisEventType);
-    std::vector<int32_t> pressedKeys = lastPointerEvent->GetPressedKeys();
-    pointerEvent->SetPressedKeys(pressedKeys);
-
-#ifdef OHOS_BUILD_ENABLE_POINTER
-    auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
-    if (eventDispatchHandler == nullptr) {
-        MMI_HILOGE("eventDispatchHandler is null");
-        return;
-    }
-    eventDispatchHandler->HandlePointerEvent(pointerEvent);
-#endif // OHOS_BUILD_ENABLE_POINTER
-}
-
-void InputWindowsManager::DispatchTouchRedispatch(int32_t pointerAction, float zOrder,
-    int32_t deviceId, int32_t pointerId, int32_t toolType, const WindowInfo& windowInfo)
-{
-    CALL_DEBUG_ENTER;
-    auto fingerEvent = touchRedispatchStore_.GetFingerEvent(zOrder, deviceId, pointerId, toolType);
-    if (fingerEvent == nullptr) {
-        MMI_HILOGW("No finger event for zOrder:%{public}f deviceId:%{public}d pointerId:%{public}d",
-            zOrder, deviceId, pointerId);
-        return;
-    }
-    auto pointerEvent = PointerEvent::Create();
-    if (pointerEvent == nullptr) {
-        MMI_HILOGE("pointerEvent is null");
-        return;
-    }
-    pointerEvent->UpdateId();
-    LogTracer lt(pointerEvent->GetId(), pointerEvent->GetEventType(), pointerAction);
-    PointerEvent::PointerItem lastPointerItem;
-    if (!fingerEvent->GetPointerItem(pointerId, lastPointerItem)) {
-        MMI_HILOGE("GetPointerItem:%{public}d fail", pointerId);
-        return;
-    }
-    if (pointerAction == PointerEvent::POINTER_ACTION_CANCEL) {
-        lastPointerItem.SetCanceled(true);
-    }
-    pointerEvent->SetTargetWindowId(windowInfo.id);
-    pointerEvent->SetAgentWindowId(windowInfo.agentWindowId);
-    pointerEvent->SetTargetDisplayId(windowInfo.displayId);
-    pointerEvent->SetDeviceId(deviceId);
-    pointerEvent->SetPointerId(pointerId);
-    pointerEvent->AddPointerItem(lastPointerItem);
-    pointerEvent->SetPointerAction(pointerAction);
-    pointerEvent->SetSourceType(PointerEvent::SOURCE_TYPE_TOUCHSCREEN);
-    int64_t time = GetSysClockTime();
-    pointerEvent->SetActionTime(time);
-    pointerEvent->SetActionStartTime(time);
-#ifdef OHOS_BUILD_ENABLE_TOUCH
-    auto eventDispatchHandler = InputHandler->GetEventDispatchHandler();
-    if (eventDispatchHandler == nullptr) {
-        MMI_HILOGE("eventDispatchHandler is null");
-        return;
-    }
-    eventDispatchHandler->HandleTouchEvent(pointerEvent);
-#endif // OHOS_BUILD_ENABLE_TOUCH
-}
-
 void InputWindowsManager::PrintEnterEventInfo(std::shared_ptr<PointerEvent> pointerEvent)
 {
     int32_t pointerAc = pointerEvent->GetPointerAction();
@@ -5263,29 +5165,11 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
             }
         } else {
             axisBeginWindowInfo_ = touchWindow;
-            if (axisBeginWindowInfo_) {
-                std::vector<float> keysToErase;
-                for (const auto &entry : mouseRedispatchStore_.GetAxisBeginWindowMap()) {
-                    if (entry.second && entry.second->id == axisBeginWindowInfo_->id) {
-                        DispatchPointerRedispatch(PointerEvent::POINTER_ACTION_AXIS_END,
-                            axisBeginWindowInfo_.value(), entry.first);
-                        mouseRedispatchStore_.DeactivateWindow(axisBeginWindowInfo_->id);
-                        keysToErase.push_back(entry.first);
-                    }
-                }
-                for (float key : keysToErase) {
-                    mouseRedispatchStore_.EraseAxisBeginWindow(key);
-                }
-            }
         }
     }
     if (dispatchEventFlag) {
         int32_t curAction = pointerEvent->GetPointerAction();
         if (curAction == PointerEvent::POINTER_ACTION_BUTTON_DOWN) {
-            if (touchWindow && mouseDownInfo_.id != -1 && touchWindow->id == mouseDownInfo_.id) {
-                MMI_HILOGI("Virtual mouse down conflicts with real mouse down, window:%{public}d", touchWindow->id);
-                return RET_ERR;
-            }
             if (touchWindow) {
                 mouseRedispatchStore_.SetWindowActive(MouseSessionType::BUTTON, touchWindow->id);
                 mouseRedispatchStore_.SetButtonDownWindow(mouseRedispatchStore_.GetZOrder(), *touchWindow);
@@ -5574,19 +5458,6 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
     }
 #endif // OHOS_BUILD_ENABLE_ANCO
     if (action == PointerEvent::POINTER_ACTION_BUTTON_DOWN) {
-        if (!dispatchEventFlag && touchWindow) {
-            float buttonZOrder = mouseRedispatchStore_.FindButtonSessionZOrder(touchWindow->id);
-            if (buttonZOrder > 0.0f) {
-                auto evictWindow = mouseRedispatchStore_.GetButtonDownWindow(buttonZOrder);
-                if (evictWindow) {
-                    MMI_HILOGI("Real mouse down evicts virtual button session, window:%{public}d", touchWindow->id);
-                    DispatchPointerRedispatch(PointerEvent::POINTER_ACTION_BUTTON_UP,
-                        evictWindow.value(), buttonZOrder);
-                }
-                mouseRedispatchStore_.DeactivateWindow(MouseSessionType::BUTTON, touchWindow->id);
-                mouseRedispatchStore_.EraseButtonDownWindow(buttonZOrder);
-            }
-        }
         if (!dispatchEventFlag) {
             mouseDownInfo_ = *touchWindow;
             mouseDownEventId_ = pointerEvent->GetId();
@@ -6591,28 +6462,6 @@ int32_t InputWindowsManager::UpdateTouchScreenTarget(std::shared_ptr<PointerEven
     }
     pointerEvent->SetTargetWindowId(touchWindow->id);
     pointerItem.SetTargetWindowId(touchWindow->id);
-    auto action = pointerEvent->GetPointerAction();
-    if ((action == PointerEvent::POINTER_ACTION_DOWN ||
-         action == PointerEvent::POINTER_ACTION_HOVER_ENTER) &&
-        !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH)) {
-        for (const auto& [zOrder, fingerMap] : touchRedispatchStore_.GetFingerMap()) {
-            auto iter = fingerMap.find({pointerEvent->GetDeviceId(), pointerId,
-                pointerItem.GetToolType()});
-            if (iter != fingerMap.end() && iter->second.windowId == touchWindow->id) {
-                MMI_HILOGI("Touch DOWN conflicts with active redispatch finger, "
-                    "zOrder:%{public}f deviceId:%{public}d pointerId:%{public}d toolType:%{public}d"
-                    " windowId:%{public}d",
-                    zOrder, pointerEvent->GetDeviceId(), pointerId, pointerItem.GetToolType(),
-                    touchWindow->id);
-                DispatchTouchRedispatch(PointerEvent::POINTER_ACTION_CANCEL,
-                    zOrder, pointerEvent->GetDeviceId(), pointerId, pointerItem.GetToolType(),
-                    *touchWindow);
-                touchRedispatchStore_.DeactivateFinger(zOrder, pointerEvent->GetDeviceId(), pointerId,
-                    pointerItem.GetToolType());
-                break;
-            }
-        }
-    }
     double windowX = logicalX - touchWindow->area.x;
     double windowY = logicalY - touchWindow->area.y;
     if (!(touchWindow->transform.empty())) {

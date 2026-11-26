@@ -80,7 +80,6 @@ HWTEST_F(TouchRedispatchStoreTest, TouchRedispatchStoreTest_StylusFingerIsolatio
         PointerEvent::TOOL_TYPE_PEN));
     EXPECT_TRUE(store.IsFingerActive(TEST_Z_ORDER, TEST_DEVICE_ID, TEST_POINTER_ID,
         PointerEvent::TOOL_TYPE_FINGER));
-    EXPECT_EQ(store.GetFingerMap().at(TEST_Z_ORDER).size(), 2u);
 }
 
 /**
@@ -134,7 +133,6 @@ HWTEST_F(TouchRedispatchStoreTest, TouchRedispatchStoreTest_DeactivateIsolation_
     store.DeactivateFinger(TEST_Z_ORDER, TEST_DEVICE_ID, TEST_POINTER_ID, PointerEvent::TOOL_TYPE_FINGER);
     EXPECT_FALSE(store.IsFingerActive(TEST_Z_ORDER, TEST_DEVICE_ID, TEST_POINTER_ID,
         PointerEvent::TOOL_TYPE_FINGER));
-    EXPECT_TRUE(store.GetFingerMap().find(TEST_Z_ORDER) == store.GetFingerMap().end());
 }
 
 /**

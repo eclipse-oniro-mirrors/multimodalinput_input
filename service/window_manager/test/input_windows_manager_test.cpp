@@ -14515,34 +14515,6 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AbandonRedispatch_001,
 }
 
 /**
- * @tc.name: InputWindowsManagerTest_DispatchPointerRedispatch_001
- * @tc.desc: Test branch
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_DispatchPointerRedispatch_001, TestSize.Level1)
-{
-    CALL_TEST_DEBUG;
-    std::shared_ptr<InputWindowsManager> inputWindowsManager = std::make_shared<InputWindowsManager>();
-    int32_t pointerAction = PointerEvent::POINTER_ACTION_AXIS_BEGIN;
-    WindowInfo windowInfo;
-    windowInfo.id = 1;
-    windowInfo.agentWindowId = 1;
-    inputWindowsManager->DispatchPointerRedispatch(pointerAction, windowInfo, 0.0f);
-    EXPECT_EQ(inputWindowsManager->mouseRedispatchStore_.GetLastEvent(), nullptr);
-    std::shared_ptr<PointerEvent> pointerEvent = PointerEvent::Create();
-    ASSERT_NE(pointerEvent, nullptr);
-    inputWindowsManager->mouseRedispatchStore_.CacheLastEvent(pointerEvent);
-    inputWindowsManager->DispatchPointerRedispatch(pointerAction, windowInfo, 0.0f);
-    EXPECT_NE(inputWindowsManager->mouseRedispatchStore_.GetLastEvent(), nullptr);
-    PointerEvent::PointerItem item;
-    item.SetPointerId(0);
-    inputWindowsManager->mouseRedispatchStore_.GetLastEvent()->AddPointerItem(item);
-    inputWindowsManager->mouseRedispatchStore_.GetLastEvent()->SetPointerId(0);
-    EXPECT_NE(inputWindowsManager->mouseRedispatchStore_.GetLastEvent(), nullptr);
-}
-
-/**
 * @tc.name: InputWindowsManagerTest_ClearPointerDeviceId_001
 * @tc.desc: Test ClearPointerDeviceId
 * @tc.type: FUNC

@@ -112,9 +112,6 @@ public:
     int32_t GetFingerWindowId(float zOrder, int32_t deviceId, int32_t pointerId,
         int32_t toolType = PointerEvent::TOOL_TYPE_FINGER) const;
 
-    using FingerMap = std::map<float, std::map<RedispatchFingerKey, RedispatchFingerInfo>>;
-    const FingerMap& GetFingerMap() const;
-
     std::map<int32_t, std::map<int32_t, std::set<int32_t>>>& GetTargetTouchWinIds();
     std::map<int32_t, WindowPartInfo>& GetFirstTouchInfos();
     WindowInfo& GetLockWindowInfo();

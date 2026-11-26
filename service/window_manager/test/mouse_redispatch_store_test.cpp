@@ -134,7 +134,7 @@ HWTEST_F(MouseRedispatchStoreTest, MouseRedispatchStoreTest_LastEventPerZOrder_0
 
 /**
  * @tc.name: MouseRedispatchStoreTest_ButtonDownWindowPerZOrder_001
- * @tc.desc: Button session lock window shall be isolated by zOrder and searchable by windowId
+ * @tc.desc: Button session lock window shall be isolated by zOrder
  * @tc.type: FUNC
  * @tc.require:
  */
@@ -149,13 +149,9 @@ HWTEST_F(MouseRedispatchStoreTest, MouseRedispatchStoreTest_ButtonDownWindowPerZ
 
     EXPECT_EQ(store.GetButtonDownWindow(TEST_Z_ORDER)->id, TEST_WINDOW_ID);
     EXPECT_EQ(store.GetButtonDownWindow(TEST_Z_ORDER_B)->id, TEST_WINDOW_ID_B);
-    EXPECT_FLOAT_EQ(store.FindButtonSessionZOrder(TEST_WINDOW_ID), TEST_Z_ORDER);
-    EXPECT_FLOAT_EQ(store.FindButtonSessionZOrder(TEST_WINDOW_ID_B), TEST_Z_ORDER_B);
-    EXPECT_FLOAT_EQ(store.FindButtonSessionZOrder(-1), 0.0f);
 
     store.EraseButtonDownWindow(TEST_Z_ORDER);
     EXPECT_EQ(store.GetButtonDownWindow(TEST_Z_ORDER), std::nullopt);
-    EXPECT_FLOAT_EQ(store.FindButtonSessionZOrder(TEST_WINDOW_ID), 0.0f);
 }
 
 /**

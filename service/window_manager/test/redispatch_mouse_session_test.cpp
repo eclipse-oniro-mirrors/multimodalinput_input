@@ -169,21 +169,6 @@ HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_AbandonAxisSessi
 }
 
 /**
- * @tc.name: RedispatchMouseSessionTest_ButtonSessionFoundByWindow_001
- * @tc.desc: The zOrder of the button session locked on a window shall be discoverable for eviction
- * @tc.type: FUNC
- * @tc.require:
- */
-HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_ButtonSessionFoundByWindow_001, TestSize.Level1)
-{
-    ActivateButtonSession();
-    EXPECT_FLOAT_EQ(store_->FindButtonSessionZOrder(TEST_WINDOW_ID), TEST_Z_ORDER);
-
-    store_->EraseButtonDownWindow(TEST_Z_ORDER);
-    store_->DeactivateWindow(MouseSessionType::BUTTON, TEST_WINDOW_ID);
-    EXPECT_FLOAT_EQ(store_->FindButtonSessionZOrder(TEST_WINDOW_ID), 0.0f);
-}
-/**
  * @tc.name: RedispatchMouseSessionTest_MouseWheelRejected_001
  * @tc.desc: Mouse wheel axis events (TOOL_TYPE_MOUSE) shall be rejected even when an axis session is
  *           active; only touchpad two-finger axis events support redispatch (BR-7, EX-8)

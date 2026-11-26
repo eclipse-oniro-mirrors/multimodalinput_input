@@ -153,9 +153,6 @@ public:
         const sptr<IRemoteObject> &token = nullptr) const;
     int32_t GetPointerStyleInfo(int32_t pid, int32_t windowId, PointerStyle &pointerStyle) const;
     void DispatchPointer(int32_t pointerAction, int32_t windowId = -1);
-    void DispatchPointerRedispatch(int32_t pointerAction, const WindowInfo& windowInfo, float zOrder);
-    void DispatchTouchRedispatch(int32_t pointerAction, float zOrder,
-        int32_t deviceId, int32_t pointerId, int32_t toolType, const WindowInfo& windowInfo);
     void SendPointerEvent(int32_t pointerAction);
     bool IsMouseSimulate();
     bool HasMouseHideFlag();

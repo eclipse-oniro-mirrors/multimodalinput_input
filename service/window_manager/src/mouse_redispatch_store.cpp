@@ -81,11 +81,6 @@ void MouseRedispatchStore::EraseAxisBeginWindow(float zOrder)
     axisBeginWindowMap_.erase(zOrder);
 }
 
-const std::map<float, std::optional<WindowInfo>>& MouseRedispatchStore::GetAxisBeginWindowMap() const
-{
-    return axisBeginWindowMap_;
-}
-
 void MouseRedispatchStore::SetButtonDownWindow(float zOrder, const WindowInfo& window)
 {
     buttonDownWindowMap_[zOrder] = window;
@@ -103,16 +98,6 @@ std::optional<WindowInfo> MouseRedispatchStore::GetButtonDownWindow(float zOrder
 void MouseRedispatchStore::EraseButtonDownWindow(float zOrder)
 {
     buttonDownWindowMap_.erase(zOrder);
-}
-
-float MouseRedispatchStore::FindButtonSessionZOrder(int32_t windowId) const
-{
-    for (const auto& [zOrder, window] : buttonDownWindowMap_) {
-        if (window && window->id == windowId) {
-            return zOrder;
-        }
-    }
-    return 0.0f;
 }
 
 const std::set<int32_t>& MouseRedispatchStore::GetActiveWindows(MouseSessionType sessionType) const
