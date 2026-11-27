@@ -4445,10 +4445,21 @@ int32_t PointerDrawingManager::RestoreOnServiceStart()
 int32_t PointerDrawingManager::DrawGlobalPriorityCursor()
 {
     CALL_DEBUG_ENTER;
+    if (!hasDisplay_ || lastPhysicalX_ < 0 || lastPhysicalY_ < 0) {
+        MMI_HILOGD("display not ready or position invalid, skip draw global priority cursor");
+    }
     PointerStyle style;
     style.id = MOUSE_ICON::DEVELOPER_DEFINED_ICON;
     Direction direction = GetDisplayDirection(&displayInfo_);
+    bool needLayerUpdate = CursorDrawingInformation::GetInstance().GetMouseIconUpdate();
     DrawPointer(displayInfo_.rsId, lastPhysicalX_, lastPhysicalY_, style, direction);
+    if (needLayerUpdate) {
+        int32_t x = lastPhysicalX_;
+        int32_t y = lastPhysicalY_;
+        AdjustMouseFocusToSoftRenderOrigin(direction, MOUSE_ICON::DEVELOPER_DEFINED_ICON, x, y);
+        UpdateMouseLayer(x, y);
+    }
+
     return RET_OK;
 }
 
