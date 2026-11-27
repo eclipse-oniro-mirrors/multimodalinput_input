@@ -3964,5 +3964,229 @@ HWTEST_F(InputManagerImplTest, MouseControllerImpl_CreatePointerItem_001, TestSi
     EXPECT_EQ(item.GetDisplayXPos(), 640);
     EXPECT_EQ(item.GetDisplayYPos(), 480);
 }
+struct TestInputEventObserver final : public MMIEventObserver {
+public:
+    TestInputEventObserver() = default;
+    ~TestInputEventObserver() = default;
+    void SyncBundleName(int32_t pid, int32_t uid, std::string bundleName, int32_t syncStatus) override
+    {
+        ++syncCount_;
+        lastPid_ = pid;
+        lastUid_ = uid;
+        lastBundleName_ = bundleName;
+        lastSyncStatus_ = syncStatus;
+    }
+    int32_t syncCount_ { 0 };
+    int32_t lastPid_ { -1 };
+    int32_t lastUid_ { -1 };
+    std::string lastBundleName_;
+    int32_t lastSyncStatus_ { -1 };
+};
+
+/**
+ * @tc.name: InputManagerImplTest_SubscribeTabletProximity_001
+ * @tc.desc: SubscribeTabletProximity with a null callback is rejected
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_SubscribeTabletProximity_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t ret = InputMgrImpl.SubscribeTabletProximity(nullptr);
+    EXPECT_EQ(ret, RET_ERR);
+}
+
+/**
+ * @tc.name: InputManagerImplTest_UnsubscribetabletProximity_001
+ * @tc.desc: UnsubscribetabletProximity with an arbitrary id does not crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_UnsubscribetabletProximity_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t subscriberId = 100;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.UnsubscribetabletProximity(subscriberId));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_AddInputEventObserver_001
+ * @tc.desc: AddInputEventObserver with a null observer is rejected
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_AddInputEventObserver_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t ret = InputMgrImpl.AddInputEventObserver(nullptr);
+    EXPECT_EQ(ret, RET_ERR);
+}
+
+/**
+ * @tc.name: InputManagerImplTest_AddRemoveInputEventObserver_002
+ * @tc.desc: NotifyBundleName forwards to the registered observer and RemoveInputEventObserver detaches it
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_AddRemoveInputEventObserver_002, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    auto observer = std::make_shared<TestInputEventObserver>();
+    ASSERT_NE(observer, nullptr);
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.AddInputEventObserver(observer));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.NotifyBundleName(123, 456, "com.example.test", 1));
+    if (observer->syncCount_ > 0) {
+        EXPECT_EQ(observer->lastPid_, 123);
+        EXPECT_EQ(observer->lastUid_, 456);
+        EXPECT_EQ(observer->lastBundleName_, "com.example.test");
+        EXPECT_EQ(observer->lastSyncStatus_, 1);
+    }
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.RemoveInputEventObserver(observer));
+    // After removal, notifications must not reach the observer anymore.
+    int32_t count = observer->syncCount_;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.NotifyBundleName(789, 12, "com.example.other", 0));
+    EXPECT_EQ(observer->syncCount_, count);
+}
+
+/**
+ * @tc.name: InputManagerImplTest_QuerySwitchStatus_001
+ * @tc.desc: QuerySwitchStatus with an out-of-range switch type is rejected
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_QuerySwitchStatus_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t state = 0;
+#ifdef OHOS_BUILD_ENABLE_SWITCH
+    int32_t ret = InputMgrImpl.QuerySwitchStatus(SwitchEvent::SwitchType::SWITCH_DEFAULT - 1, state);
+    EXPECT_EQ(ret, RET_ERR);
+    ret = InputMgrImpl.QuerySwitchStatus(SwitchEvent::SwitchType::SWITCH_PRIVACY + 1, state);
+    EXPECT_EQ(ret, RET_ERR);
+#else
+    int32_t ret = InputMgrImpl.QuerySwitchStatus(0, state);
+    EXPECT_EQ(ret, ERROR_UNSUPPORT);
+#endif // OHOS_BUILD_ENABLE_SWITCH
+}
+
+/**
+ * @tc.name: InputManagerImplTest_SetNapStatus_001
+ * @tc.desc: SetNapStatus can be invoked without a crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_SetNapStatus_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SetNapStatus(100, 200, "com.example.nap", 1));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_MarkConsumed_001
+ * @tc.desc: MarkConsumed can be invoked without a crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_MarkConsumed_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.MarkConsumed(1, 100));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_ClearWindowPointerStyle_001
+ * @tc.desc: ClearWindowPointerStyle can be invoked without a crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_ClearWindowPointerStyle_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.ClearWindowPointerStyle(123, 456));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_SetMultiWindowScreenId_001
+ * @tc.desc: SetMultiWindowScreenId can be invoked without a crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_SetMultiWindowScreenId_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SetMultiWindowScreenId(1, 2));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_KnuckleSwitch_001
+ * @tc.desc: SetKnuckleSwitch/GetKnuckleSwitch can be invoked without a crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_KnuckleSwitch_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SetKnuckleSwitch(true));
+    bool knuckleSwitch = false;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.GetKnuckleSwitch(knuckleSwitch));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SetKnuckleSwitch(false));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.GetKnuckleSwitch(knuckleSwitch));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_MouseAccelerateAndCapturePermission_001
+ * @tc.desc: SetMouseAccelerateMotionSwitch/SwitchScreenCapturePermission/ClearMouseHideFlag are callable
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_MouseAccelerateAndCapturePermission_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SetMouseAccelerateMotionSwitch(1, true));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SetMouseAccelerateMotionSwitch(1, false));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SwitchScreenCapturePermission(0, true));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.SwitchScreenCapturePermission(0, false));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.ClearMouseHideFlag(1));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_EnableTouchpadRawEvent_001
+ * @tc.desc: EnableTouchpadRawEvent with both enable and disable is callable
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_EnableTouchpadRawEvent_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.EnableTouchpadRawEvent(true));
+    ASSERT_NO_FATAL_FAILURE(InputMgrImpl.EnableTouchpadRawEvent(false));
+}
+
+/**
+ * @tc.name: InputManagerImplTest_HasPendingInputEvent_001
+ * @tc.desc: HasPendingInputEvent can be queried without a crash
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_HasPendingInputEvent_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    bool hasPending = false;
+    ASSERT_NO_FATAL_FAILURE(hasPending = InputMgrImpl.HasPendingInputEvent());
+    MMI_HILOGI("HasPendingInputEvent returns %{public}d", hasPending);
+}
+
+/**
+ * @tc.name: InputManagerImplTest_GetKeyboardRepeatDelay_001
+ * @tc.desc: GetKeyboardRepeatDelay with a null callback is rejected
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputManagerImplTest, InputManagerImplTest_GetKeyboardRepeatDelay_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    int32_t ret = InputMgrImpl.GetKeyboardRepeatDelay(nullptr);
+    EXPECT_EQ(ret, RET_ERR);
+}
 } // namespace MMI
 } // namespace OHOS

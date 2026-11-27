@@ -585,5 +585,44 @@ HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStoped_011, TestSize.L
     listener.OnAppDebugStoped(stopInfos);
     EXPECT_EQ(listener.GetAppDebugPid(), 1111);
 }
+/**
+ * @tc.name: AppDebugListener_OnAppDebugStarted_SamePidTwice_001
+ * @tc.desc: Test OnAppDebugStarted with the same pid twice keeps that pid
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStarted_SamePidTwice_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    AppDebugListener listener;
+    std::vector<AppExecFwk::AppDebugInfo> startInfos;
+    AppExecFwk::AppDebugInfo startInfo;
+    startInfo.pid = 4321;
+    startInfos.push_back(startInfo);
+    listener.OnAppDebugStarted(startInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 4321);
+    listener.OnAppDebugStarted(startInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), 4321);
+}
+
+/**
+ * @tc.name: AppDebugListener_OnAppDebugStoped_NeverStarted_001
+ * @tc.desc: Test OnAppDebugStoped without a prior start keeps the pid at -1
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(AppDebugListenerTest, AppDebugListener_OnAppDebugStoped_NeverStarted_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    AppDebugListener listener;
+    EXPECT_EQ(listener.GetAppDebugPid(), -1);
+    std::vector<AppExecFwk::AppDebugInfo> stopInfos;
+    AppExecFwk::AppDebugInfo stopInfo;
+    stopInfo.pid = 8765;
+    stopInfos.push_back(stopInfo);
+    listener.OnAppDebugStoped(stopInfos);
+    EXPECT_EQ(listener.GetAppDebugPid(), -1);
+}
+
 } // namespace MMI
 } // namespace OHOS

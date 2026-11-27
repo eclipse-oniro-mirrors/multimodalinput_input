@@ -319,5 +319,74 @@ HWTEST_F(InputActiveSubscribeManagerTest, UnsubscribeInputActive_Test_003, TestS
     EXPECT_EQ(result, ERROR_INVALID_SUBSCRIBE_ID);
 }
 
+/**
+ * @tc.name: UnsubscribeInputActive_Test_004
+ * @tc.desc: Subscribe again after a successful unsubscribe returns a valid id
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscribeManagerTest, UnsubscribeInputActive_Test_004, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // Best-effort cleanup of subscriptions left by earlier tests (shared singleton).
+    INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(VALID_SUBSCRIBE_ID);
+    std::shared_ptr<TestInputEventConsumer> inputEventConsumer = std::make_shared<TestInputEventConsumer>();
+    ASSERT_NE(inputEventConsumer, nullptr);
+    int64_t interval = 500; // ms
+    int32_t subscriberId = INPUT_ACTIVE_SUBSCRIBE_MGR.SubscribeInputActive(
+        std::static_pointer_cast<IInputEventConsumer>(inputEventConsumer), interval);
+    EXPECT_GE(subscriberId, 0);
+    EXPECT_EQ(INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(subscriberId), RET_OK);
+
+    subscriberId = INPUT_ACTIVE_SUBSCRIBE_MGR.SubscribeInputActive(
+        std::static_pointer_cast<IInputEventConsumer>(inputEventConsumer), interval);
+    EXPECT_GE(subscriberId, 0);
+    EXPECT_EQ(INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(subscriberId), RET_OK);
+}
+
+/**
+ * @tc.name: UnsubscribeInputActive_Test_005
+ * @tc.desc: Unsubscribe without any active subscription returns ERROR_NO_SUBSCRIBE_INPUT_ACTIVE
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscribeManagerTest, UnsubscribeInputActive_Test_005, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // Best-effort cleanup of subscriptions left by earlier tests (shared singleton).
+    INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(VALID_SUBSCRIBE_ID);
+    int32_t result = INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(VALID_SUBSCRIBE_ID);
+    EXPECT_EQ(result, ERROR_NO_SUBSCRIBE_INPUT_ACTIVE);
+}
+
+/**
+ * @tc.name: OnSubscribeInputActiveCallback_Test_007
+ * @tc.desc: Callback with a positive non-zero subscribeId returns ERROR_INVALID_SUBSCRIBE_ID
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscribeManagerTest, OnSubscribeInputActiveCallback_Test_007, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    // Best-effort cleanup of subscriptions left by earlier tests (shared singleton).
+    INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(VALID_SUBSCRIBE_ID);
+    std::shared_ptr<TestInputEventConsumer> inputEventConsumer = std::make_shared<TestInputEventConsumer>();
+    ASSERT_NE(inputEventConsumer, nullptr);
+    int64_t interval = 500; // ms
+    int32_t subscriberInput = INPUT_ACTIVE_SUBSCRIBE_MGR.SubscribeInputActive(
+        std::static_pointer_cast<IInputEventConsumer>(inputEventConsumer), interval);
+    EXPECT_GE(subscriberInput, 0);
+
+    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    int32_t result = INPUT_ACTIVE_SUBSCRIBE_MGR.OnSubscribeInputActiveCallback(keyEvent, 1);
+    EXPECT_EQ(result, ERROR_INVALID_SUBSCRIBE_ID);
+    auto pointerEvent = PointerEvent::Create();
+    ASSERT_NE(pointerEvent, nullptr);
+    result = INPUT_ACTIVE_SUBSCRIBE_MGR.OnSubscribeInputActiveCallback(pointerEvent, 1);
+    EXPECT_EQ(result, ERROR_INVALID_SUBSCRIBE_ID);
+    EXPECT_EQ(INPUT_ACTIVE_SUBSCRIBE_MGR.UnsubscribeInputActive(subscriberInput), RET_OK);
+}
+
 } // namespace MMI
 } // namespace OHOS
