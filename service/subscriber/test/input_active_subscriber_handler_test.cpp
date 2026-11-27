@@ -831,5 +831,137 @@ HWTEST_F(InputActiveSubscriberHandlerTest, InputActiveSubscriberHandlerTest_Hand
     handler.HandleKeyEvent(keyEvent);
     EXPECT_EQ(subscriber->sendEventLastTime_, 0);
 }
+/**
+ * @tc.name: InputActiveSubscriberHandlerTest_CleanSubscribeInfo_WithActiveTimer_001
+ * @tc.desc: CleanSubscribeInfo removes an active timer and resets the whole subscriber state
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscriberHandlerTest,
+    InputActiveSubscriberHandlerTest_CleanSubscribeInfo_WithActiveTimer_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputActiveSubscriberHandler handler;
+    auto session = std::make_shared<UDSSession>("test_program", 1, 123, 1000, 2000);
+    ASSERT_NE(session, nullptr);
+    std::shared_ptr<InputActiveSubscriberHandler::Subscriber> subscriber =
+        std::make_shared<InputActiveSubscriberHandler::Subscriber>(0, session, 500);
+    ASSERT_NE(subscriber, nullptr);
+    std::shared_ptr<PointerEvent> pointerEvent =
+        std::make_shared<PointerEvent>(PointerEvent::POINTER_ACTION_PROXIMITY_IN);
+    ASSERT_NE(pointerEvent, nullptr);
+    subscriber->timerId_ = 5;
+    subscriber->lastEventType_ = InputActiveSubscriberHandler::EVENTTYPE_POINTER;
+    subscriber->pointerEvent_ = pointerEvent;
+    subscriber->sendEventLastTime_ = 400;
+    handler.CleanSubscribeInfo(subscriber, 1000);
+    EXPECT_EQ(subscriber->timerId_, -1);
+    EXPECT_EQ(subscriber->lastEventType_, InputActiveSubscriberHandler::EVENTTYPE_INVALID);
+    EXPECT_EQ(subscriber->pointerEvent_, nullptr);
+    EXPECT_EQ(subscriber->keyEvent_, nullptr);
+    EXPECT_EQ(subscriber->sendEventLastTime_, 1000);
+}
+
+/**
+ * @tc.name: InputActiveSubscriberHandlerTest_StartIntervalTimer_AlreadyRunning_001
+ * @tc.desc: StartIntervalTimer with an already running timer keeps the existing timer id
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscriberHandlerTest,
+    InputActiveSubscriberHandlerTest_StartIntervalTimer_AlreadyRunning_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputActiveSubscriberHandler handler;
+    auto session = std::make_shared<UDSSession>("test_program", 1, 123, 1000, 2000);
+    ASSERT_NE(session, nullptr);
+    std::shared_ptr<InputActiveSubscriberHandler::Subscriber> subscriber =
+        std::make_shared<InputActiveSubscriberHandler::Subscriber>(0, session, 500);
+    ASSERT_NE(subscriber, nullptr);
+    subscriber->timerId_ = 7;
+    subscriber->lastEventType_ = InputActiveSubscriberHandler::EVENTTYPE_KEY;
+    std::shared_ptr<KeyEvent> keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    subscriber->keyEvent_ = keyEvent;
+    int64_t currTime = 1000;
+    handler.StartIntervalTimer(subscriber, currTime);
+    EXPECT_EQ(subscriber->timerId_, 7);
+    EXPECT_EQ(subscriber->keyEvent_, keyEvent);
+}
+
+/**
+ * @tc.name: InputActiveSubscriberHandlerTest_OnSessionDelete_MultipleSubscribers_001
+ * @tc.desc: OnSessionDelete removes all subscribers of the same session at once
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscriberHandlerTest,
+    InputActiveSubscriberHandlerTest_OnSessionDelete_MultipleSubscribers_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputActiveSubscriberHandler handler;
+    auto session = std::make_shared<UDSSession>("test_program", 1, 123, 1000, 2000);
+    ASSERT_NE(session, nullptr);
+    auto subscriber1 = std::make_shared<InputActiveSubscriberHandler::Subscriber>(1, session, 500);
+    ASSERT_NE(subscriber1, nullptr);
+    auto subscriber2 = std::make_shared<InputActiveSubscriberHandler::Subscriber>(2, session, 500);
+    ASSERT_NE(subscriber2, nullptr);
+    handler.InsertSubscriber(subscriber1);
+    handler.InsertSubscriber(subscriber2);
+    EXPECT_EQ(handler.subscribers_.size(), 2);
+    handler.OnSessionDelete(session);
+    EXPECT_EQ(handler.subscribers_.size(), 0);
+}
+
+/**
+ * @tc.name: InputActiveSubscriberHandlerTest_UnsubscribeInputActive_WithActiveTimer_001
+ * @tc.desc: UnsubscribeInputActive removes a subscriber with an active timer successfully
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscriberHandlerTest,
+    InputActiveSubscriberHandlerTest_UnsubscribeInputActive_WithActiveTimer_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputActiveSubscriberHandler handler;
+    auto session = std::make_shared<UDSSession>("test_program", 1, 123, 1000, 2000);
+    ASSERT_NE(session, nullptr);
+    int32_t subscribeId = 3;
+    EXPECT_EQ(handler.SubscribeInputActive(session, subscribeId, 500), RET_OK);
+    ASSERT_EQ(handler.subscribers_.size(), 1);
+    handler.subscribers_.front()->timerId_ = 5;
+    auto ret = handler.UnsubscribeInputActive(session, subscribeId);
+    EXPECT_EQ(ret, RET_OK);
+    EXPECT_EQ(handler.subscribers_.size(), 0);
+}
+
+/**
+ * @tc.name: InputActiveSubscriberHandlerTest_Dump_NullAndValidEntries_001
+ * @tc.desc: Dump tolerates null entries and empty subscriber lists without failing
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(InputActiveSubscriberHandlerTest,
+    InputActiveSubscriberHandlerTest_Dump_NullAndValidEntries_001, TestSize.Level1)
+{
+    CALL_TEST_DEBUG;
+    InputActiveSubscriberHandler handler;
+    std::vector<std::string> args;
+    // Empty list.
+    EXPECT_NO_FATAL_FAILURE(handler.Dump(1, args));
+    auto session = std::make_shared<UDSSession>("test_program", 1, 123, 1000, 2000);
+    ASSERT_NE(session, nullptr);
+    auto subscriber = std::make_shared<InputActiveSubscriberHandler::Subscriber>(1, session, 500);
+    ASSERT_NE(subscriber, nullptr);
+    handler.InsertSubscriber(subscriber);
+    handler.InsertSubscriber(nullptr);
+    EXPECT_NO_FATAL_FAILURE(handler.Dump(1, args));
+    // A subscriber without a session is skipped as well.
+    auto orphan = std::make_shared<InputActiveSubscriberHandler::Subscriber>(2, nullptr, 500);
+    ASSERT_NE(orphan, nullptr);
+    handler.InsertSubscriber(orphan);
+    EXPECT_NO_FATAL_FAILURE(handler.Dump(1, args));
+}
+
 } // namespace MMI
 } // namespace OHOS

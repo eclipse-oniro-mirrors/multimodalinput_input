@@ -728,5 +728,119 @@ HWTEST_F(TriggerEventDispatcherTest,
     result = dispatcher_->ShouldConsume(keyOption, keyEvent);
     EXPECT_FALSE(result);
 }
+/**
+ * @tc.name: TriggerEventDispatcher_CheckDuration_WindowPassed_001
+ * @tc.desc: Test duration window: after the window elapses, ShouldDispatch returns true
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(TriggerEventDispatcherTest, TriggerEventDispatcher_CheckDuration_WindowPassed_001, TestSize.Level1)
+{
+    auto keyOption = std::make_shared<KeyOption>();
+    // Use KEYCODE_R to avoid collision with other tests.
+    keyOption->SetFinalKey(KeyEvent::KEYCODE_R);
+    keyOption->SetTriggerType(REPEAT_PRESSED); // isolate CheckDuration (no firstDownSent_ dedup)
+    keyOption->SetFinalKeyDownDuration(200);
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_R);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    // First call only starts the duration window.
+    EXPECT_FALSE(dispatcher_->ShouldDispatch(keyOption, keyEvent));
+    // Sleep long enough to pass the window in both ms/us interpretations of the duration.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    EXPECT_TRUE(dispatcher_->ShouldDispatch(keyOption, keyEvent));
+    std::string subscribeKey = std::to_string(KeyEvent::KEYCODE_R) + "," +
+        std::to_string(REPEAT_PRESSED) + "," + "200";
+    dispatcher_->ClearSubscribeState(subscribeKey);
+}
+
+/**
+ * @tc.name: TriggerEventDispatcher_ShouldConsume_PRESSED_FinalKeyUp_001
+ * @tc.desc: Test PRESSED mode consumes finalKey UP events as well
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(TriggerEventDispatcherTest, TriggerEventDispatcher_ShouldConsume_PRESSED_FinalKeyUp_001, TestSize.Level1)
+{
+    auto keyOption = std::make_shared<KeyOption>();
+    keyOption->SetFinalKey(KeyEvent::KEYCODE_S);
+    keyOption->SetTriggerType(PRESSED);
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_S);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    EXPECT_TRUE(dispatcher_->ShouldConsume(keyOption, keyEvent));
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_UP);
+    EXPECT_TRUE(dispatcher_->ShouldConsume(keyOption, keyEvent));
+}
+
+/**
+ * @tc.name: TriggerEventDispatcher_ShouldConsume_InvalidTriggerType_001
+ * @tc.desc: Test ShouldConsume with an invalid trigger type returns false
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(TriggerEventDispatcherTest, TriggerEventDispatcher_ShouldConsume_InvalidTriggerType_001, TestSize.Level1)
+{
+    auto keyOption = std::make_shared<KeyOption>();
+    keyOption->SetFinalKey(KeyEvent::KEYCODE_T);
+    keyOption->SetTriggerType(99); // invalid trigger type
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_T);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    EXPECT_FALSE(dispatcher_->ShouldConsume(keyOption, keyEvent));
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_UP);
+    EXPECT_FALSE(dispatcher_->ShouldConsume(keyOption, keyEvent));
+}
+
+/**
+ * @tc.name: TriggerEventDispatcher_ShouldDispatch_REPEAT_PRESSED_PreKeysMismatch_001
+ * @tc.desc: Test REPEAT_PRESSED mode with unmatched preKeys returns false
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(TriggerEventDispatcherTest,
+    TriggerEventDispatcher_ShouldDispatch_REPEAT_PRESSED_PreKeysMismatch_001, TestSize.Level1)
+{
+    auto keyOption = std::make_shared<KeyOption>();
+    keyOption->SetPreKeys({ KeyEvent::KEYCODE_CTRL_LEFT });
+    keyOption->SetFinalKey(KeyEvent::KEYCODE_Q);
+    keyOption->SetTriggerType(REPEAT_PRESSED);
+    keyOption->SetFinalKeyDownDuration(0);
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_Q);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    EXPECT_FALSE(dispatcher_->ShouldDispatch(keyOption, keyEvent));
+}
+
+/**
+ * @tc.name: TriggerEventDispatcher_ShouldDispatch_ALL_RELEASED_PreKeysMismatch_001
+ * @tc.desc: Test ALL_RELEASED activation requires the configured preKeys to be pressed
+ * @tc.type: FUNC
+ * @tc.require:
+ */
+HWTEST_F(TriggerEventDispatcherTest,
+    TriggerEventDispatcher_ShouldDispatch_ALL_RELEASED_PreKeysMismatch_001, TestSize.Level1)
+{
+    auto keyOption = std::make_shared<KeyOption>();
+    keyOption->SetPreKeys({ KeyEvent::KEYCODE_CTRL_LEFT });
+    keyOption->SetFinalKey(KeyEvent::KEYCODE_Y);
+    keyOption->SetTriggerType(ALL_RELEASED);
+    keyOption->SetFinalKeyDownDuration(0);
+    auto keyEvent = KeyEvent::Create();
+    ASSERT_NE(keyEvent, nullptr);
+    keyEvent->SetKeyCode(KeyEvent::KEYCODE_Y);
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_DOWN);
+    // Final key pressed without the preKey held: activation is rejected.
+    EXPECT_FALSE(dispatcher_->ShouldDispatch(keyOption, keyEvent));
+    // The combo must not have been activated, so the finalKey UP is not consumed either.
+    keyEvent->SetKeyAction(KeyEvent::KEY_ACTION_UP);
+    EXPECT_FALSE(dispatcher_->ShouldConsume(keyOption, keyEvent));
+    dispatcher_->ClearSubscribeState(keyOption);
+}
+
 } // namespace MMI
 } // namespace OHOS
