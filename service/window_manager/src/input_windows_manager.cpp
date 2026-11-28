@@ -5160,17 +5160,8 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
         ClearTargetWindowId(pointerId, pointerEvent->GetDeviceId());
     }
     auto touchWindow = SelectWindowInfo(logicalX, logicalY, pointerEvent);
-    PointerEvent::PointerItem axisPointerItem;
-    int32_t axisToolType = PointerEvent::TOOL_TYPE_MOUSE;
-    if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), axisPointerItem)) {
-        axisToolType = axisPointerItem.GetToolType();
-    }
     if (pointerEvent->GetPointerAction() == PointerEvent::POINTER_ACTION_AXIS_BEGIN) {
         if (dispatchEventFlag) {
-            if (axisToolType != PointerEvent::TOOL_TYPE_TOUCHPAD) {
-                MMI_HILOGD("Mouse wheel axis redispatch is not supported, toolType:%{public}d", axisToolType);
-                return RET_ERR;
-            }
             mouseRedispatchStore_.SetAxisBeginWindow(touchWindow);
             if (touchWindow) {
                 mouseRedispatchStore_.SetWindowActive(touchWindow->id);
@@ -5220,7 +5211,8 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
             } else {
                 CursorDrawingComponent::GetInstance().SetMouseDisplayState(true);
             }
-            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_ACCESSIBILITY)) {
+            if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_ACCESSIBILITY) &&
+                !pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH)) {
                 std::vector<int32_t> cursorPos = HandleHardwareCursor(physicalDisplayInfo, physicalX, physicalY);
                 CHKFR((cursorPos.size() >= CURSOR_POSITION_EXPECTED_SIZE), RET_ERR, "cursorPos is invalid");
                 const int32_t groupId = FindDisplayGroupId(physicalDisplayInfo->id);
@@ -5378,12 +5370,15 @@ int32_t InputWindowsManager::UpdateMouseTarget(std::shared_ptr<PointerEvent> poi
 #endif // #ifdef OHOS_BUILD_ENABLE_TOUCH_DRAWING
     }
 #ifdef OHOS_BUILD_ENABLE_MAGICCURSOR
-    MAGIC_POINTER_VELOCITY_TRACKER->MonitorCursorMovement(pointerEvent);
+    if (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH)) {
+        MAGIC_POINTER_VELOCITY_TRACKER->MonitorCursorMovement(pointerEvent);
+    }
 #endif // OHOS_BUILD_ENABLE_MAGICCURSOR
     int64_t beginTime = GetSysClockTime();
 #ifdef OHOS_BUILD_ENABLE_POINTER_DRAWING
     if (IsMouseDrawing(pointerEvent->GetPointerAction()) &&
-        (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_ACCESSIBILITY))) {
+        (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_ACCESSIBILITY)) &&
+        (!pointerEvent->HasFlag(InputEvent::EVENT_FLAG_REDISPATCH))) {
         if (pointerEvent->HasFlag(InputEvent::EVENT_FLAG_HIDE_POINTER) ||
             pointerItem.GetMoveFlag() == POINTER_MOVEFLAG) {
             CursorDrawingComponent::GetInstance().SetMouseDisplayState(false);

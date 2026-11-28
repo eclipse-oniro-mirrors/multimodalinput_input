@@ -169,21 +169,28 @@ HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_AbandonAxisSessi
 }
 
 /**
- * @tc.name: RedispatchMouseSessionTest_MouseWheelRejected_001
- * @tc.desc: Mouse wheel axis events (TOOL_TYPE_MOUSE) shall be rejected even when an axis session is
- *           active; only touchpad two-finger axis events support redispatch (BR-7, EX-8)
+ * @tc.name: RedispatchMouseSessionTest_MouseWheelAxisFollowsSession_001
+ * @tc.desc: Mouse wheel axis events (TOOL_TYPE_MOUSE) shall follow the same axis session admission
+ *           as touchpad axis events: rejected without an active session, delivered once the session
+ *           is active, and the session ends on AXIS_END
  * @tc.type: FUNC
  * @tc.require:
  */
-HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_MouseWheelRejected_001, TestSize.Level1)
+HWTEST_F(RedispatchMouseSessionTest, RedispatchMouseSessionTest_MouseWheelAxisFollowsSession_001, TestSize.Level1)
 {
-    auto mouseWheel = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN, {},
+    auto mouseWheelBegin = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_BEGIN, {},
         PointerEvent::TOOL_TYPE_MOUSE);
-    ASSERT_NE(mouseWheel, nullptr);
-    EXPECT_TRUE(store_->Abandon(mouseWheel));
+    auto mouseWheelEnd = CreateMouseEvent(PointerEvent::POINTER_ACTION_AXIS_END, {},
+        PointerEvent::TOOL_TYPE_MOUSE);
+    ASSERT_NE(mouseWheelBegin, nullptr);
+    ASSERT_NE(mouseWheelEnd, nullptr);
+
+    EXPECT_TRUE(store_->Abandon(mouseWheelBegin));
 
     store_->SetWindowActive(MouseSessionType::AXIS, TEST_WINDOW_ID);
-    EXPECT_TRUE(store_->Abandon(mouseWheel));
+    EXPECT_FALSE(store_->Abandon(mouseWheelBegin));
+    EXPECT_FALSE(store_->Abandon(mouseWheelEnd));
+    EXPECT_FALSE(store_->IsWindowActive(MouseSessionType::AXIS, TEST_WINDOW_ID));
 }
 
 /**

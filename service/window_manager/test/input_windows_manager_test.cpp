@@ -14671,9 +14671,6 @@ HWTEST_F(InputWindowsManagerTest, InputWindowsManagerTest_AbandonRedispatch_001,
     axisItem.SetPointerId(0);
     axisItem.SetToolType(PointerEvent::TOOL_TYPE_TOUCHPAD);
     pointerEvent->AddPointerItem(axisItem);
-    // MouseRedispatchStore::Abandon resolves the tool type through the event's pointer id;
-    // without it the lookup misses and the item's TOUCHPAD type is never seen.
-    pointerEvent->SetPointerId(0);
     auto result = inputWindowsManager->mouseRedispatchStore_.Abandon(pointerEvent);
     EXPECT_TRUE(result);
     inputWindowsManager->mouseRedispatchStore_.SetWindowActive(MouseSessionType::AXIS, targetWindowId);
