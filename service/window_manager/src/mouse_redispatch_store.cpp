@@ -146,18 +146,9 @@ bool MouseRedispatchStore::Abandon(const std::shared_ptr<PointerEvent>& pointerE
     int32_t action = pointerEvent->GetPointerAction();
     int32_t windowId = pointerEvent->GetTargetWindowId();
     bool pressed = !pointerEvent->GetPressedButtons().empty();
-    PointerEvent::PointerItem pointerItem;
-    int32_t toolType = PointerEvent::TOOL_TYPE_MOUSE;
-    if (pointerEvent->GetPointerItem(pointerEvent->GetPointerId(), pointerItem)) {
-        toolType = pointerItem.GetToolType();
-    }
     if (action == PointerEvent::POINTER_ACTION_AXIS_BEGIN ||
         action == PointerEvent::POINTER_ACTION_AXIS_UPDATE ||
         action == PointerEvent::POINTER_ACTION_AXIS_END) {
-        if (toolType != PointerEvent::TOOL_TYPE_TOUCHPAD) {
-            MMI_HILOGD("Abandon mouse redispatch, mouse wheel is not supported, toolType:%{public}d", toolType);
-            return true;
-        }
         if (!IsWindowActive(MouseSessionType::AXIS, windowId)) {
             MMI_HILOGD("Abandon mouse redispatch, axis window:%{public}d not active", windowId);
             return true;
